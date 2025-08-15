@@ -1,6 +1,6 @@
 # Development
 
-A lot of 
+Some guides on developing BAF.
 
 ## Storing Data for Antares and Pre-Processing
 To store adjustments to the format of the mentioned .zip-file, execute the following commands in powershell to zip data:
