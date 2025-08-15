@@ -1,0 +1,150 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pre-Processing &mdash; Balmorel-Antares Soft-Linking Framework 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="_static/css_options.css?v=313b1874" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="About this code" href="about.html" />
+    <link rel="prev" title="Development" href="getstarted/development.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Balmorel-Antares Soft-Linking Framework
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">BAF</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getstarted.html">Get Started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Pre-Processing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tasks">Tasks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#generate-mapping">Generate Mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#generate-antares-vre">Generate Antares VRE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#generate-balmorel-timeseries">Generate Balmorel Timeseries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#generate-balmorel-hydro">Generate Balmorel Hydro</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="about.html">About this code</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Balmorel-Antares Soft-Linking Framework</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Pre-Processing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/preprocessing.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="pre-processing">
+<h1>Pre-Processing<a class="headerlink" href="#pre-processing" title="Link to this heading"></a></h1>
+<p>This page will explain how to Pre-Processing to prepare the Balmorel and Antares models. The main part of the Antares model was prepared using the <a class="reference external" href="https://zenodo.org/records/7323821">OSMOSE WP1 model</a>, while the Balmorel model is based on the <a class="reference external" href="https://github.com/balmorelcommunity/Balmorel/tree/d89f89e99c9a4d14cc48ea2f5910da11c4cd5018">master branch from 7. January 2025</a>. The output of these steps result in the Balmorel data of the <a class="reference external" href="https://github.com/Mathias157/Balmorel_Data.git">BAF</a> branch, which can just be downloaded if you just wish to apply the framework.</p>
+<section id="tasks">
+<h2>Tasks<a class="headerlink" href="#tasks" title="Link to this heading"></a></h2>
+<p>The entire preprocessing workflow can be run using snakemake, by simply running <code class="docutils literal notranslate"><span class="pre">snakemake</span></code> in the src folder. This will run a bunch of pixi tasks, which could also be run individually with <code class="docutils literal notranslate"><span class="pre">pixi</span> <span class="pre">run</span> <span class="pre">&lt;task-name&gt;</span></code>. If you used a conda installation, replace the shell commands in the <code class="docutils literal notranslate"><span class="pre">src/Workflow/snakefile</span></code> with the commands defined in pixi.toml under the <code class="docutils literal notranslate"><span class="pre">[tasks]</span></code> category. More details on the individual tasks are written below.</p>
+<section id="generate-mapping">
+<h3>Generate Mapping<a class="headerlink" href="#generate-mapping" title="Link to this heading"></a></h3>
+<p>To generate spatial and technological mapping dictionaries between the models, run the <code class="docutils literal notranslate"><span class="pre">generate-mapping</span></code> task.
+The Python function <code class="docutils literal notranslate"><span class="pre">generate_mapping</span></code> is hard-coded with names of technologies, fuels and regions. The tasks below depends on the output of this task.</p>
+</section>
+<section id="generate-antares-vre">
+<h3>Generate Antares VRE<a class="headerlink" href="#generate-antares-vre" title="Link to this heading"></a></h3>
+<p>Generates the Antares solar, on- and offshore wind profiles with renewables in the cluster setting.</p>
+</section>
+<section id="generate-balmorel-timeseries">
+<h3>Generate Balmorel Timeseries<a class="headerlink" href="#generate-balmorel-timeseries" title="Link to this heading"></a></h3>
+<p>Generates the Balmorel timeseries for VRE (solar, on- and offshore wind) and exogenous electricity demand.</p>
+</section>
+<section id="generate-balmorel-hydro">
+<h3>Generate Balmorel Hydro<a class="headerlink" href="#generate-balmorel-hydro" title="Link to this heading"></a></h3>
+<p>Generates the Balmorel hydro data for reservoir, run-of-river and pumped storage.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="getstarted/development.html" class="btn btn-neutral float-left" title="Development" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="about.html" class="btn btn-neutral float-right" title="About this code" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Mathias Berg Rosendal.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
