@@ -129,6 +129,7 @@ if USE_MARKETVAL:
 if USE_FICTDEM:  
     # Fictive Electricity Demand
     f = IncFile(name='ANTBALM_FICTDE',
+                body="\n".join([f"DE('{year}',RRR,'FICTIVE_{year}') = 10*SUM(DEUSER, DE('{year}',RRR,DEUSER));" for year in Y]),
                 path=path)
     f.save()
     print('Cleared ANTBALM_FICTDE.inc')
@@ -145,12 +146,14 @@ if USE_FICTDEM:
 
     # Fictive Electricity Demand Profiles
     f = IncFile(name='ANTBALM_FICTDE_VAR_T',
+                body="\n".join([f"DE_VAR_T(RRR, 'FICTIVE_{year}', SSS, TTT) = DE_VAR_T(RRR, 'RESE', SSS, TTT);" for year in Y]),
                 path=path)
     f.save()
     print('Cleared ANTBALM_FICTDE_VAR_T.inc')
 
     # Fictive Hydrogen Demand
     f = IncFile(name='ANTBALM_FICTDH2',
+                body="\n".join([f"HYDROGEN_DH2('{year}',RRR) = 10*HYDROGEN_DH2('{year}',RRR);" for year in Y]),
                 path=path)
     f.save()
     print('Cleared ANTBALM_FICTDH2.inc')
