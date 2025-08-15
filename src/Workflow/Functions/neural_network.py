@@ -486,7 +486,7 @@ def convert_to_incfiles(new_scenarios_df: pd.DataFrame,
     ).save()
 
         
-def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int = 64, batch_size: int = 256, learning_rate: float = 5e-4, seed: int = 42, logger=None, scenario_folder: str = 'operun'):
+def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int = 64, batch_size: int = 256, learning_rate: float = 5e-4, seed: int = 42, n_features=72, logger=None, scenario_folder: str = 'operun'):
     """
     Pretrain the scenario generator.
     
@@ -506,6 +506,8 @@ def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int =
         Optimizer learning rate for the ScenarioGenerator.
     seed : int, default 42
         Random seed for reproducibility.
+    n_features : int, default 72
+        Amount of features in training data, 72 for all weather years for small-system, 33 for one weather year and no yearly data.
     logger : bool, default None
         Whether to log or print (None = False)
     scenario_folder : str, default operun
@@ -515,7 +517,7 @@ def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int =
     log = (logger.info if logger else print)
 
 
-    model = ScenarioGenerator(input_shape=(days*24, 72), latent_dim=latent_dim, lr=learning_rate, seed=seed, logger=logger)
+    model = ScenarioGenerator(input_shape=(days*24, n_features), latent_dim=latent_dim, lr=learning_rate, seed=seed, logger=logger)
     model.load_and_process_data('Pre-Processing/Output/genmodel_input.csv', k_days=days)
     
     log(f"Pretraining for {epochs} epochs, batch_size={batch_size}, lr={learning_rate}, seed={seed}")
