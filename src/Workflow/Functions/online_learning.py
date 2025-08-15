@@ -132,6 +132,10 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
     epoch = 0    
     model = pretrain(pretrain_epochs, days=days, n_scenarios=n_scenarios, latent_dim=latent_dim, batch_size=batch_size, learning_rate=learning_rate, seed=seed, logger=logger)
     
+
+    logs_dir = logfile.parent
+    ckpt_path = logs_dir / f"{scenario_name}_model_checkpoint.pth"
+
     os.chdir('Balmorel')
     os.system(f'mkdir simex_{scenario_name}')
 
@@ -168,7 +172,7 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
         model = train(model, f"{scenario_name}_dispatch", epoch, n_scenarios=n_scenarios, batch_size=batch_size, logger=logger, scenario_folder=scenario_folder)
         
         # save the model
-        model.save_model(f"Logs/{scenario_name}_model_checkpoint.pth")
+        model.save_model(str(ckpt_path))
         logger.info(f"Epoch {epoch} completed and model saved.")
         
         epoch += 1
