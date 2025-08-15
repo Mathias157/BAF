@@ -1,10 +1,10 @@
-* Reading transmission capacities
-$if     EXIST '../data/ANTBALM_XMIN.inc' $INCLUDE         '../data/ANTBALM_XMIN.inc';
-$if not EXIST '../data/ANTBALM_XMIN.inc' $INCLUDE '../../base/data/ANTBALM_XMIN.inc';
+* * Reading transmission capacities
+* $if     EXIST '../data/ANTBALM_XMIN.inc' $INCLUDE         '../data/ANTBALM_XMIN.inc';
+* $if not EXIST '../data/ANTBALM_XMIN.inc' $INCLUDE '../../base/data/ANTBALM_XMIN.inc';
 
-* Reading generation capacites
-$if     EXIST '../data/ANTBALM_GMIN.inc' $INCLUDE         '../data/ANTBALM_GMIN.inc';
-$if not EXIST '../data/ANTBALM_GMIN.inc' $INCLUDE '../../base/data/ANTBALM_GMIN.inc';
+* * Reading generation capacites
+* $if     EXIST '../data/ANTBALM_GMIN.inc' $INCLUDE         '../data/ANTBALM_GMIN.inc';
+* $if not EXIST '../data/ANTBALM_GMIN.inc' $INCLUDE '../../base/data/ANTBALM_GMIN.inc';
 
 
 $ifi not %CAPCRED%==yes $goto NoCapCred

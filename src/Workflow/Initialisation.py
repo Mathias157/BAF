@@ -44,6 +44,7 @@ with open('Workflow/MetaResults/%s_meta.ini'%SC, 'w') as f:
 SC_folder = Config.get('RunMetaData', 'SC_Folder')
 ResetReserveMargin = Config.get('PostProcessing', 'ResetReserveMargin').lower() == 'true'
 
+USE_FICTDEM   = Config.getboolean('PostProcessing', 'Fictivedem')
 USE_CAPCRED   = Config.getboolean('PostProcessing', 'Capacitycredit')
 USE_H2CAPCRED   = Config.getboolean('PostProcessing', 'H2Capacitycredit')
 USE_MARKETVAL  = Config.getboolean('PostProcessing', 'Marketvalue')
@@ -100,9 +101,10 @@ fAntTechno = pd.DataFrame({}, columns=['Iter', 'Year', 'Region', 'Tech']).pivot_
 with open('./Workflow/OverallResults/%s_AT.pkl'%SC, 'wb') as f:
     pickle.dump(fAntTechno, f)
 
-# Market value
-fMV = pd.DataFrame({}, columns=['Iter', 'Year', 'Region', 'Tech', 'Value (eur/MWh)'])
-fMV.to_csv('./Workflow/OverallResults/%s_MV.csv'%SC, index=False)
+if USE_MARKETVAL:
+    # Market value
+    fMV = pd.DataFrame({}, columns=['Iter', 'Year', 'Region', 'Tech', 'Value (eur/MWh)'])
+    fMV.to_csv('./Workflow/OverallResults/%s_MV.csv'%SC, index=False)
 
 # Reserve Margin
 if USE_CAPCRED:
@@ -115,134 +117,138 @@ print('\nResetting ANTBALM addon data...')
 
 path = 'Balmorel/%s/data/'%SC_folder
 
-# Market Value
-f = IncFile(name='ANTBALM_MARKETVAL',
-            prefix="PARAMETER ANTBALM_MARKETVAL(YYY, RRR, GGG)\n;\n",
-            body="ANTBALM_MARKETVAL(YYY, RRR, GGG) = 0;",
-            path=path)
-f.save()
-print('Cleared ANTBALM_MARKETVAL.inc')
-  
-# Fictive Electricity Demand
-f = IncFile(name='ANTBALM_FICTDE',
-            path=path)
-f.save()
-print('Cleared ANTBALM_FICTDE.inc')
-
-# Fictive Electricity Demand 'Users' (actually just to have different profiles pr. year)
-f = IncFile(prefix='SET DEUSER  "Electricity demand user groups. Set must include element RESE for holding demand not included in any other user group"\n/\n',
-            name='ANTBALM_FICTDEUSER',
-            path=path)
-for year in Y:
-    f.body += 'FICTIVE_%s\n'%year     
-f.suffix = '/;'
-f.save()
-print('Cleared ANTBALM_FICTDEUSER.inc')
-
-# Fictive Electricity Demand Profiles
-f = IncFile(name='ANTBALM_FICTDE_VAR_T',
-            path=path)
-f.save()
-print('Cleared ANTBALM_FICTDE_VAR_T.inc')
-
-# Fictive Hydrogen Demand
-f = IncFile(name='ANTBALM_FICTDH2',
-            path=path)
-f.save()
-print('Cleared ANTBALM_FICTDH2.inc')
-
-# Generator Capacity Credits - set to high in first iteration so it does not have an impact
-capcred_first_iter = 100
-f = IncFile(name='ANTBALM_GCAPCRED',
-            prefix="PARAMETER ANTBALM_GCAPCRED(YYY, RRR, GGG)\n;\n",
-            body="ANTBALM_GCAPCRED(YYY, RRR, GGG) = %d;"%capcred_first_iter,
-            path=path)
-f.save()
-print('Cleared ANTBALM_GCAPCRED.inc')
-
-# Electricity Transmission Capacity Credit
-f = IncFile(name='ANTBALM_XCAPCRED',
-            prefix="PARAMETER ANTBALM_XCAPCRED(YYY, IRRRE, IRRRI)\n;\n",
-            body='\n'.join(["ANTBALM_XCAPCRED(YYY, IRRRE, IRRRI) = %d;"%capcred_first_iter,
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-W') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-E') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-S') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-S', 'DE4-W') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-N', 'DE4-E') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-N') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-S', 'DE4-E') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-S') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-N') = 0;", 
-                          "ANTBALM_XCAPCRED(YYY, 'DE4-N', 'DE4-W') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'NO1', 'NO2') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'NO2', 'NO1') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'NO1', 'NO5') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'NO5', 'NO1') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'NO5', 'NO2') = 0;",
-                          "ANTBALM_XCAPCRED(YYY, 'NO2', 'NO5') = 0;",]),
-            path=path)
-f.save()
-print('Cleared ANTBALM_XCAPCRED.inc')
-
-# Hydrogen Transmission Capacity Credit
-f = IncFile(name='ANTBALM_XH2CAPCRED',
-            prefix="PARAMETER ANTBALM_XH2CAPCRED(YYY, IRRRE, IRRRI)\n;\n",
-            body='\n'.join(["ANTBALM_XH2CAPCRED(YYY, IRRRE, IRRRI) = %d;"%capcred_first_iter,
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-W') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-E') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-S') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-S', 'DE4-W') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-N', 'DE4-E') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-N') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-S', 'DE4-E') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-S') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-N') = 0;", 
-                          "ANTBALM_XH2CAPCRED(YYY, 'DE4-N', 'DE4-W') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'NO1', 'NO2') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'NO2', 'NO1') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'NO1', 'NO5') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'NO5', 'NO1') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'NO5', 'NO2') = 0;",
-                          "ANTBALM_XH2CAPCRED(YYY, 'NO2', 'NO5') = 0;",]),
-            path=path)
-f.save()
-print('Cleared ANTBALM_XH2CAPCRED.inc')
-
-if ResetReserveMargin:
-
-    # Get reser
-    elreserve_margin_start = Config.getfloat('PostProcessing', 'elresmar0')
-    h2reserve_margin_start = Config.getfloat('PostProcessing', 'h2resmar0')
-
-    # Electricity Reserve Margin
-    f = IncFile(name='ANTBALM_RESMAR',
-                prefix="""* The reserve margin is the amount of extra capacity relative to maximum estimated demand
-* 1.28 is assumed in the publication below
-* Alimou, Yacine, Nadia Maïzi, Jean-Yves Bourmaud, and Marion Li. “Assessing the Security of Electricity Supply through Multi-Scale Modeling: The TIMES-ANTARES Linking Approach.” Applied Energy, 2020. https://doi.org/10.1016/j.apenergy.2020.115717.\n
-* ...which corresponds to an assertion that 28% higher capacity compared to maximum demand is necessary for a secure system\n
-PARAMETER ANTBALM_RESMAR(YYY, RRR) 'Assumed electricity reserve margin'
-;\n""",
-    path=path)
-    f.body = "ANTBALM_RESMAR(YYY, RRR) = %0.4f;"%elreserve_margin_start
-    f.save()
-    print('Cleared ANTBALM_RESMAR.inc')
-    
-    # Hydrogen Reserve Margin
-    f = IncFile(name='ANTBALM_H2RESMAR',
-                prefix="""PARAMETER ANTBALM_H2RESMAR(YYY, RRR) 'Assumed hydrogen reserve margin';\n""",
-                path=path)
-    f.body = "ANTBALM_H2RESMAR(YYY, RRR) = %0.4f;"%h2reserve_margin_start
-    f.save()
-    print('Cleared ANTBALM_H2RESMAR.inc')
-
-# Minimum Electricity Transmission constraint
-f = IncFile(name='ANTBALM_XMIN', 
-            prefix="* Max transmission investments of 10 GW / decade (assuming model years in Y are separated by 10 years)\nVXKN.UP(Y,IRRRE,IRRRI) = 10000;\nVXH2KN.UP(Y,IRRRE,IRRRI) = 10000;",
-            path=path)
 if USE_MARKETVAL:
-    f.suffix = "\n*Upper limit on tech investments for market value feasibility\nVGKN.UP(Y,IA,G) = 100000000;"
-f.save()
-print('Cleared ANTBALM_XMIN.inc')
+    # Market Value
+    f = IncFile(name='ANTBALM_MARKETVAL',
+                prefix="PARAMETER ANTBALM_MARKETVAL(YYY, RRR, GGG)\n;\n",
+                body="ANTBALM_MARKETVAL(YYY, RRR, GGG) = 0;",
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_MARKETVAL.inc')
+
+if USE_FICTDEM:  
+    # Fictive Electricity Demand
+    f = IncFile(name='ANTBALM_FICTDE',
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_FICTDE.inc')
+
+    # Fictive Electricity Demand 'Users' (actually just to have different profiles pr. year)
+    f = IncFile(prefix='SET DEUSER  "Electricity demand user groups. Set must include element RESE for holding demand not included in any other user group"\n/\n',
+                name='ANTBALM_FICTDEUSER',
+                path=path)
+    for year in Y:
+        f.body += 'FICTIVE_%s\n'%year     
+    f.suffix = '/;'
+    f.save()
+    print('Cleared ANTBALM_FICTDEUSER.inc')
+
+    # Fictive Electricity Demand Profiles
+    f = IncFile(name='ANTBALM_FICTDE_VAR_T',
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_FICTDE_VAR_T.inc')
+
+    # Fictive Hydrogen Demand
+    f = IncFile(name='ANTBALM_FICTDH2',
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_FICTDH2.inc')
+
+if USE_CAPCRED:
+    # Generator Capacity Credits - set to high in first iteration so it does not have an impact
+    capcred_first_iter = 100
+    f = IncFile(name='ANTBALM_GCAPCRED',
+                prefix="PARAMETER ANTBALM_GCAPCRED(YYY, RRR, GGG)\n;\n",
+                body="ANTBALM_GCAPCRED(YYY, RRR, GGG) = %d;"%capcred_first_iter,
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_GCAPCRED.inc')
+
+    # Electricity Transmission Capacity Credit
+    f = IncFile(name='ANTBALM_XCAPCRED',
+                prefix="PARAMETER ANTBALM_XCAPCRED(YYY, IRRRE, IRRRI)\n;\n",
+                body='\n'.join(["ANTBALM_XCAPCRED(YYY, IRRRE, IRRRI) = %d;"%capcred_first_iter,
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-W') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-E') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-S') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-S', 'DE4-W') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-N', 'DE4-E') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-N') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-S', 'DE4-E') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-S') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-N') = 0;", 
+                            "ANTBALM_XCAPCRED(YYY, 'DE4-N', 'DE4-W') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'NO1', 'NO2') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'NO2', 'NO1') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'NO1', 'NO5') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'NO5', 'NO1') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'NO5', 'NO2') = 0;",
+                            "ANTBALM_XCAPCRED(YYY, 'NO2', 'NO5') = 0;",]),
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_XCAPCRED.inc')
+
+    if USE_H2CAPCRED:
+        # Hydrogen Transmission Capacity Credit
+        f = IncFile(name='ANTBALM_XH2CAPCRED',
+                    prefix="PARAMETER ANTBALM_XH2CAPCRED(YYY, IRRRE, IRRRI)\n;\n",
+                    body='\n'.join(["ANTBALM_XH2CAPCRED(YYY, IRRRE, IRRRI) = %d;"%capcred_first_iter,
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-W') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-E') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-S') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-S', 'DE4-W') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-N', 'DE4-E') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-N') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-S', 'DE4-E') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-S') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-N') = 0;", 
+                                "ANTBALM_XH2CAPCRED(YYY, 'DE4-N', 'DE4-W') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'NO1', 'NO2') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'NO2', 'NO1') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'NO1', 'NO5') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'NO5', 'NO1') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'NO5', 'NO2') = 0;",
+                                "ANTBALM_XH2CAPCRED(YYY, 'NO2', 'NO5') = 0;",]),
+                    path=path)
+        f.save()
+        print('Cleared ANTBALM_XH2CAPCRED.inc')
+
+    if ResetReserveMargin:
+
+        # Get reser
+        elreserve_margin_start = Config.getfloat('PostProcessing', 'elresmar0')
+        h2reserve_margin_start = Config.getfloat('PostProcessing', 'h2resmar0')
+
+        # Electricity Reserve Margin
+        f = IncFile(name='ANTBALM_RESMAR',
+                    prefix="""* The reserve margin is the amount of extra capacity relative to maximum estimated demand
+    * 1.28 is assumed in the publication below
+    * Alimou, Yacine, Nadia Maïzi, Jean-Yves Bourmaud, and Marion Li. “Assessing the Security of Electricity Supply through Multi-Scale Modeling: The TIMES-ANTARES Linking Approach.” Applied Energy, 2020. https://doi.org/10.1016/j.apenergy.2020.115717.\n
+    * ...which corresponds to an assertion that 28% higher capacity compared to maximum demand is necessary for a secure system\n
+    PARAMETER ANTBALM_RESMAR(YYY, RRR) 'Assumed electricity reserve margin'
+    ;\n""",
+        path=path)
+        f.body = "ANTBALM_RESMAR(YYY, RRR) = %0.4f;"%elreserve_margin_start
+        f.save()
+        print('Cleared ANTBALM_RESMAR.inc')
+        
+        # Hydrogen Reserve Margin
+        f = IncFile(name='ANTBALM_H2RESMAR',
+                    prefix="""PARAMETER ANTBALM_H2RESMAR(YYY, RRR) 'Assumed hydrogen reserve margin';\n""",
+                    path=path)
+        f.body = "ANTBALM_H2RESMAR(YYY, RRR) = %0.4f;"%h2reserve_margin_start
+        f.save()
+        print('Cleared ANTBALM_H2RESMAR.inc')
+
+# # Minimum Electricity Transmission constraint
+# f = IncFile(name='ANTBALM_XMIN', 
+#             prefix="* Max transmission investments of 10 GW / decade (assuming model years in Y are separated by 10 years)\nVXKN.UP(Y,IRRRE,IRRRI) = 10000;\nVXH2KN.UP(Y,IRRRE,IRRRI) = 10000;",
+#             path=path)
+# if USE_MARKETVAL:
+#     f.suffix = "\n*Upper limit on tech investments for market value feasibility\nVGKN.UP(Y,IA,G) = 100000000;"
+# f.save()
+# print('Cleared ANTBALM_XMIN.inc')
 
 
 ### 1.3 Setting Temporal Resolution
