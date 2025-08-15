@@ -820,6 +820,37 @@ $setglobal ADDGROUP_DEMAND_SHIFT
 *--------------------------------------------
 
 
+*--------------------ANTARES SOFT-LINK--------------------------------------------------------------
+$setglobal ANTBALM yes
+*!option yes
+
+$setglobal FICTDEM yes
+
+* NOTE: The following options are chosen by the BAF framework 
+* Only change these if working with Balmorel stand-alone!
+
+* Using mapping of VRE areas from Antares to Balmorel?
+* If not 'yes': New areas area created and Antares timeseries are used
+$setglobal USEANTARESDATA
+*!option yes
+
+* Adjust hydro to antares data?
+$setglobal ADJUSTHYDRO
+*!option yes
+
+* The following aggregation options should be harmonised with the input antares data
+* Aggregate option 1? (NOS = NO1 + NO2 + NO5 and DE = DE4-N + DE4-E + DE4-S + DE4-W)
+$setglobal AGGR1
+*!option yes
+
+
+* Disaggregation option 2? (FR = FR00, FR15, GR = GR00, GR03, IT = ITCA, ITCN, ITN1, ITSI, ITS1, ITSA, ITCS, UK = UK00, UKNI)
+$setglobal AGGR2
+*!option yes
+
+
+*--------------------END OF ANTARES SOFT-LINK-----------------------------------------------------------
+
 
 
 *===============================================================================
