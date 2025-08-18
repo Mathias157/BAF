@@ -438,7 +438,7 @@ def convert_to_incfiles(new_scenarios_df: pd.DataFrame,
             suffix = '\n;'
         
         df = new_scenarios_df.loc[:, idx]
-        df.columns = df.columns.str.replace(parameter_name+'|', '').str.replace('|', ' . ')
+        df.columns = df.columns.str.replace(parameter_name+'|', '', n=1).str.replace('|', ' . ')
 
         if 'SSS' in sets and 'TTT' in sets:
             df.index = balmorel_season_time_index   
@@ -460,14 +460,23 @@ def convert_to_incfiles(new_scenarios_df: pd.DataFrame,
                 prefix = prefix.replace('TABLE', 'PARAMETER')
                 prefix += "/\n"
                 suffix = "\n/;"
-                
-        IncFile(
-            name=parameter_name,
-            prefix=prefix,
-            body=df.to_string(),
-            suffix=suffix,
-            path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
-        ).save()
+        
+        if parameter_name != 'HYDROGEN_DH2':
+            IncFile(
+                name=parameter_name,
+                prefix=prefix,
+                body=df.to_string(),
+                suffix=suffix,
+                path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
+            ).save()
+        else:
+            IncFile(
+                name='HYDROGEN_DH2',
+                prefix='',
+                suffix='',
+                body="\n".join([f"HYDROGEN_DH2('{year}', '{region}') = HYDROGEN_DH2('{year}', '{region}') + {df.loc[f'{year} . {region}']};" for year, region in df.index.str.split(' . ', expand=True)]),
+                path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
+            ).save()
         
     # Define temporal resolution
     IncFile(

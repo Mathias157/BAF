@@ -151,6 +151,8 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
             else:
                 os.system(f'cp -f {scenario_folder}/S.inc {scenario_folder}/data')
                 os.system(f'cp -f {scenario_folder}/T_{runtype}.inc {scenario_folder}/data/T.inc')
+                os.system(f'touch {scenario_folder}/data/ANTBALM_FICTDH2.inc')
+                os.system(f'touch {scenario_folder}/data/ANTBALM_FICTDE.inc')
                 os.system(f'mv {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt')
 
             # Copy from the simex folder
@@ -177,9 +179,9 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
         model.save_model(str(ckpt_path))
         logger.info(f"Epoch {epoch} completed and model saved.")
         
-        epoch += 1
-
         os.chdir('Balmorel')
+        
+        epoch += 1
 
 #%% ------------------------------- ###
 ###            2. Utils             ###
