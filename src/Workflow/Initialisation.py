@@ -127,9 +127,14 @@ if USE_MARKETVAL:
     print('Cleared ANTBALM_MARKETVAL.inc')
 
 if USE_FICTDEM:  
+    
+    FictElFactorFunc = Config.getfloat('PostProcessing', 'FictElFactorFunc')
+    FictHFactorFunc = Config.getfloat('PostProcessing', 'FictHFactorFunc')
+    FictH2FactorFunc = Config.getfloat('PostProcessing', 'FictH2FactorFunc')
+    
     # Fictive Electricity Demand
     f = IncFile(name='ANTBALM_FICTDE',
-                body="\n".join([f"DE('{year}',RRR,'FICTIVE_{year}') = 1*SUM(DEUSER, DE('{year}',RRR,DEUSER));" for year in Y]),
+                body="\n".join([f"DE('{year}',RRR,'FICTIVE_{year}') = {FictElFactorFunc}*SUM(DEUSER, DE('{year}',RRR,DEUSER));" for year in Y]),
                 path=path)
     f.save()
     print('Cleared ANTBALM_FICTDE.inc')
@@ -150,10 +155,34 @@ if USE_FICTDEM:
                 path=path)
     f.save()
     print('Cleared ANTBALM_FICTDE_VAR_T.inc')
+    
+    # Fictive Heating Demand
+    f = IncFile(name='ANTBALM_FICTDH',
+                body="\n".join([f"DH('{year}',AAA,'FICTIVE_{year}') = {FictHFactorFunc}*SUM(DHUSER, DH('{year}',AAA,DHUSER));" for year in Y]),
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_FICTDH.inc')
+
+    # Fictive Electricity Demand 'Users' (actually just to have different profiles pr. year)
+    f = IncFile(prefix='SET DHUSER  "Heat demand user groups. Set must include element RESH for holding demand not included in any other user group"\n/\n',
+                name='ANTBALM_FICTDHUSER',
+                path=path)
+    for year in Y:
+        f.body += 'FICTIVE_%s\n'%year     
+    f.suffix = '/;'
+    f.save()
+    print('Cleared ANTBALM_FICTDHUSER.inc')
+
+    # Fictive Electricity Demand Profiles
+    f = IncFile(name='ANTBALM_FICTDH_VAR_T',
+                body="\n".join([f"DH_VAR_T(AAA, 'FICTIVE_{year}', SSS, TTT) = DH_VAR_T(AAA, 'RESH', SSS, TTT);" for year in Y]),
+                path=path)
+    f.save()
+    print('Cleared ANTBALM_FICTDH_VAR_T.inc')
 
     # Fictive Hydrogen Demand
     f = IncFile(name='ANTBALM_FICTDH2',
-                body="\n".join([f"HYDROGEN_DH2('{year}',RRR) = 1*HYDROGEN_DH2('{year}',RRR);" for year in Y]),
+                body="\n".join([f"HYDROGEN_DH2('{year}',RRR) = {FictH2FactorFunc}*HYDROGEN_DH2('{year}',RRR);" for year in Y]),
                 path=path)
     f.save()
     print('Cleared ANTBALM_FICTDH2.inc')
