@@ -130,7 +130,7 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
     logger.info("Starting pretraining...")
     
     epoch = 0    
-    model = pretrain(pretrain_epochs, days=days, n_scenarios=n_scenarios, latent_dim=latent_dim, batch_size=batch_size, learning_rate=learning_rate, seed=seed, logger=logger)
+    model = pretrain(pretrain_epochs, days=days, n_scenarios=n_scenarios, latent_dim=latent_dim, batch_size=batch_size, learning_rate=learning_rate, seed=seed, logger=logger, n_features=39)
     
 
     logs_dir = logfile.parent
@@ -146,6 +146,8 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
             
             if runtype == 'capacity':
                 os.system(f'cp -f {scenario_folder}/capexp_data/*.inc {scenario_folder}/data')
+                os.system(f'mv {scenario_folder}/data/HYDROGEN_DH2.inc {scenario_folder}/data/ANTBALM_FICTDH2.inc')
+                os.system(f'mv {scenario_folder}/data/DE.inc {scenario_folder}/data/ANTBALM_FICTDE.inc')
             else:
                 os.system(f'cp -f {scenario_folder}/S.inc {scenario_folder}/data')
                 os.system(f'cp -f {scenario_folder}/T_{runtype}.inc {scenario_folder}/data/T.inc')

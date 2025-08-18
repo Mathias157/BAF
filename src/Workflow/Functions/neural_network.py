@@ -128,7 +128,7 @@ class ScenarioGenerator(nn.Module):
         df = group.filter(lambda x: len(x) == 24 * k_days)
 
         feature_cols = df.columns.difference(['WY', 'SSS', 'TTT', 'year', 'week', 'hour', 'day_in_week', 'block_in_week'])
-        feature_cols = feature_cols[df[feature_cols].nunique() > 1]
+
         if len(feature_cols) == 0:
             raise ValueError("No valid feature columns found. Ensure there are non-constant features.")
 
