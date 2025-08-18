@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import click
 import os
 from neural_network import pretrain, train
-
+import subprocess as sp
 import logging
 import shlex
 from datetime import datetime
@@ -57,8 +57,8 @@ def _run(cmd: str, logger: logging.Logger, logfile: Path) -> int:
     """Run a shell command, append stdout/stderr to logfile, and log the command."""
     logger.info(f"$ {cmd}")
     qlog = shlex.quote(str(logfile))
-    rc = os.system(f"{cmd} >> {qlog} 2>&1")
-    if rc != 0:
+    rc = sp.run(f"{cmd} >> {qlog} 2>&1", shell=True)
+    if rc.returncode != 0:
         logger.warning(f"Command returned non-zero exit code {rc}: {cmd}")
     return rc
 
@@ -130,50 +130,50 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
     logger.info("Starting pretraining...")
     
     epoch = 0    
-    model = pretrain(pretrain_epochs, days=days, n_scenarios=n_scenarios, latent_dim=latent_dim, batch_size=batch_size, learning_rate=learning_rate, seed=seed, logger=logger, n_features=41)
+    model = pretrain(pretrain_epochs, days=days, n_scenarios=n_scenarios, latent_dim=latent_dim, batch_size=batch_size, learning_rate=learning_rate, seed=seed, logger=logger, n_features=88)
     
 
     logs_dir = logfile.parent
     ckpt_path = logs_dir / f"{scenario_name}_model_checkpoint.pth"
 
     os.chdir('Balmorel')
-    os.system(f'mkdir simex_{scenario_name}')
+    sp.run(f'mkdir simex_{scenario_name}', shell=True)
 
     while epoch < update_epochs:
         for runtype in ['capacity', 'dispatch']:
             
-            os.system(f'rm {scenario_folder}/data/*.inc')
+            sp.run(f'rm {scenario_folder}/data/*.inc', shell=True)
             
             if runtype == 'capacity':
-                os.system(f'cp -f {scenario_folder}/capexp_data/*.inc {scenario_folder}/data')
-                os.system(f'mv {scenario_folder}/data/DE.inc {scenario_folder}/data/ANTBALM_FICTDE.inc')
-                os.system(f'mv {scenario_folder}/data/DH.inc {scenario_folder}/data/ANTBALM_FICTDH.inc')
-                os.system(f'mv {scenario_folder}/data/HYDROGEN_DH2.inc {scenario_folder}/data/ANTBALM_FICTDH2.inc')
+                sp.run(f'cp -f {scenario_folder}/capexp_data/*.inc {scenario_folder}/data', shell=True)
+                sp.run(f'mv {scenario_folder}/data/DE.inc {scenario_folder}/data/ANTBALM_FICTDE.inc', shell=True)
+                sp.run(f'mv {scenario_folder}/data/DH.inc {scenario_folder}/data/ANTBALM_FICTDH.inc', shell=True)
+                sp.run(f'mv {scenario_folder}/data/HYDROGEN_DH2.inc {scenario_folder}/data/ANTBALM_FICTDH2.inc', shell=True)
             else:
-                os.system(f'cp -f {scenario_folder}/S.inc {scenario_folder}/data')
-                os.system(f'cp -f {scenario_folder}/T_{runtype}.inc {scenario_folder}/data/T.inc')
-                os.system(f'touch {scenario_folder}/data/ANTBALM_FICTDE.inc')
-                os.system(f'touch {scenario_folder}/data/ANTBALM_FICTDH.inc')
-                os.system(f'touch {scenario_folder}/data/ANTBALM_FICTDH2.inc')
-                os.system(f'mv {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt')
+                sp.run(f'cp -f {scenario_folder}/S.inc {scenario_folder}/data', shell=True)
+                sp.run(f'cp -f {scenario_folder}/T_{runtype}.inc {scenario_folder}/data/T.inc', shell=True)
+                sp.run(f'touch {scenario_folder}/data/ANTBALM_FICTDE.inc', shell=True)
+                sp.run(f'touch {scenario_folder}/data/ANTBALM_FICTDH.inc', shell=True)
+                sp.run(f'touch {scenario_folder}/data/ANTBALM_FICTDH2.inc', shell=True)
+                sp.run(f'mv {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt', shell=True)
 
             # Copy from the simex folder
             if epoch > 0 and runtype == 'dispatch':
-                os.system(f'cp -rf simex_{scenario_name}/* simex')
+                sp.run(f'cp -rf simex_{scenario_name}/* simex', shell=True)
             
             os.chdir(f'{scenario_folder}/model')
-            os.system(f'gams Balmorel --scenario_name "{scenario_name}_{runtype}_E{epoch}"')
+            sp.run(f'gams Balmorel --scenario_name "{scenario_name}_{runtype}_E{epoch}"', shell=True)
 
             os.chdir('../../')
 
             # Copy the simex folder          
-            os.system(f'cp -rf simex/* simex_{scenario_name}')
+            sp.run(f'cp -rf simex/* simex_{scenario_name}', shell=True)
 
             if runtype != "capacity":
                 # Rename balopt back
-                os.system(f'mv "{scenario_folder}/model/balopt.opt" "{scenario_folder}/model/balopt_{runtype}.opt"')
+                sp.run(f'mv "{scenario_folder}/model/balopt.opt" "{scenario_folder}/model/balopt_{runtype}.opt"', shell=True)
         
-        os.system(f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_dispatch" {epoch}')
+        sp.run(f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_dispatch" {epoch}', shell=True)
         os.chdir('../')
         model = train(model, f"{scenario_name}_dispatch", epoch, n_scenarios=n_scenarios, batch_size=batch_size, logger=logger, scenario_folder=scenario_folder)
         
