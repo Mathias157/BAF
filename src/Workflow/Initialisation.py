@@ -175,7 +175,7 @@ if USE_FICTDEM:
 
     # Fictive Electricity Demand Profiles
     f = IncFile(name='ANTBALM_FICTDH_VAR_T',
-                body="\n".join([f"DH_VAR_T(AAA, 'FICTIVE_{year}', SSS, TTT) = DH_VAR_T(AAA, 'RESH', SSS, TTT);" for year in Y]),
+                body="\n".join([f"DH_VAR_T(AAA, 'FICTIVE_{year}', SSS, TTT) = SUM(DHUSER, DH_VAR_T(AAA, DHUSER, SSS, TTT));" for year in Y]),
                 path=path)
     f.save()
     print('Cleared ANTBALM_FICTDH_VAR_T.inc')
