@@ -462,21 +462,28 @@ def convert_to_incfiles(new_scenarios_df: pd.DataFrame,
                 suffix = "\n/;"
         
         if parameter_name != 'HYDROGEN_DH2':
-            IncFile(
+            file = IncFile(
                 name=parameter_name,
                 prefix=prefix,
                 body=df.to_string(),
                 suffix=suffix,
                 path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
-            ).save()
+            )
         else:
-            IncFile(
+            file = IncFile(
                 name='HYDROGEN_DH2',
                 prefix='',
                 suffix='',
                 body="\n".join([f"HYDROGEN_DH2('{year}', '{region}') = HYDROGEN_DH2('{year}', '{region}') + {df.loc[f'{year} . {region}']};" for year, region in df.index.str.split(' . ', expand=True)]),
                 path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
-            ).save()
+            )
+            
+        if parameter_name == 'DE_VAR_T':
+            file.suffix += "\n* Flat profiles for industry and datacenter"
+            file.suffix += "\nDE_VAR_T(RRR,'PII',SSS,TTT)=1;"
+            file.suffix += "\nDE_VAR_T(RRR,'DATACENTER',SSS,TTT)=1;"
+            
+        file.save()
         
     # Define temporal resolution
     IncFile(
