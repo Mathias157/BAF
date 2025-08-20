@@ -130,7 +130,7 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
     logger.info("Starting pretraining...")
     
     epoch = 0    
-    model = pretrain(pretrain_epochs, days=days, n_scenarios=n_scenarios, latent_dim=latent_dim, batch_size=batch_size, learning_rate=learning_rate, seed=seed, logger=logger, n_features=88)
+    model = pretrain(pretrain_epochs, days=days, n_scenarios=n_scenarios, latent_dim=latent_dim, batch_size=batch_size, learning_rate=learning_rate, seed=seed, logger=logger, n_features=80)
     
 
     logs_dir = logfile.parent
@@ -138,6 +138,7 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
 
     os.chdir('Balmorel')
     sp.run(f'mkdir simex_{scenario_name}', shell=True)
+    sp.run(f'mv {scenario_folder}/model/balopt.opt {scenario_folder}/model/balopt_dispatch.opt', shell=True) # make sure first run is a capacity expansion
 
     while epoch < update_epochs:
         for runtype in ['capacity', 'dispatch']:
@@ -164,6 +165,13 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
             os.chdir(f'{scenario_folder}/model')
             sp.run(f'gams Balmorel --scenario_name "{scenario_name}_{runtype}_E{epoch}"', shell=True)
 
+            # Check feasibility
+            out = sp.run('cat Balmorel.lst | grep "LP status"', shell=True, capture_output=True).stdout
+            if not 'optimal' in str(out):
+                logger.warning(f"{scenario_name}_{runtype}_E{epoch} infeasible!")
+            else:
+                logger.info(f"{scenario_name}_{runtype}_E{epoch} feasible.")
+
             os.chdir('../../')
 
             # Copy the simex folder          
@@ -175,7 +183,7 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
         
         sp.run(f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_dispatch" {epoch}', shell=True)
         os.chdir('../')
-        model = train(model, f"{scenario_name}_dispatch", epoch, n_scenarios=n_scenarios, batch_size=batch_size, logger=logger, scenario_folder=scenario_folder)
+        model = train(model, scenario_name, epoch, n_scenarios=n_scenarios, batch_size=batch_size, logger=logger, scenario_folder=scenario_folder)
         
         # save the model
         model.save_model(str(ckpt_path))

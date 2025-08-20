@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from pybalmorel import IncFile, Balmorel
+from pybalmorel import IncFile, Balmorel, MainResults
 import random  
 import os
 
@@ -556,15 +556,21 @@ def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int =
 def train(model: ScenarioGenerator, scenario: str, epoch: int, n_scenarios: int=4, batch_size: int = 256, logger=None, scenario_folder: str = 'operun'):
     
     # Get the objective value
-    df1 = pd.read_csv(os.path.join('Balmorel/analysis/output', scenario + '_adeq.csv')).query(f'epoch == {epoch}')
-    # df2 = pd.read_csv(os.path.join('Balmorel/analysis/output', scenario + '_backcapN3.csv'))
-    # print(df2)
+    results = MainResults([f'MainResults_{scenario}_{runtype}_E{epoch}.gdx' for runtype in ['capacity', 'dispatch']],
+                          paths=[f'Balmorel/{scenario_folder}/model'])
+    df=results.get_result('OBJ_YCR')
+    operational_costs = df.query('Scenario.str.contains("dispatch") and not (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
+    capital_costs = df.query('Scenario.str.contains("capacity") and (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
     
     log = (logger.info if logger else print)
     
-    log("read objective value from csv")
+    log("read objective values from capacity and dispatch runs")
+    log(f"Capital costs:\n%s"%capital_costs.to_string())
+    log(f"Operational costs:\n%s"%operational_costs.to_string())
     
-    obj_value = np.sum(df1[['ENS_TWh', 'LOLE_h']].values)
+    obj_value = capital_costs.Value.sum() + operational_costs.Value.sum()
+    
+    log(f'Loss value: {obj_value} M€')
 
     # update the model with the objective value
     model.update(obj_value, epoch=epoch)
