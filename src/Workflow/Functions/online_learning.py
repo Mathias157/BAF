@@ -162,6 +162,7 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
             
             os.chdir(f'{scenario_folder}/model')
             current_scenario_name = f"{scenario_name}_{runtype}_E{epoch_string}"
+            logger.info(f"Running {current_scenario_name}")
             sp.run(f'gams Balmorel --scenario_name {current_scenario_name}', shell=True)
 
             # Check feasibility

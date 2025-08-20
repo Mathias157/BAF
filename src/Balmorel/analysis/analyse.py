@@ -399,10 +399,10 @@ def map(ctx, commodity: str, scenario: str, year: int,
     res = MainResults('MainResults_%s.gdx'%scenario, paths=model_path)
     
     if hier and geofile=='analysis/geofiles/municipalities.gpkg':
-        geofile = model_path.replace('model', 'data') + '/DE_%dcluster_geofile_2nd-order.gpkg'%(int(re.findall('M\d+', scenario)[0].lstrip('M')))
+        geofile = model_path.replace('model', 'data') + '/DE_%dcluster_geofile_2nd-order.gpkg'%(int(re.findall(r'M\d+', scenario)[0].lstrip('M')))
         geofile_region_column = 'cluster_name'
     elif 'N' in scenario and not 'TransRelaxation' in scenario and geofile=='analysis/geofiles/municipalities.gpkg':
-        geofile = 'analysis/geofiles/DE-DH-WNDFLH-SOLEFLH_%dcluster_geofile.gpkg'%(int(re.findall('N\d+', scenario)[0].lstrip('N')))
+        geofile = 'analysis/geofiles/DE-DH-WNDFLH-SOLEFLH_%dcluster_geofile.gpkg'%(int(re.findall(r'N\d+', scenario)[0].lstrip('N')))
         geofile_region_column = 'cluster_name'
     
     
@@ -671,7 +671,7 @@ def adequacy(ctx, scenario: str, epoch_string: str, nth_max: int):
     "Quantify the adequacy in terms of LOLE (h) and energy not supplied (TWh)"
     
     # Find path to scenario
-    epoch_scenario_name = scenario+f'_{epoch_string}'
+    epoch_scenario_name = scenario+f'_E{epoch_string}'
     model = ctx.obj['Balmorel']
     model_path = os.path.join(ctx.obj['path'], model.scname_to_scfolder[epoch_scenario_name], 'model')
 
@@ -781,7 +781,7 @@ def bar_chart(ctx, scenarios: str, symbol: str,
 def sort_scenarios(df: pd.DataFrame):
     "Will sort scenarios, so e.g. N2 comes before N10"
     
-    df['Scenario'] = pd.Categorical(df['Scenario'], categories=sorted(df['Scenario'].unique(), key=lambda x: int(re.findall(r'N\d+', x)[0][1:]) if re.findall(r'N\d+', x) else float('inf')))
+    df['Scenario'] = pd.Categorical(df['Scenario'], categories=sorted(df['Scenario'].unique()))
     
     return df
 
