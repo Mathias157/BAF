@@ -161,15 +161,15 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
                 sp.run(f'mv {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt', shell=True)
             
             os.chdir(f'{scenario_folder}/model')
-            scenario_name = f"{scenario}_{runtype}_{epoch_string}"
-            sp.run(f'gams Balmorel --scenario_name {scenario_name}', shell=True)
+            current_scenario_name = f"{scenario_name}_{runtype}_{epoch_string}"
+            sp.run(f'gams Balmorel --scenario_name {current_scenario_name}', shell=True)
 
             # Check feasibility
             out = sp.run('cat Balmorel.lst | grep "LP status"', shell=True, capture_output=True).stdout
             if not 'optimal' in str(out):
-                logger.warning(f"{scenario_name} infeasible!")
+                logger.warning(f"{current_scenario_name} infeasible!")
             else:
-                logger.info(f"{scenario_name} feasible.")
+                logger.info(f"{current_scenario_name} feasible.")
 
             os.chdir('../../')
 

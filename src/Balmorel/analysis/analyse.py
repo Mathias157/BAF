@@ -696,12 +696,13 @@ def adequacy(ctx, scenario: str, epoch_string: str, nth_max: int):
     ENS = df.pivot_table(index=['Season', 'Time'], columns='Commodity',
                           values='Value', aggfunc='sum')
     
+    epoch = int(epoch_string)
     df_out = pd.DataFrame({
-        'epoch'   : int(epoch_string),
+        'epoch'   : epoch,
         'ENS_TWh' : ENS.sum() / 1e6,
         'LOLE_h'  : ENS.count()
     })
-    cap['epoch'] = int(epoch_string)
+    cap['epoch'] = epoch
 
     # Save
     files = [f'analysis/output/{scenario}_backcapN{nth_max}.csv',
