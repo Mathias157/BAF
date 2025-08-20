@@ -557,7 +557,7 @@ def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int =
 def train(model: ScenarioGenerator, scenario: str, epoch_string: str, n_scenarios: int=4, batch_size: int = 256, logger=None, scenario_folder: str = 'operun'):
     
     # Get the objective value
-    results = MainResults([f'MainResults_{scenario}_{runtype}_{epoch_string}.gdx' for runtype in ['capacity', 'dispatch']],
+    results = MainResults([f'MainResults_{scenario}_{runtype}_E{epoch_string}.gdx' for runtype in ['capacity', 'dispatch']],
                           paths=[f'Balmorel/{scenario_folder}/model'])
     obj_value, capital_costs, operational_costs = get_combined_obj_value(results, return_capex_opex_dfs=True)
 
@@ -569,7 +569,7 @@ def train(model: ScenarioGenerator, scenario: str, epoch_string: str, n_scenario
     log(f'Loss value: {obj_value} M€')
 
     # update the model with the objective value
-    model.update(obj_value, epoch=int(epoch))
+    model.update(obj_value, epoch=int(epoch_string))
     
     # create new incfiles
     new_scenarios, new_scenarios_df = model.generate_scenario(batch_size=batch_size, n_scenarios=n_scenarios)

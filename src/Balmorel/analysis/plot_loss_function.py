@@ -19,10 +19,24 @@ def CLI():
 def sc(scenario: str, scenario_folder: str):
     
     path = Path(f'Balmorel/{scenario_folder}/model')
-    files = [file.name for file in path.glob(f'MainResults_{scenario}*E*.gdx')]
-    print(files)
-    results = MainResults(files=files,
-                          paths=str(path.absolute().resolve()))
+    files = pd.Series([file.name for file in path.glob(f'MainResults_{scenario}*E*.gdx')])
+    epochs = list(files.str.extract(r'E(\d+)')[0].unique())
+    epochs.sort()
+    data = []
+    for epoch in epochs:
+        idx = files.str.contains(f"E{epoch}.gdx")
+
+        if len(files[idx]) == 2:
+            results = MainResults(files=list(files[idx]), paths=str(path.absolute().resolve()))
+            obj_value = get_combined_obj_value(results)
+            data.append([int(epoch), obj_value])
+        else:
+            print(f'Epoch {epoch} didnt finish')
+    
+    fig, ax = plt.subplots()
+    df = pd.DataFrame(data, columns=['Epochs', 'Obj. Value'])
+    df.plot(x='Epochs', y='Obj. Value', ax=ax)
+    fig.savefig('Balmorel/analysis/output/loss_function_evolution.png')
     
 
 @CLI.command()
