@@ -665,13 +665,13 @@ def get(ctx, symbol: str, pars, filters: str, diff: bool):
 @CLI.command()
 @click.pass_context
 @click.argument('scenario', type=str, required=True)
-@click.argument('epoch', type=int, required=True)
+@click.argument('epoch-string', type=str, required=True)
 @click.option('--nth-max', type=int, required=False, default=3, help="Which nth maximum backup production to interpret as required backup capacity Default is 3, as it could be interpreted as a LOLE = 3 h condition.")
-def adequacy(ctx, scenario: str, epoch: int, nth_max: int):
+def adequacy(ctx, scenario: str, epoch_string: str, nth_max: int):
     "Quantify the adequacy in terms of LOLE (h) and energy not supplied (TWh)"
     
     # Find path to scenario
-    epoch_scenario_name = scenario+f'_E{epoch}'
+    epoch_scenario_name = scenario+f'_{epoch_string}'
     model = ctx.obj['Balmorel']
     model_path = os.path.join(ctx.obj['path'], model.scname_to_scfolder[epoch_scenario_name], 'model')
 
@@ -697,11 +697,11 @@ def adequacy(ctx, scenario: str, epoch: int, nth_max: int):
                           values='Value', aggfunc='sum')
     
     df_out = pd.DataFrame({
-        'epoch'   : epoch,
+        'epoch'   : int(epoch_string),
         'ENS_TWh' : ENS.sum() / 1e6,
         'LOLE_h'  : ENS.count()
     })
-    cap['epoch'] = epoch
+    cap['epoch'] = int(epoch_string)
 
     # Save
     files = [f'analysis/output/{scenario}_backcapN{nth_max}.csv',

@@ -137,10 +137,12 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
     ckpt_path = logs_dir / f"{scenario_name}_model_checkpoint.pth"
 
     os.chdir('Balmorel')
-    sp.run(f'mkdir simex_{scenario_name}', shell=True)
     sp.run(f'mv {scenario_folder}/model/balopt.opt {scenario_folder}/model/balopt_dispatch.opt', shell=True) # make sure first run is a capacity expansion
 
     while epoch < update_epochs:
+        
+        epoch_string = f'{epoch:03.0f}'
+        
         for runtype in ['capacity', 'dispatch']:
             
             sp.run(f'rm {scenario_folder}/data/*.inc', shell=True)
@@ -157,37 +159,31 @@ def CLI(ctx, scenario_name: str, scenario_folder: str, dark_style: bool, plot_ex
                 sp.run(f'touch {scenario_folder}/data/ANTBALM_FICTDH.inc', shell=True)
                 sp.run(f'touch {scenario_folder}/data/ANTBALM_FICTDH2.inc', shell=True)
                 sp.run(f'mv {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt', shell=True)
-
-            # Copy from the simex folder
-            if epoch > 0 and runtype == 'dispatch':
-                sp.run(f'cp -rf simex_{scenario_name}/* simex', shell=True)
             
             os.chdir(f'{scenario_folder}/model')
-            sp.run(f'gams Balmorel --scenario_name "{scenario_name}_{runtype}_E{epoch}"', shell=True)
+            scenario_name = f"{scenario_name}_{runtype}_{epoch_string}"
+            sp.run(f'gams Balmorel --scenario_name {scenario_name}', shell=True)
 
             # Check feasibility
             out = sp.run('cat Balmorel.lst | grep "LP status"', shell=True, capture_output=True).stdout
             if not 'optimal' in str(out):
-                logger.warning(f"{scenario_name}_{runtype}_E{epoch} infeasible!")
+                logger.warning(f"{scenario_name} infeasible!")
             else:
-                logger.info(f"{scenario_name}_{runtype}_E{epoch} feasible.")
+                logger.info(f"{scenario_name} feasible.")
 
             os.chdir('../../')
-
-            # Copy the simex folder          
-            sp.run(f'cp -rf simex/* simex_{scenario_name}', shell=True)
 
             if runtype != "capacity":
                 # Rename balopt back
                 sp.run(f'mv "{scenario_folder}/model/balopt.opt" "{scenario_folder}/model/balopt_{runtype}.opt"', shell=True)
         
-        sp.run(f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_dispatch" {epoch}', shell=True)
+        sp.run(f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_dispatch" {epoch_string}', shell=True)
         os.chdir('../')
-        model = train(model, scenario_name, epoch, n_scenarios=n_scenarios, batch_size=batch_size, logger=logger, scenario_folder=scenario_folder)
+        model = train(model, scenario_name, epoch_string, n_scenarios=n_scenarios, batch_size=batch_size, logger=logger, scenario_folder=scenario_folder)
         
         # save the model
         model.save_model(str(ckpt_path))
-        logger.info(f"Epoch {epoch} completed and model saved.")
+        logger.info(f"Epoch {epoch_string} completed and model saved.")
         
         os.chdir('Balmorel')
         

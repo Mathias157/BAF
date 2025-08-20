@@ -3,6 +3,11 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import click
+from pybalmorel import MainResults
+import sys
+sys.path.append('Workflow/Functions')
+from GeneralHelperFunctions import get_combined_obj_value
+from pathlib import Path
 
 @click.group()
 def CLI():
@@ -10,7 +15,22 @@ def CLI():
 
 @CLI.command()
 @click.argument('scenario', type=str, required=True)
-def sc(scenario: str):
+@click.option('--scenario-folder', type=str, default='operun', help='The scenario folder the scenarios were run in')
+def sc(scenario: str, scenario_folder: str):
+    
+    path = Path(f'Balmorel/{scenario_folder}/model')
+    files = [file.name for file in path.glob(f'MainResults_{scenario}*E*.gdx')]
+    print(files)
+    results = MainResults(files=files,
+                          paths=str(path.absolute().resolve()))
+    
+
+@CLI.command()
+@click.argument('scenario', type=str, required=True)
+def adequacy_sc(scenario: str):
+    """
+    Plot the sum of ENS and LOLE for a specific scenario
+    """
         
     df = pd.read_csv('Balmorel/analysis/output/' + scenario + '_adeq.csv')
 
@@ -22,15 +42,17 @@ def sc(scenario: str):
     fig, ax = plt.subplots()
     print(df)
     df.plot(ax=ax)
-    plt.show()
+    ax.set_ylim([0, df.max().max()*1.2])
+    fig.savefig('out.png')
 
 @CLI.command()
-def all():
+def adequacy_all():
+    """
+    Plot the sum of ENS and LOLE for all hardcoded scenarios
+    """
 
     df = pd.DataFrame()    
-    for scenario in ['test2_operun', 'test2_onlydispatch_dispatch', 
-                     'test2_OD_96_dispatch', 'test2_OD_48_4_dispatch',
-                     'test2_OD_168_8_dispatch',
+    for scenario in ['DO_D4W4_dispatch',
                      ]:
         temp = pd.read_csv('Balmorel/analysis/output/' + scenario + '_adeq.csv')
 
@@ -43,12 +65,13 @@ def all():
         # df = df.join(temp)
         df = pd.concat([df, temp], axis=1)
 
+    plt.style.use('dark_background')
     fig, ax = plt.subplots()
     df.plot(ax=ax)
     ax.set_ylabel('Loss Value')
     ax.set_xlabel('Epoch')
-    # ax.set_ylim([0, df.max().max()*1.2])
-    plt.show()
+    ax.set_ylim([0, df.max().max()*1.2])
+    fig.savefig('test.png', transparent=True)
 
 if __name__ == '__main__':
     CLI()

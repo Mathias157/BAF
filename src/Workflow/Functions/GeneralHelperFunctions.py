@@ -167,6 +167,17 @@ def doLDC(array, n_bins, plot=False, fig = None, ax = None):
     else:
         return duration, curve
 
+def get_combined_obj_value(results: MainResults, capital_scenario_string: str = 'capacity', operational_scenario_string: str = 'dispatch', return_capex_opex_dfs: bool = False):
+    df=results.get_result('OBJ_YCR')
+    operational_costs = df.query(f'Scenario.str.contains("{operational_scenario_string}") and not (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
+    capital_costs = df.query(f'Scenario.str.contains("{capital_scenario_string}") and (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
+    obj_value = capital_costs.Value.sum() + operational_costs.Value.sum()
+    
+    if return_capex_opex_dfs:
+        return obj_value, capital_costs, operational_costs
+    else:
+        return obj_value
+    
 #%% ------------------------------- ###
 ###        4. Antares Input         ###
 ### ------------------------------- ###

@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from pybalmorel import IncFile, Balmorel, MainResults
+from GeneralHelperFunctions import get_combined_obj_value
 import random  
 import os
 
@@ -553,27 +554,22 @@ def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int =
 
     return model
 
-def train(model: ScenarioGenerator, scenario: str, epoch: int, n_scenarios: int=4, batch_size: int = 256, logger=None, scenario_folder: str = 'operun'):
+def train(model: ScenarioGenerator, scenario: str, epoch_string: str, n_scenarios: int=4, batch_size: int = 256, logger=None, scenario_folder: str = 'operun'):
     
     # Get the objective value
-    results = MainResults([f'MainResults_{scenario}_{runtype}_E{epoch}.gdx' for runtype in ['capacity', 'dispatch']],
+    results = MainResults([f'MainResults_{scenario}_{runtype}_{epoch_string}.gdx' for runtype in ['capacity', 'dispatch']],
                           paths=[f'Balmorel/{scenario_folder}/model'])
-    df=results.get_result('OBJ_YCR')
-    operational_costs = df.query('Scenario.str.contains("dispatch") and not (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
-    capital_costs = df.query('Scenario.str.contains("capacity") and (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
-    
+    obj_value, capital_costs, operational_costs = get_combined_obj_value(results, return_capex_opex_dfs=True)
+
     log = (logger.info if logger else print)
     
     log("read objective values from capacity and dispatch runs")
     log(f"Capital costs:\n%s"%capital_costs.to_string())
     log(f"Operational costs:\n%s"%operational_costs.to_string())
-    
-    obj_value = capital_costs.Value.sum() + operational_costs.Value.sum()
-    
     log(f'Loss value: {obj_value} M€')
 
     # update the model with the objective value
-    model.update(obj_value, epoch=epoch)
+    model.update(obj_value, epoch=int(epoch))
     
     # create new incfiles
     new_scenarios, new_scenarios_df = model.generate_scenario(batch_size=batch_size, n_scenarios=n_scenarios)
