@@ -35,11 +35,11 @@ export PATH=~/.pixi/bin:$PATH
 pixi run python Workflow/Functions/online_learning.py \
   --scenario-name DO_D1W1 \
   --scenario-folder operun \
-  --pretrain-epochs 200 \
+  --pretrain-epochs 50 \
   --update-epochs 200 \
   --days 1 \
   --n-scenarios 2 \
   --latent-dim 64 \
-  --seed 42 \
+  --seed 0 \
   --batch-size 256 \
   --learning-rate 0.0005 \

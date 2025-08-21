@@ -77,3 +77,7 @@ Balmorel/ik_model/data
 # pixi environments
 .pixi
 *.egg-info
+
+# Track Balmorel data folder
+!src/Balmorel/base/data/
+!src/Balmorel/base/data/**
