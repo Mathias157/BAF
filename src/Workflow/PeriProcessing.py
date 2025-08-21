@@ -868,9 +868,7 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         # Make fits in parallel
         regions = list(prices_demands[commodity].keys())
         regional_unserved_energy_costs = [unserved_energy_cost.getfloat('unserverdenergycost', region.lower()) for region in regions]
-        pool = Pool()
-        args_list = list(zip(regions, regional_unserved_energy_costs))
-        regional_unserved_energy_costs, scenario_builder_values = pool.starmap(model_func, args_list)
+        regional_unserved_energy_costs, scenario_builder_values = process_in_batches(regions, regional_unserved_energy_costs, model_func)
     
         # Set unserved energy cost
         for result in range(len(regions)):
@@ -883,6 +881,31 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
     
     with open('Antares/input/thermal/areas.ini', 'w') as f:
         unserved_energy_cost.max().write(f)
+
+def process_in_batches(regions, regional_unserved_energy_costs, model_func, batch_size=5):
+    """Process regions in smaller batches to control memory usage"""
+    all_unserved_costs = []
+    all_scenario_values = []
+    
+    for i in range(0, len(regions), batch_size):
+        batch_regions = regions[i:i+batch_size]
+        batch_costs = regional_unserved_energy_costs[i:i+batch_size]
+        batch_args = list(zip(batch_regions, batch_costs))
+        
+        print(f"Processing batch {i//batch_size + 1}/{(len(regions)-1)//batch_size + 1}")
+        
+        with Pool() as pool:
+            batch_results = pool.starmap(model_func, batch_args)
+        
+        # Process batch results
+        for unserved_cost, scenario_vals in batch_results:
+            all_unserved_costs.append(unserved_cost)
+            all_scenario_values.append(scenario_vals)
+        
+        # Clear batch results from memory
+        del batch_results
+    
+    return all_unserved_costs, all_scenario_values
 
 def model_demand_response(commodity: str, 
                           weather_years: list,
@@ -1057,8 +1080,8 @@ def main(ctx, sc_name: str, year: str):
     #                                     CCCRRR, cap)
     
     # Demand response 
-    # create_demand_response(ctx.obj['weather_years'], res, SC, int(year), temporal_resolution,
-    #                        parameter_x, parameter_y, style)
+    create_demand_response(ctx.obj['weather_years'], res, SC, int(year), temporal_resolution,
+                           parameter_x, parameter_y, style)
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
 
     print('\n|--------------------------------------------------|')   
