@@ -8,4 +8,4 @@ for /f "delims=" %%i in ('git rev-parse HEAD') do (
 )
 
 :: zip data
-powershell Compress-Archive -Path "Antares/input, Pre-Processing/Data, Pre-Processing/Output" -DestinationPath "BAF-Data_small-system_%SHORT_HASH%.zip"
+powershell Compress-Archive -Path "Antares/input, Pre-Processing/Data, Pre-Processing/Output" -DestinationPath "BAF-Data_EU-system_%SHORT_HASH%.zip"
