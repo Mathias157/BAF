@@ -5,18 +5,18 @@ platforms = ["linux-64", "win-64"]
 version = "0.1.0"
 
 [tasks]
-generate-mappings = "cd src && python Pre-Processing/preprocessing.py generate-mappings"
-generate-antares-vre = "cd src && pixi run python Pre-Processing/preprocessing.py generate-antares-vre"
-generate-balmorel-timeseries = "cd src && pixi run python Pre-Processing/preprocessing.py generate-balmorel-timeseries"
-generate-balmorel-hydro = "cd src && python Pre-Processing/preprocessing.py generate-balmorel-hydro"
-generate-balmorel-heat-series = "cd src && python Pre-Processing/preprocessing.py generate-balmorel-heat-series"
+generate-mappings = "cd src && python -u Pre-Processing/preprocessing.py generate-mappings"
+generate-antares-vre = "cd src && pixi run python -u Pre-Processing/preprocessing.py generate-antares-vre"
+generate-balmorel-timeseries = "cd src && pixi run python -u Pre-Processing/preprocessing.py generate-balmorel-timeseries"
+generate-balmorel-hydro = "cd src && python -u Pre-Processing/preprocessing.py generate-balmorel-hydro"
+generate-balmorel-heat-series = "cd src && python -u Pre-Processing/preprocessing.py generate-balmorel-heat-series"
 preprocessing = "cd src && snakemake -s Jobs/preprocessing.smk"
 initialisation = "cd src && python -m Workflow.Initialisation" 
-periprocess = "cd src && python Workflow/PeriProcessing.py" 
-postprocess = "cd src && python Workflow/PostProcessing.py" 
-space-aggregate-balmorel = "cd src && python Pre-Processing/spatial_aggregation.py"
-analyse = "cd src/Balmorel && python Analysis/analyse.py "
-temporal-agg = "cd src && python Workflow/TimeseriesAggregation.py"
+periprocess = "cd src && python -u Workflow/PeriProcessing.py" 
+postprocess = "cd src && python -u Workflow/PostProcessing.py" 
+space-aggregate-balmorel = "cd src && python -u Pre-Processing/spatial_aggregation.py"
+analyse = "cd src/Balmorel && python -u Analysis/analyse.py "
+temporal-agg = "cd src && python -u Workflow/TimeseriesAggregation.py"
 
 [target.win.tasks]
 r = "cmd /c %USERPROFILE%\\AppData\\Local\\Programs\\R\\R-4.2.3\\bin\\x64\\R"

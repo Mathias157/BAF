@@ -29,7 +29,7 @@ If unzipping the data file on a HPC, you may need to ensure writing capabilities
 ```
 chmod -R +x Pre-Processing/Output
 chmod -R +x Pre-Processing/Data
-chmod -R +x input
+chmod -R +x Antares/input
 ```
 
 Otherwise, these files will not be editable, which is needed in the framework
