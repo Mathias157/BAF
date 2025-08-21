@@ -37,35 +37,54 @@ def load_possible_investments(gams_system_directory: str ='/opt/gams/48.5'):
 ###            2. Main              ###
 ### ------------------------------- ###
 
-@click.command()
+@click.group()
 @click.option('--dark-style', is_flag=True, required=False, help='Dark plot style')
 def main(dark_style: bool):
-
     # Set global style of plot
     if dark_style:
         plt.style.use('dark_background')
         fc = 'none'
     else:
         fc = 'white'
+        
+    # Load R packages to R instance
+    importr("base")
+    importr("antaresEditObject")
+    
+@main.command()
+def regions():
 
     # Load all possible investments (remember to have a full Balmorel dataset!)
     df = load_possible_investments().query('IRRRE != "ROW" and IRRRI != "ROW" and YYY == "2050"').drop_duplicates()
     regions = set(df.IRRRE.unique()) | set(df.IRRRI.unique()) 
     print(regions)
 
-    # Load R packages to R instance
-    importr("base")
-    importr("antaresEditObject")
     
     # Load simulation
     robjects.r('antaresRead::setSimulationPath(path="Antares", simulation="input")')
 
     for region in regions:
+        
         # Create region if it doesn't exist    
         try:
             out = robjects.r(f'createArea(name = "{region}")')
         except RRuntimeError as exception:
             print(f'{region} is probably already created, check error message:\n{exception}')
+            
+        # Create PtX regions, if they don't exist
+        for commodity in ['HEAT', 'HYDROGEN']:
+            try:
+                out = robjects.r(f'createArea(name = "{region}_{commodity}")')
+                
+                # Append to list of links
+                df = pd.concat((df, pd.DataFrame({'YYY' : ["2050"], 'IRRRE' : [region], 'IRRRI' : [f'{region}_{commodity}'], 'Value' : [1]})), ignore_index=True)
+                
+            except RRuntimeError as exception:
+                print(f'{region}_{commodity} is probably already created, check error message:\n{exception}')
+            
+        # Add links to battery and PSP storage
+        df = pd.concat((df, pd.DataFrame({'YYY' : ["2050"], 'IRRRE' : [region], 'IRRRI' : ['00_BAT_STO'], 'Value' : [1]})), ignore_index=True)
+        df = pd.concat((df, pd.DataFrame({'YYY' : ["2050"], 'IRRRE' : [region], 'IRRRI' : ['00_PSP_STO'], 'Value' : [1]})), ignore_index=True)
             
         # Create link if it doesn't exist
         for importing_link in df.query(f'IRRRE == "{region}"')['IRRRI']:

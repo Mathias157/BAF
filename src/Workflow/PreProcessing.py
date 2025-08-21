@@ -541,7 +541,9 @@ def generate_balmorel_hydro(ctx):
             hydro_WTRRSVAR_S['%s_A'%area] = res_series.rolling(window=7).sum()[6::7][weather_year].values
             
             # FLH
-            hydro_WTRRSFLH += "%s_A\t\t%0.2f\n"%(area, ((res_series[weather_year]).sum())/(8760*turb_cap)*8760)
+            if turb_cap > 0:
+                hydro_WTRRSFLH += "%s_A\t\t%0.2f\n"%(area, ((res_series[weather_year]).sum())/(8760*turb_cap)*8760)
+
               
             # Make .inc file commands
             hydro_AAA += '%s_A\n'%area 
@@ -577,8 +579,9 @@ def generate_balmorel_hydro(ctx):
                 
             hydro_WTRRRVAR_T['%s_A'%area] = ror_series.loc[:8735, weather_year].values
             
-            hydro_WTRRRFLH += "%s_A\t\t%0.2f\n"%(area, ((ror_series[weather_year]).sum())/(8760*ror_cap)*8760)
-
+            if ror_cap > 0:
+                hydro_WTRRRFLH += "%s_A\t\t%0.2f\n"%(area, ((ror_series[weather_year]).sum())/(8760*ror_cap)*8760)
+                
             
             hydro_GKFX += "GKFX(YYY, '%s_A', 'GNR_ROR_WTR') = %0.2f;\n"%(area, ror_cap)
             print('Found run-of-river data..')

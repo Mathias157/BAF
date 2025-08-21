@@ -189,8 +189,10 @@ def get_vre_availability(ctx, result: MainResults, scenario: str,
     # Calculate VRE profiles
     capacities = result.get_result('G_CAP_YCRAF').query('Scenario == @scenario and Year == @model_year').query('Technology in ["WIND-ON", "WIND-OFF", "SOLAR-PV"]').pivot_table(columns=['Region'], index='Technology', values='Value', aggfunc='sum', fill_value=0)
     regions = capacities.columns
+    print('all_data keys:', all_data['offshore_wind'].keys())
     all_data['onshore_wind'] = all_data['onshore_wind'][regions] * capacities.loc['WIND-ON'] * 1e3
-    all_data['offshore_wind'] = all_data['offshore_wind'][regions] * capacities.loc["WIND-OFF"] * 1e3
+    offshore_regions = set(all_data['offshore_wind'].keys())
+    all_data['offshore_wind'] = all_data['offshore_wind'][list(set(regions) & offshore_regions)] * capacities.loc["WIND-OFF"] * 1e3
     all_data['solar_pv'] = all_data['solar_pv'][regions] * capacities.loc["SOLAR-PV"] * 1e3
     
     # Calculate inverse residual load

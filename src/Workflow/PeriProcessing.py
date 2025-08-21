@@ -605,9 +605,8 @@ def antares_weekly_resource_constraints(
                 vre = f.loc[:, stochyears].mean(axis=1)*vrecap
                 load = load - vre # Residual load
                 
-            except EmptyDataError:
-                pass
-                # print('No profile for %s in %s'%(VRE, region))
+            except EmptyDataError | configparser.NoOptionError:
+                print('No profile for %s in %s'%(VRE, region))
 
 
         # Plot Residual LDC
@@ -870,7 +869,8 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         regions = list(prices_demands[commodity].keys())
         regional_unserved_energy_costs = [unserved_energy_cost.getfloat('unserverdenergycost', region.lower()) for region in regions]
         pool = Pool()
-        regional_unserved_energy_costs, scenario_builder_values = pool.starmap(model_func, [regions, regional_unserved_energy_costs])
+        args_list = list(zip(regions, regional_unserved_energy_costs))
+        regional_unserved_energy_costs, scenario_builder_values = pool.starmap(model_func, args_list)
     
         # Set unserved energy cost
         for result in range(len(regions)):
@@ -1051,14 +1051,14 @@ def main(ctx, sc_name: str, year: str):
                                          A2B_regi, year)
 
     # Resource Constraints
-    antares_weekly_resource_constraints(A2B_regi, B2A_ren,
-                                        BalmTechs, year, 
-                                        GDATA, GMAXF, GMAXFS,
-                                        CCCRRR, cap)
+    # antares_weekly_resource_constraints(A2B_regi, B2A_ren,
+    #                                     BalmTechs, year, 
+    #                                     GDATA, GMAXF, GMAXFS,
+    #                                     CCCRRR, cap)
     
     # Demand response 
-    create_demand_response(ctx.obj['weather_years'], res, SC, int(year), temporal_resolution,
-                           parameter_x, parameter_y, style)
+    # create_demand_response(ctx.obj['weather_years'], res, SC, int(year), temporal_resolution,
+    #                        parameter_x, parameter_y, style)
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
 
     print('\n|--------------------------------------------------|')   
