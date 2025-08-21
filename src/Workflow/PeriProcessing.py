@@ -78,7 +78,7 @@ def antares_vre_capacities(db: gams.GamsDatabase,
             # Read Antares Config file for region
             area_config = configparser.ConfigParser()
             area_config.read('Antares/input/renewables/clusters/%s/list.ini'%region.lower())
-                
+
             # Sum capacity from Balmorel Regions
             tech_cap = 0
             
@@ -91,6 +91,12 @@ def antares_vre_capacities(db: gams.GamsDatabase,
                 idx_cap = idx & (cap.R == region)
                 tech_cap = cap.loc[idx_cap, 'Value'].sum() * 1000
                 capex = get_capex(cap, idx_cap, GDATA, ANNUITYCG)
+                
+            # Raise error if section doesn't exist but Balmorel invested in capacity
+            if B2A_ren[tech] not in area_config.sections() and tech_cap > 1e-5:
+                raise ValueError(f"Balmorel invested in a {B2A_ren[tech]} capacity in {region} that isn't configured in Antares!")
+            else:
+                continue
                 
             if (tech_cap > 1e-5):
                 area_config.set(B2A_ren[tech], 'nominalcapacity', str(tech_cap))

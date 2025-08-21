@@ -10,6 +10,7 @@ Created on 09-06-2023
 import click
 import pandas as pd
 from pandas.errors import EmptyDataError
+import os
 import sys
 sys.path.append('.')
 from Functions.GeneralHelperFunctions import load_OSMOSE_data, data_context
@@ -284,13 +285,49 @@ def generate_antares_vre(ctx, data: str, stoch_year_data: dict, antares_input_pa
     }):
     """Generate production factor timeseries for Antares VRE"""
     
+    group_name = {'offshore_wind' : 'Wind Offshore',
+                  'onshore_wind' : 'Wind Onshore',
+                  'solar_pv' : 'Solar PV'}
+    folder_name = {'offshore_wind' : 'offshore',
+                  'onshore_wind' : 'onshore',
+                  'solar_pv' : 'photovoltaics'}
+    
+    
     # Create matrix of input that Antares expects
     for region in ctx.obj['geographical_scope']:
         
         try:   
             data_to_antares_input = pd.DataFrame({year : stoch_year_data[year][region] for year in stoch_year_data.keys()})
+            
+            # Make series input
+            series_folder_path = (antares_input_paths[data]%region.lower()).replace('/series.txt', '')
+            if not(os.path.exists(series_folder_path)):
+                os.makedirs(series_folder_path)
+            
             data_to_antares_input.to_csv(antares_input_paths[data]%(region.lower()),
                         index=False, header=False, sep='\t')
+            
+            # Make .ini file
+            ini_folder_path = series_folder_path.replace(f'series/{region.lower()}/{folder_name[data]}', f'clusters/{region.lower()}')
+            if not(os.path.exists(ini_folder_path)):
+                os.makedirs(ini_folder_path)
+                file = open('list.ini', 'w')
+                file.close()
+                
+            inifile=configparser.ConfigParser()
+            inifile.read(ini_folder_path + '/list.ini')
+            try:
+                inifile.add_section(folder_name[data])
+                inifile.set(folder_name[data], 'name', folder_name[data])
+                inifile.set(folder_name[data], 'group', group_name[data])
+                inifile.set(folder_name[data], 'nominalcapacity', '0')
+                inifile.set(folder_name[data], 'unitcount', '1')
+                inifile.set(folder_name[data], 'ts-interpretation', 'production-factor')
+                with open(ini_folder_path + '/list.ini', 'w') as f:
+                    inifile.write(f)
+            except configparser.DuplicateSectionError:
+                print(f'{data} already exists in ini file for {region}')
+            
         except KeyError:
             print('No %s for %s'%(data, region))
     
