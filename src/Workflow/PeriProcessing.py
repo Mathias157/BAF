@@ -860,31 +860,35 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         fit_parameters = get_supply_curve_parameters_fit(result, scenario, year, commodity, temporal_resolution) # for fitting to Balmorel results
         prices_demands[commodity] = get_prices_demands(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices)
         
+        del fit_parameters
         
         model_func = partial(model_demand_response, commodity, weather_years, 
                              all_parameters, parameter_x, parameter_y, 
                              prices_demands, antares_input)
         
+        del all_parameters
+        
         # Make fits in parallel
         regions = list(prices_demands[commodity].keys())
         regional_unserved_energy_costs = [unserved_energy_cost.getfloat('unserverdenergycost', region.lower()) for region in regions]
+        print(f'Starting to batch {regions} with current unserved energy costs: {regional_unserved_energy_costs}')
         regional_unserved_energy_costs, scenario_builder_values = process_in_batches(regions, regional_unserved_energy_costs, model_func)
     
         # Set unserved energy cost
-        for result in range(len(regions)):
-            
-            for region in regional_unserved_energy_costs[result].keys():
-                unserved_energy_cost.set('unserverdenergycost', region, str(regional_unserved_energy_costs[region]))
-    
-            for cluster in scenario_builder_values[result]:
-                set_scenariobuilder_values(cluster)
+        for region in regional_unserved_energy_costs.keys():
+            print(f'setting unserved energy cost in {region} to {regional_unserved_energy_costs[region]}')
+            unserved_energy_cost.set('unserverdenergycost', region, str(regional_unserved_energy_costs[region]))
+
+        for cluster in scenario_builder_values:
+            print(f'building scenario order for {cluster}')
+            set_scenariobuilder_values(cluster)
     
     with open('Antares/input/thermal/areas.ini', 'w') as f:
-        unserved_energy_cost.max().write(f)
+        unserved_energy_cost.write(f)
 
-def process_in_batches(regions, regional_unserved_energy_costs, model_func, batch_size=5):
+def process_in_batches(regions, regional_unserved_energy_costs, model_func, batch_size=4):
     """Process regions in smaller batches to control memory usage"""
-    all_unserved_costs = []
+    all_unserved_costs = {}
     all_scenario_values = []
     
     for i in range(0, len(regions), batch_size):
@@ -899,8 +903,8 @@ def process_in_batches(regions, regional_unserved_energy_costs, model_func, batc
         
         # Process batch results
         for unserved_cost, scenario_vals in batch_results:
-            all_unserved_costs.append(unserved_cost)
-            all_scenario_values.append(scenario_vals)
+            all_unserved_costs = all_unserved_costs | unserved_cost
+            all_scenario_values = all_scenario_values + scenario_vals
         
         # Clear batch results from memory
         del batch_results
@@ -919,8 +923,8 @@ def model_demand_response(commodity: str,
     
     # Do kernel smoothing
     print(f'Kernel smoothing {parameter_x} and {parameter_y} for {commodity} in {region}')
-    z_capacity, x0, y0 = do_kernel_smoothing(prices_demands[commodity][region], parameter_x, parameter_y, 'capacity')
-    z_price, x1, y1 = do_kernel_smoothing(prices_demands[commodity][region], parameter_x, parameter_y, 'price')
+    z_capacity, x0, y0 = do_kernel_smoothing(prices_demands[commodity][region], parameter_x, parameter_y, 'capacity', plot=True, plot_name=f"ksmooth_{commodity}_{region}.png")
+    z_price, x1, y1 = do_kernel_smoothing(prices_demands[commodity][region], parameter_x, parameter_y, 'price', plot=True, plot_name=f"ksmooth_{commodity}_{region}.png")
 
     if not(np.all(x0 == x1) and np.all(y0 == y1)):
         raise ValueError("x and y were not similar from kernel smoothing output!")

@@ -722,6 +722,7 @@ def set_scenariobuilder_values(element: str,
     scenariobuilder.read('Antares/settings/scenariobuilder.dat')
     
     for weather_year in range(weather_years):
+        # print(f'formatting {element} to {element%weather_year} and value as {weather_year+1}')
         scenariobuilder.set('default ruleset', element%weather_year, str(weather_year+1))
         
     with open('Antares/settings/scenariobuilder.dat', 'w') as f:

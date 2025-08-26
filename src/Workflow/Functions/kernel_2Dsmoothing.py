@@ -109,7 +109,8 @@ def do_kernel_smoothing(df: pd.DataFrame,
                         parameter_z: str,
                         bandwidth_x: float = 0.1, 
                         bandwidth_y: float = 0.1, 
-                        plot: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray, plt.Figure, plt.Axes]:
+                        plot: bool = False,
+                        plot_name: str = 'output.png') -> tuple[np.ndarray, np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray, plt.Figure, plt.Axes]:
     
     x_obs, x_abs_min, x_abs_max = normalise(getattr(df, parameter_x).astype(float))
     y_obs, y_abs_min, y_abs_max = normalise(getattr(df, parameter_y).astype(float))
@@ -139,14 +140,17 @@ def do_kernel_smoothing(df: pd.DataFrame,
         ax.plot_surface(X_grid*x_abs_max + x_abs_min, Y_grid*y_abs_max + y_abs_min, Z_grid, alpha=0.7, cmap='viridis')
         ax.set_title(f'Bandwidth {parameter_x}: {bandwidth_x} Bandwidth {parameter_y}: {bandwidth_y}')
 
-        if parameter_z == 'price':
-            ax.set_zlim([0, 500])
+        # if parameter_z == 'price':
+        #     ax.set_zlim([0, 500])
         
         ax.legend((parameter_z, 'smoothed'))
         fig.subplots_adjust(hspace=0.7)
-        plt.show()
+        fig.savefig(f"Workflow/MetaResults/{parameter_z}_{plot_name}")
+        with open(f"Workflow/MetaResults/{parameter_z}_{plot_name}.pkl", 'wb') as f:
+            pkl.dump(fig, f)
+ 
     
-        return smoothed, X_flat*x_abs_max + x_abs_min, Y_flat*y_abs_max + y_abs_min, fig, ax
+        return smoothed, X_flat*x_abs_max + x_abs_min, Y_flat*y_abs_max + y_abs_min
     
     else:
         return smoothed, X_flat*x_abs_max + x_abs_min, Y_flat*y_abs_max + y_abs_min

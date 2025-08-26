@@ -189,7 +189,6 @@ def get_vre_availability(ctx, result: MainResults, scenario: str,
     # Calculate VRE profiles
     capacities = result.get_result('G_CAP_YCRAF').query('Scenario == @scenario and Year == @model_year').query('Technology in ["WIND-ON", "WIND-OFF", "SOLAR-PV"]').pivot_table(columns=['Region'], index='Technology', values='Value', aggfunc='sum', fill_value=0)
     regions = capacities.columns
-    print('all_data keys:', all_data['offshore_wind'].keys())
     all_data['onshore_wind'] = all_data['onshore_wind'][regions] * capacities.loc['WIND-ON'] * 1e3
     offshore_regions = set(all_data['offshore_wind'].keys())
     all_data['offshore_wind'] = all_data['offshore_wind'][list(set(regions) & offshore_regions)] * capacities.loc["WIND-OFF"] * 1e3
@@ -749,8 +748,9 @@ def model_supply_curves_in_antares(weather_years: list,
         pass
     
     # Map the parameters not captured by Balmorel timeslices to the closest fitted parameter
-    print(f'Fitting {commodity} for region {region}')  
+    print(f'Defining activation price and capacity of {commodity} el. demand response for {region}')  
     temp = all_parameters.query(f'Region == "{region}"')
+    del all_parameters # reduce memory
     
     # Compute distances etc
     px_values = temp[parameter_x].values
@@ -761,10 +761,12 @@ def model_supply_curves_in_antares(weather_years: list,
     closest_indices = distances.argmin(axis=0)
     prices = z_price[closest_indices].round()
     capacities = z_capacity[closest_indices].round()
-    
+   
     # Insert values 
-    temp['price'] = prices
-    temp['capacity'] = capacities
+    temp.loc[:, 'price'] = prices
+    temp.loc[:, 'capacity'] = capacities
+    
+    print(f'Unique prices for {region}: ', temp['price'].unique())
     
     for i, price in enumerate(temp['price'].unique()):
         
