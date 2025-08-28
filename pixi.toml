@@ -54,3 +54,4 @@ premailer = ">=3.10.0, <4"
 gamsapi = { version = "==47.6.0", extras = ["transfer"] }
 scikit-learn = "*"
 torch = ">=2.8.0, <3"
+memory-profiler = ">=0.61.0, <0.62"

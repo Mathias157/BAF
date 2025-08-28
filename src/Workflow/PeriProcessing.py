@@ -1096,6 +1096,7 @@ def create_demand_response_hourly_constraint(
             f.write("\n".join(["0" for i in range(49)]))
 
 
+@profile
 def create_demand_response(
     weather_years: list,
     result: MainResults,
@@ -1180,7 +1181,7 @@ def create_demand_response(
             )
 
         for cluster in scenario_builder_values:
-            print(f"building scenario order for {cluster}")
+            # print(f"building scenario order for {cluster}")
             set_scenariobuilder_values(cluster)
 
     with open("Antares/input/thermal/areas.ini", "w") as f:
@@ -1188,7 +1189,7 @@ def create_demand_response(
 
 
 def process_in_batches(
-    regions, regional_unserved_energy_costs, model_func, batch_size=17
+    regions, regional_unserved_energy_costs, model_func, batch_size=33
 ):
     """Process regions in smaller batches to control memory usage"""
     all_unserved_costs = {}

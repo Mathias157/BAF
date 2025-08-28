@@ -320,8 +320,7 @@ def get_vre_availability(
 
     # Calculate inverse residual load
     vre_availability = (
-        all_data["onshore_wind"] +
-        all_data["offshore_wind"] + all_data["solar_pv"]
+        all_data["onshore_wind"] + all_data["offshore_wind"] + all_data["solar_pv"]
     )
     vre_availability = (
         vre_availability.stack()
@@ -583,8 +582,7 @@ def seasonal_colors(num_seasons: int, style: str):
     for i in range(1, num_seasons + 1):
         # Calculate how far we are from the midpoint (S26)
         # This gives a value between 0 (at S26) and 1 (at S01 or S52)
-        distance_from_mid = abs(
-            i - (num_seasons / 2 + 0.5)) / (num_seasons / 2)
+        distance_from_mid = abs(i - (num_seasons / 2 + 0.5)) / (num_seasons / 2)
 
         # Red component: max at midpoint, min at endpoints
         color = 1.0 - distance_from_mid
@@ -597,8 +595,7 @@ def seasonal_colors(num_seasons: int, style: str):
             colors[season_key] = mcolors.to_hex([color, 0, 0, 0.5])
         else:
             # Red component varies, others fixed. .to_hex used to avoid color map warning
-            colors[season_key] = mcolors.to_hex(
-                [1, other_color, other_color, 0.5])
+            colors[season_key] = mcolors.to_hex([1, other_color, other_color, 0.5])
 
     return colors
 
@@ -640,8 +637,7 @@ def combine_step_curves(x1, y1, x2, y2):
             combined_x.append(x0)
             combined_y.append(0)
         combined_x.append(x0)
-        combined_y.append(find_closest_x(x0, x1, y1) +
-                          find_closest_x(x0, x2, y2))
+        combined_y.append(find_closest_x(x0, x1, y1) + find_closest_x(x0, x2, y2))
 
     return combined_x, combined_y
 
@@ -709,8 +705,7 @@ def get_supply_curves(
     """
 
     year = str(year)
-    commodity2technology = {
-        "HEAT": "ELECT-TO-HEAT", "HYDROGEN": "ELECTROLYZER"}
+    commodity2technology = {"HEAT": "ELECT-TO-HEAT", "HYDROGEN": "ELECTROLYZER"}
     technology = commodity2technology[commodity]
     df1_temp = fuel_consumption.query(
         f'Year == "{year}" and Technology == "{technology}"'
@@ -809,8 +804,7 @@ def get_supply_curves(
                         ax.set_ylabel(f"{tech} (MWh)")
                         ax.set_xlabel("Electricity Price (€/MWh)")
                         ax.set_title(area)
-                        ax.legend(loc="center left",
-                                  bbox_to_anchor=(1.05, 0.5))
+                        ax.legend(loc="center left", bbox_to_anchor=(1.05, 0.5))
                         fig.savefig(
                             f"Workflow/OverallResults/eldempricecurve_{commodity}_{area}_{tech}_{parameter_names[0]}{average_parameters[0]:0.2f}_{parameter_names[1]}{average_parameters[1]:0.2f}.png",
                             bbox_inches="tight",
@@ -827,8 +821,7 @@ def get_supply_curves(
 
             # Plot overall curve
             if plot_all_curves or plot_overall_curves:
-                ax_parameter.plot(combined_x, combined_y,
-                                  label=average_parameters)
+                ax_parameter.plot(combined_x, combined_y, label=average_parameters)
 
             # Store seasonal curves
             resulting_curves[region][i] = {
@@ -840,15 +833,13 @@ def get_supply_curves(
 
         # Plot overall curve
         if plot_all_curves or plot_overall_curves:
-            ax_parameter.set_title(
-                "Supply Curve for %s in %s" % (commodity, region))
+            ax_parameter.set_title("Supply Curve for %s in %s" % (commodity, region))
             ax_parameter.set_ylabel("MWh")
             ax_parameter.set_xlabel("€/MWh")
             ax_parameter.set_facecolor("none")
             ax_parameter.legend(loc="center left", bbox_to_anchor=(1.05, 0.5))
             fig_season.savefig(
-                "Workflow/OverallResults/supply_curve_%s_%s.png" % (
-                    commodity, region),
+                "Workflow/OverallResults/supply_curve_%s_%s.png" % (commodity, region),
                 bbox_inches="tight",
             )
 
@@ -879,8 +870,7 @@ def get_prices_demands(
     """
 
     year = str(year)
-    commodity2technology = {
-        "HEAT": "ELECT-TO-HEAT", "HYDROGEN": "ELECTROLYZER"}
+    commodity2technology = {"HEAT": "ELECT-TO-HEAT", "HYDROGEN": "ELECTROLYZER"}
     technology = commodity2technology[commodity]
     df1_temp = fuel_consumption.query(
         f'Year == "{year}" and Technology == "{technology}"'
@@ -969,8 +959,7 @@ def find_closest_indices_with_cut(column, Y):
         labels = list(range(len(Y)))
 
     # Use pd.cut to assign each value to closest Y index
-    closest_indices = pd.cut(
-        column, bins=bins, labels=labels, include_lowest=True)
+    closest_indices = pd.cut(column, bins=bins, labels=labels, include_lowest=True)
 
     # Group original indices by their closest Y value
     result = {}
@@ -1083,8 +1072,7 @@ def model_supply_curves_in_antares(
 
         row_indices = capacity.index.values
         col_indices = capacity.columns.values - 1982
-        row_mesh, col_mesh = np.meshgrid(
-            row_indices, col_indices, indexing="ij")
+        row_mesh, col_mesh = np.meshgrid(row_indices, col_indices, indexing="ij")
 
         # Set availability of virtual cluster
         availability[cluster_name][row_mesh, col_mesh] += capacity.values
@@ -1093,8 +1081,7 @@ def model_supply_curves_in_antares(
         load[row_mesh, col_mesh] += capacity.values
 
     # Set load
-    np.savetxt(
-        antares_input.path_load[virtual_area], load, delimiter="\t", fmt="%g")
+    np.savetxt(antares_input.path_load[virtual_area], load, delimiter="\t", fmt="%g")
 
     # Set transmission capacity equal to the load
     create_transmission_input(
@@ -1131,8 +1118,7 @@ def model_supply_curves_in_antares(
     fuelcell_cost = conf.getfloat("fuelcell_hydrogen", "marginal-cost")
     if fuelcell_cost <= highest_price:
         conf.set("fuelcell_hydrogen", "marginal-cost", str(highest_price + 5))
-        conf.set("fuelcell_hydrogen", "market-bid-cost",
-                 str(highest_price + 5))
+        conf.set("fuelcell_hydrogen", "market-bid-cost", str(highest_price + 5))
         with open(
             "Antares/input/thermal/clusters/%s/list.ini" % region.lower(), "w"
         ) as f:
@@ -1141,7 +1127,7 @@ def model_supply_curves_in_antares(
     return unserved_energy_cost, scenario_builder_values
 
 
-def find_closest_indices_chunked(x, y, px_values, py_values, chunk_size=5000):
+def find_closest_indices_chunked(x, y, px_values, py_values, chunk_size=100):
     """Find closest indices using chunked processing to minimize memory usage."""
     n_px = len(px_values)
     closest_indices = np.zeros(n_px, dtype=int)
