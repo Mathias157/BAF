@@ -12,7 +12,6 @@ Created on 15.07.2025
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from memory_profiler import profile
 import numpy as np
 import pickle as pkl
 import click

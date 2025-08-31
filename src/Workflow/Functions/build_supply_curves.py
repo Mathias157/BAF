@@ -13,14 +13,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import pandas as pd
-from memory_profiler import profile
 import click
 import pickle
 from sklearn.cluster import KMeans
 import os
 import configparser
 from pybalmorel import Balmorel, MainResults
-from scipy.spatial.distance import cdist
 from .GeneralHelperFunctions import (
     load_OSMOSE_data,
     create_transmission_input,
@@ -1127,7 +1125,7 @@ def model_supply_curves_in_antares(
     return unserved_energy_cost, scenario_builder_values
 
 
-def find_closest_indices_chunked(x, y, px_values, py_values, chunk_size=100):
+def find_closest_indices_chunked(x, y, px_values, py_values, chunk_size=300):
     """Find closest indices using chunked processing to minimize memory usage."""
     n_px = len(px_values)
     closest_indices = np.zeros(n_px, dtype=int)

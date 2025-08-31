@@ -13,7 +13,7 @@ ASSUMPTIONS:
 OTHER:
 Read this script from the bottom and up to get an overview
 """
-# %% ------------------------------- ###
+### ------------------------------- ###
 ###       0. Script Settings        ###
 ### ------------------------------- ###
 
@@ -21,10 +21,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pandas.errors import EmptyDataError
 import numpy as np
-import matplotlib.pyplot as plt
-import gams
-from memory_profiler import profile
 import click
+import gams
 import os
 import pickle
 import configparser
@@ -91,7 +89,9 @@ def antares_vre_capacities(
 
     for tech in B2A_ren.keys():
         # Filter tech
-        idx = (cap["Tech"] == tech) & (cap["Y"] == year)
+        idx = (cap["Tech"] == tech) & (cap["Y"] == str(year))
+        print(tech)
+        print(cap["Y"].dtype)
 
         p = "../Antares/input/%s/series/" % (B2A_ren[tech])
 
@@ -106,11 +106,14 @@ def antares_vre_capacities(
             # Sum capacity from Balmorel Regions
             tech_cap = 0
 
+            print(region, A2B_regi[region])
+
             # If Balmorel has higher spatial resolution...
             if len(A2B_regi[region]) > 1:
                 for balmorel_region in A2B_regi[region]:
                     tech_cap += (
-                        cap.loc[idx & (cap.R == balmorel_region), "Value"].sum() * 1000
+                        cap.loc[idx & (cap.R == balmorel_region),
+                                "Value"].sum() * 1000
                     )
             # ...otherwise
             else:
@@ -123,11 +126,10 @@ def antares_vre_capacities(
                 raise ValueError(
                     f"Balmorel invested in a {B2A_ren[tech]} capacity in {region} that isn't configured in Antares!"
                 )
-            else:
-                continue
 
             if tech_cap > 1e-5:
-                area_config.set(B2A_ren[tech], "nominalcapacity", str(tech_cap))
+                area_config.set(
+                    B2A_ren[tech], "nominalcapacity", str(tech_cap))
                 area_config.set(B2A_ren[tech], "enabled", "true")
             else:
                 area_config.set(B2A_ren[tech], "nominalcapacity", "0")
@@ -145,7 +147,8 @@ def antares_vre_capacities(
             # Save technoeconomic data to file
             fAntTechno.loc[(i, year, region, tech), "CAPEX"] = capex
             fAntTechno.loc[(i, year, region, tech), "OPEX"] = 0
-            fAntTechno.loc[(i, year, region, tech), "Power Capacity"] = tech_cap
+            fAntTechno.loc[(i, year, region, tech),
+                           "Power Capacity"] = tech_cap
 
     return fAntTechno, cap
 
@@ -319,14 +322,16 @@ def antares_thermal_capacities(
                 if not (cluster_name in thermal_config.sections()):
                     # First, save previous edits
                     with open(
-                        "Antares/input/thermal/clusters/%s/list.ini" % (region.lower()),
+                        "Antares/input/thermal/clusters/%s/list.ini" % (
+                            region.lower()),
                         "w",
                     ) as f:
                         thermal_config.write(f)
                     thermal_config.clear()
 
                     # Then, create new cluster
-                    ant_input.create_thermal(region.lower(), cluster_name, fuel.lower())
+                    ant_input.create_thermal(
+                        region.lower(), cluster_name, fuel.lower())
 
                     # Read again
                     thermal_config.read(
@@ -343,7 +348,8 @@ def antares_thermal_capacities(
                 # Create transmission capacity for hydrogen offtake, for fuel cell:
                 if (tech == "FUELCELL") & (fuel == "HYDROGEN") & (tech_cap > 1e-5):
                     fuellcell_production_hours = (
-                        production_hourly.query("Region == @region and Year == @year")
+                        production_hourly.query(
+                            "Region == @region and Year == @year")
                         .pivot_table(index=["Season", "Time"], values="Value")
                         .index.unique()
                     )
@@ -366,8 +372,10 @@ def antares_thermal_capacities(
                         "eur/MWh",
                     )
 
-                thermal_config.set(cluster_name, "marginal-cost", str(round(mc_cost)))
-                thermal_config.set(cluster_name, "market-bid-cost", str(round(mc_cost)))
+                thermal_config.set(
+                    cluster_name, "marginal-cost", str(round(mc_cost)))
+                thermal_config.set(
+                    cluster_name, "market-bid-cost", str(round(mc_cost)))
 
                 # Save capacity timeseries (assuming no outage!)
                 temp = pd.Series(np.ones(8760) * tech_cap).astype(int)
@@ -449,7 +457,8 @@ def antares_thermal_capacities(
         # Load constant PSP capacities and save in .ini
 
         with open(
-            "Antares/input/thermal/clusters/%s/list.ini" % (region.lower()), "w"
+            "Antares/input/thermal/clusters/%s/list.ini" % (
+                region.lower()), "w"
         ) as f:
             thermal_config.write(f)
         thermal_config.clear()
@@ -472,7 +481,8 @@ def antares_thermal_capacities(
                 weight * temp[temp.R == balmorel_region].Value.sum() * 1e3
             )  # MW H2 out
             if temp.loc[temp.R == balmorel_region, "Value"].sum() * 1000 > 1e-6:
-                eff += get_efficiency(cap, idx_cap & (cap.R == balmorel_region), GDATA)
+                eff += get_efficiency(cap, idx_cap &
+                                      (cap.R == balmorel_region), GDATA)
                 N_reg += 1
 
     return fAntTechno
@@ -574,7 +584,8 @@ def antares_storage_capacities(
         )
 
         # 'Pumping' Capacity (Charge)
-        set_cluster_attribute("z_bat_gen", "nominalcapacity", power_cap, region)
+        set_cluster_attribute(
+            "z_bat_gen", "nominalcapacity", power_cap, region)
 
         create_transmission_input(
             "./", "Antares", "00_BAT_STO", region.lower(), [0, power_cap], 0
@@ -583,8 +594,10 @@ def antares_storage_capacities(
         # Save technoeconomic data to file
         fAntTechno.loc[(i, year, region, "battery"), "OPEX"] = 0
         fAntTechno.loc[(i, year, region, "battery"), "CAPEX"] = capex
-        fAntTechno.loc[(i, year, region, "battery"), "Energy Capacity"] = power_cap * 24
-        fAntTechno.loc[(i, year, region, "battery"), "Power Capacity"] = power_cap
+        fAntTechno.loc[(i, year, region, "battery"),
+                       "Energy Capacity"] = power_cap * 24
+        fAntTechno.loc[(i, year, region, "battery"),
+                       "Power Capacity"] = power_cap
 
     return fAntTechno
 
@@ -603,87 +616,46 @@ def antares_transmission_capacities(
 
     print("\nTransmission capacities to Antares...\n")
 
-    # 4.1 Read All Links
-    # PRODUCED BY HAND...
-    links = pd.read_csv("Pre-Processing/Data/Links.csv", sep=";")
-
-    # 4.2 Read Balmorel Results
+    # 4.1 Read Balmorel Results
     trans = symbol_to_df(
         db, "X_CAP_YCR", ["Y", "C", "RE", "RI", "Var", "Units", "Value"]
     )
     trans.loc[:, "Commodity"] = "ELECTRICITY"
 
+    # 4.2 Read All Links
+    summed_trans_capacities = trans.query(f'Y == "{year}"').pivot_table(
+        index="RE",
+        columns="RI",
+        values="Value",
+        aggfunc=lambda x: np.sum(x) * 1e3,
+        fill_value=0,
+    )
+
     print("Paranthesis is capacity in opposite direction")
     # 4.3 Go through all links
-    for n, row in links.iterrows():
-        # Filter through capacities
-        idx = (trans.Commodity == row.carrier.upper()) & (trans.Y == year)
+    for export_region in summed_trans_capacities.index:
+        for import_region in summed_trans_capacities.columns:
+            if summed_trans_capacities.loc[export_region, import_region] > 1e-3:
+                export_cap = summed_trans_capacities.loc[export_region,
+                                                         import_region]
+                import_cap = summed_trans_capacities.loc[import_region,
+                                                         export_region]
+                print(
+                    f"{export_region} - {import_region} {export_cap:0.0f} MW ({import_cap:0.0f} MW)"
+                )
 
-        # Choose correct dictionary
-        mapper = A2B_regi if row.carrier == "electricity" else A2B_regi_h2
-        capsfunc = str.upper if row.carrier == "electricity" else str.lower
+                create_transmission_input(
+                    "./",
+                    "Antares",
+                    export_region,
+                    import_region,
+                    [export_cap, import_cap],
+                    0.01,
+                )
 
-        # Capacity from
-        # Find areas from
-        if row.comment == "from_aggregate":
-            idx2 = trans.RE != trans.RE
-            for exp in mapper[capsfunc(row["from"])]:
-                idx2 = idx2 | (trans.RE == exp)
-        else:
-            # Harmonised spatial resolution
-            idx2 = trans.RE == mapper[capsfunc(row["from"])][0]
-
-        # Find areas toE
-        if row.comment == "to_aggregate":
-            idx3 = trans.RI != trans.RI
-            for imp in mapper[capsfunc(row["to"])]:
-                idx3 = idx3 | (trans.RI == imp)
-        else:
-            # Harmonised spatial resolution
-            idx3 = trans.RI == mapper[capsfunc(row["to"])][0]
-
-        # Sum capacity
-        trans_cap_from = trans.loc[idx & idx2 & idx3, "Value"].sum() * 1e3  # MW
-
-        # Capacity to
-        # Find areas from
-        if row.comment == "from_aggregate":
-            idx2 = trans.RE != trans.RE
-            for exp in mapper[capsfunc(row["to"])]:
-                idx2 = idx2 | (trans.RE == exp)
-        else:
-            # Harmonised spatial resolution
-            idx2 = trans.RE == mapper[capsfunc(row["to"])][0]
-
-        # Find areas toE
-        if row.comment == "to_aggregate":
-            idx3 = trans.RI != trans.RI
-            for imp in mapper[capsfunc(row["from"])]:
-                idx3 = idx3 | (trans.RI == imp)
-        else:
-            # Harmonised spatial resolution
-            idx3 = trans.RI == mapper[capsfunc(row["from"])][0]
-
-        # Sum capacity
-        trans_cap_to = trans.loc[idx & idx2 & idx3, "Value"].sum() * 1e3  # MW
-        print(
-            row["from"],
-            row["to"],
-            trans_cap_from.astype(int),
-            "(",
-            trans_cap_to.astype(int),
-            ") MW",
-        )
-
-        # Save it
-        create_transmission_input(
-            "./",
-            "Antares",
-            row["from"],
-            row["to"],
-            [trans_cap_from, trans_cap_to],
-            0.01,
-        )
+                # Make sure that it will skip this connection the next time
+                summed_trans_capacities.loc[export_region, import_region] = 0
+                summed_trans_capacities.loc[import_region, export_region] = 0
 
 
 def antares_exogenous_electricity_demand(
@@ -714,7 +686,7 @@ def antares_exogenous_electricity_demand(
             # Get weather independant profiles
 
             profiles = electricity_profiles.query(
-                'RRR == @balmorel_region and DEUSER != "FICTDEM"'
+                'RRR == @balmorel_region and not DEUSER.str.contains("FICTIVE")'
             ).pivot_table(
                 index=["SSS", "TTT"],
                 columns="DEUSER",
@@ -723,7 +695,7 @@ def antares_exogenous_electricity_demand(
                 fill_value=0,
             )
             demand = electricity_demand.query(
-                'RRR == @balmorel_region and YYY == @year and DEUSER != "FICTDEM"'
+                'RRR == @balmorel_region and YYY == @year and not DEUSER.str.contains("FICTIVE")'
             ).pivot_table(index="DEUSER", values="Value", aggfunc="sum", fill_value=0)
 
             profiles = profiles / profiles.sum()
@@ -797,7 +769,8 @@ def antares_weekly_resource_constraints(
 
     Config = configparser.ConfigParser()
     for region in A2B_regi.keys():
-        Config.read("Antares/input/renewables/clusters/%s/list.ini" % region.lower())
+        Config.read("Antares/input/renewables/clusters/%s/list.ini" %
+                    region.lower())
 
         load = pd.read_table(
             "Antares/input/load/series/load_%s.txt" % (region.lower()), header=None
@@ -807,7 +780,7 @@ def antares_weekly_resource_constraints(
             # Production series
             try:
                 f = pd.read_table(
-                    "Antares/input/renewables/series/{region}/{VRE}/series.txt".format(
+                    f"Antares/input/renewables/series/{region}/{VRE}/series.txt".format(
                         region=region.lower(), VRE=VRE
                     ),
                     header=None,
@@ -881,7 +854,8 @@ def antares_weekly_resource_constraints(
                         if generator in Config.options(section):
                             # print('%s is in section %s'%(generator, section))
                             # print('Setting %s to efficiency %0.2f'%(generator, eff))
-                            Config.set(section, generator, str(round(1 / eff, 2)))
+                            Config.set(section, generator,
+                                       str(round(1 / eff, 2)))
 
             # 6.3 Calculate Weekly Fuel Limits for all fuels but Muniwaste, if not already done
             if not (CCCRRR.loc[country, "Done?"]):
@@ -908,7 +882,8 @@ def antares_weekly_resource_constraints(
                         for i in range(7):
                             if pot > 0:
                                 # If there is a potential specified
-                                f.write("%0.2f\t0\t0\n" % (week_distribution * pot / 7))
+                                f.write("%0.2f\t0\t0\n" %
+                                        (week_distribution * pot / 7))
                             else:
                                 # If there is no potential specified, put a very high limit
                                 f.write("%0.2f\t0\t0\n" % (1e12))
@@ -916,7 +891,8 @@ def antares_weekly_resource_constraints(
                     # The last week
                     if pot > 0:
                         for i in range(2):
-                            f.write("%0.2f\t0\t0\n" % (week_distribution * pot / 7))
+                            f.write("%0.2f\t0\t0\n" %
+                                    (week_distribution * pot / 7))
                     else:
                         for i in range(2):
                             f.write("%0.2f\t0\t0\n" % (1e12))
@@ -970,9 +946,11 @@ def antares_weekly_resource_constraints(
             weight += 1
         # print('%s weight: %0.2f'%(region, weight))
 
-        pot = GMAXFS.loc[idx & idx2].groupby(by=["S"]).aggregate({"Value": "sum"})
+        pot = GMAXFS.loc[idx & idx2].groupby(
+            by=["S"]).aggregate({"Value": "sum"})
         with open(
-            "Antares/input/bindingconstraints/muniwasteres_%s.txt" % (region.lower()),
+            "Antares/input/bindingconstraints/muniwasteres_%s.txt" % (
+                region.lower()),
             "w",
         ) as f:
             for week in pot.index:
@@ -1017,7 +995,8 @@ def demand_response_constraint_RHS(
         _type_: _description_
     """
 
-    demand = balmorel_timeseries.get_summed_profile(scenario, year, commodity, node)
+    demand = balmorel_timeseries.get_summed_profile(
+        scenario, year, commodity, node)
 
     # Storage capacity
     storage = (
@@ -1058,10 +1037,12 @@ def create_demand_response_hourly_constraint(
 
     # Load RRRAAA
     sc_folder = balmorel_timeseries.model.scname_to_scfolder[scenario]
-    RRRAAA = symbol_to_df(balmorel_timeseries.model.input_data[sc_folder], "RRRAAA")
+    RRRAAA = symbol_to_df(
+        balmorel_timeseries.model.input_data[sc_folder], "RRRAAA")
 
     # Load electricity nodes from balmorel_timeseries
-    electricity_regions = balmorel_timeseries.set["electricity"]["RRR"].unique()
+    electricity_regions = balmorel_timeseries.set["electricity"]["RRR"].unique(
+    )
 
     # Load heat nodes
     heat_nodes = balmorel_timeseries.set["heat"]["AAA"].unique()
@@ -1096,7 +1077,6 @@ def create_demand_response_hourly_constraint(
             f.write("\n".join(["0" for i in range(49)]))
 
 
-@profile
 def create_demand_response(
     weather_years: list,
     result: MainResults,
@@ -1159,7 +1139,8 @@ def create_demand_response(
         # Make fits in parallel
         regions = list(prices_demands[commodity].keys())
         regional_unserved_energy_costs = [
-            unserved_energy_cost.getfloat("unserverdenergycost", region.lower())
+            unserved_energy_cost.getfloat(
+                "unserverdenergycost", region.lower())
             for region in regions
         ]
         print(
@@ -1196,8 +1177,8 @@ def process_in_batches(
     all_scenario_values = []
 
     for i in range(0, len(regions), batch_size):
-        batch_regions = regions[i : i + batch_size]
-        batch_costs = regional_unserved_energy_costs[i : i + batch_size]
+        batch_regions = regions[i: i + batch_size]
+        batch_costs = regional_unserved_energy_costs[i: i + batch_size]
         batch_args = list(zip(batch_regions, batch_costs))
 
         print(
@@ -1251,7 +1232,8 @@ def model_demand_response(
     )
 
     if not (np.all(x0 == x1) and np.all(y0 == y1)):
-        raise ValueError("x and y were not similar from kernel smoothing output!")
+        raise ValueError(
+            "x and y were not similar from kernel smoothing output!")
 
     # Create demand response
     unserved_energy_cost, scenario_builder_values = model_supply_curves_in_antares(
@@ -1414,13 +1396,15 @@ def main(ctx, sc_name: str, year: str):
         .aggregate({"Value": "sum"})
     )
     FPRICE = (
-        symbol_to_df(m.input_data[SC_folder], "FUELPRICE1", ["Y", "R", "F", "Value"])
+        symbol_to_df(m.input_data[SC_folder],
+                     "FUELPRICE1", ["Y", "R", "F", "Value"])
         .groupby(by=["Y", "R", "F"])
         .aggregate({"Value": "sum"})
     )
     EMI_POL = (
         symbol_to_df(
-            m.input_data[SC_folder], "EMI_POL", ["Y", "C", "Group", "Par", "Value"]
+            m.input_data[SC_folder], "EMI_POL", [
+                "Y", "C", "Group", "Par", "Value"]
         )
         .groupby(by=["Y", "C", "Group", "Par"])
         .aggregate({"Value": "sum"})
@@ -1433,7 +1417,8 @@ def main(ctx, sc_name: str, year: str):
     DISLOSSEL = symbol_to_df(
         m.input_data[SC_folder], "DISLOSS_E", ["R", "Value"]
     ).pivot_table(index="R", values="Value")
-    GMAXF = symbol_to_df(m.input_data[SC_folder], "GMAXF", ["Y", "CRA", "F", "Value"])
+    GMAXF = symbol_to_df(m.input_data[SC_folder], "GMAXF", [
+                         "Y", "CRA", "F", "Value"])
     GMAXFS = symbol_to_df(
         m.input_data[SC_folder], "GMAXFS", ["Y", "CRA", "F", "S", "Value"]
     )
@@ -1458,7 +1443,8 @@ def main(ctx, sc_name: str, year: str):
 
     # Temporal resolution
     balmorel_index, hour_index = get_balmorel_time_and_hours(res)
-    temporal_resolution = {"balmorel_index": balmorel_index, "hour_index": hour_index}
+    temporal_resolution = {
+        "balmorel_index": balmorel_index, "hour_index": hour_index}
 
     # Renewable Capacities
     fAntTechno, cap = antares_vre_capacities(
@@ -1466,52 +1452,52 @@ def main(ctx, sc_name: str, year: str):
     )
 
     # Thermal Capacities
-    fAntTechno = antares_thermal_capacities(
-        res.db[SC],
-        A2B_regi,
-        A2B_regi_h2,
-        BalmTechs,
-        GDATA,
-        FPRICE,
-        FDATA,
-        EMI_POL,
-        ANNUITYCG,
-        cap,
-        i,
-        year,
-        fAntTechno,
-    )
-
-    # Storage Capacities
-    fAntTechno = antares_storage_capacities(
-        res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
-    )
-
-    # Transmission Capacities
-    antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
-
-    # Exogenous Electricity Demand Profile
-    antares_exogenous_electricity_demand(
-        electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
-    )
-
-    # Resource Constraints
-    # antares_weekly_resource_constraints(A2B_regi, B2A_ren,
-    #                                     BalmTechs, year,
-    #                                     GDATA, GMAXF, GMAXFS,
-    #                                     CCCRRR, cap)
-
-    # Demand response
-    create_demand_response(
-        ctx.obj["weather_years"],
-        res,
-        SC,
-        int(year),
-        temporal_resolution,
-        parameter_x,
-        parameter_y,
-        style,
-    )
+    # fAntTechno = antares_thermal_capacities(
+    #     res.db[SC],
+    #     A2B_regi,
+    #     A2B_regi_h2,
+    #     BalmTechs,
+    #     GDATA,
+    #     FPRICE,
+    #     FDATA,
+    #     EMI_POL,
+    #     ANNUITYCG,
+    #     cap,
+    #     i,
+    #     year,
+    #     fAntTechno,
+    # )
+    #
+    # # Storage Capacities
+    # fAntTechno = antares_storage_capacities(
+    #     res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
+    # )
+    #
+    # # Transmission Capacities
+    # antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
+    #
+    # # Exogenous Electricity Demand Profile
+    # antares_exogenous_electricity_demand(
+    #     electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
+    # )
+    #
+    # # Resource Constraints
+    # # antares_weekly_resource_constraints(A2B_regi, B2A_ren,
+    # #                                     BalmTechs, year,
+    # #                                     GDATA, GMAXF, GMAXFS,
+    # #                                     CCCRRR, cap)
+    #
+    # # Demand response
+    # create_demand_response(
+    #     ctx.obj["weather_years"],
+    #     res,
+    #     SC,
+    #     int(year),
+    #     temporal_resolution,
+    #     parameter_x,
+    #     parameter_y,
+    #     style,
+    # )
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
 
     print("\n|--------------------------------------------------|")
