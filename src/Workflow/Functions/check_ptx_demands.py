@@ -151,7 +151,7 @@ if __name__ == "__main__":
     # clustersize_Kmeansinit_tempres_sensitivity(gams_system_directory)
 
     balmorel_ptx, antares_ptx = get_ptx_results(
-        "20250830-1524eco-eufictdem_s4t56_iter0_y-2050",
+        "20250830-1817eco-eufictdem_s4t56_iter0_y-2050",
         "MainResults_EUFictDem_S4T56_Iter0.gdx",
         gams_system_directory,
     )
