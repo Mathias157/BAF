@@ -142,8 +142,9 @@ def do_kernel_smoothing(
 
     if plot:
         Z_grid = smoothed.reshape(X_grid.shape)  # Reshape back to grid
+        # plt.style.use('dark_background')
         fig = plt.figure(figsize=plt.figaspect(0.5))
-        ax = fig.add_subplot(1, 1, 1, projection="3d")
+        ax = fig.add_subplot(1, 1, 1, projection="3d", facecolor='none')
         ax.scatter(x_obs * x_abs_max + x_abs_min, y_obs * y_abs_max + y_abs_min, z_obs)
         ax.set_xlabel(parameter_x)
         ax.set_ylabel(parameter_y)
@@ -164,7 +165,7 @@ def do_kernel_smoothing(
 
         ax.legend((parameter_z, "smoothed"))
         fig.subplots_adjust(hspace=0.7)
-        fig.savefig(f"Workflow/MetaResults/{parameter_z}_{plot_name}")
+        fig.savefig(f"Workflow/MetaResults/{parameter_z}_{plot_name}", transparent=True)
         with open(f"Workflow/MetaResults/{parameter_z}_{plot_name}.pkl", "wb") as f:
             pkl.dump(fig, f)
 

@@ -236,6 +236,10 @@ def create_transmission_input(wk_dir, ant_study, area_from, area_to, trans_cap, 
                 f.write(str(int(trans_cap[1])) + '\n')  
         
 
+def log_time():
+    string = time.strftime('[%Y-%m-%d %H:%M]:', tuple(time.localtime()))
+    return string
+
 def get_marginal_costs(year, cap, idx_cap, fuel, GDATA, FPRICE, FDATA, EMI_POL, ANNUITYCG, include_capital_costs: bool = True):
     """Gets average marginal cost of generators in cap[idx_cap], provided VOM, fuel and emission policy data 
 

@@ -153,10 +153,14 @@ if __name__ == "__main__":
     balmorel_ptx, antares_ptx = get_ptx_results(
         "20250830-1817eco-eufictdem_s4t56_iter0_y-2050",
         "MainResults_EUFictDem_S4T56_Iter0.gdx",
+        # "20250901-1609eco-eutest_s4t56_iter0_y-2050",
+        # "MainResults_EUtest_S4T56_Iter0.gdx",
+        # "20250901-1639eco-eutest_s4t168_iter0_y-2050",
+        # "MainResults_EUtest_S4T168_Iter0.gdx",
         gams_system_directory,
     )
 
     print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
     print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
 
-    print(antares_ptx.loc[antares_ptx.Value > 0, :])
+    # print(antares_ptx.loc[antares_ptx.Value > 0, :])
