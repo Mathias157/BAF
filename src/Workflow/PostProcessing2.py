@@ -53,15 +53,20 @@ def get_antares_inadequacy(antares_result: str, regional_mapping: dict):
 @click.command()
 # @click.argument('antares-result')
 def main():
-    antares_result = "20250830-1817eco-eufictdem_s4t56_iter0_y-2050"
-
+    antares_result="20250830-1817eco-eufictdem_s4t56_iter0_y-2050"
+    # antares_result="20250901-1609eco-eutest_s4t56_iter0_y-2050" 
+    # antares_result="20250901-1639eco-eutest_s4t168_iter0_y-2050"           
+    # antares_result="20250902-1913eco-eufictdem_s4t56_2_5pctbw_iter0_y-2050"
+    # antares_result="20250902-2142eco-eutest_s4t56_2_5pctbw_iter0_y-2050"    
+    
     # Region mappings
     with open("Pre-Processing/Output/A2B_regi.pkl", "rb") as f:
         A2B_regi = pickle.load(f)
 
     df = get_antares_inadequacy(antares_result, A2B_regi)
 
-    print(df)
+    # print(df)
+    print(antares_result)
     print(df[["LOLE", "ENS"]].sum())
 
 

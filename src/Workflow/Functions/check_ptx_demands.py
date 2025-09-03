@@ -150,17 +150,28 @@ if __name__ == "__main__":
     gams_system_directory = "/appl/gams/47.6.0"
     # clustersize_Kmeansinit_tempres_sensitivity(gams_system_directory)
 
-    balmorel_ptx, antares_ptx = get_ptx_results(
-        "20250830-1817eco-eufictdem_s4t56_iter0_y-2050",
-        "MainResults_EUFictDem_S4T56_Iter0.gdx",
-        # "20250901-1609eco-eutest_s4t56_iter0_y-2050",
-        # "MainResults_EUtest_S4T56_Iter0.gdx",
-        # "20250901-1639eco-eutest_s4t168_iter0_y-2050",
-        # "MainResults_EUtest_S4T168_Iter0.gdx",
-        gams_system_directory,
-    )
+    concated = pd.DataFrame()
+    for balmorel_result, antares_result in [
+        ["MainResults_EUtest_S4T56_Iter0.gdx", "20250902-2142eco-eutest_s4t56_2_5pctbw_iter0_y-2050"],
+        ["MainResults_EUtest_S4T56_Iter0.gdx", "20250901-1609eco-eutest_s4t56_iter0_y-2050"],
+        ["MainResults_EUtest_S4T168_Iter0.gdx","20250901-1639eco-eutest_s4t168_iter0_y-2050"],
+        ["MainResults_EUFictDem_S4T56_Iter0.gdx", "20250902-1913eco-eufictdem_s4t56_2_5pctbw_iter0_y-2050"],
+        ["MainResults_EUFictDem_S4T56_Iter0.gdx","20250830-1817eco-eufictdem_s4t56_iter0_y-2050" ],
+    ]:
+        balmorel_ptx, antares_ptx = get_ptx_results(
+            antares_result,
+            balmorel_result,
+            gams_system_directory,
+        )
 
-    print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
-    print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+        temp_concatenated = pd.concat((balmorel_ptx, antares_ptx), ignore_index=True)
+        temp_concatenated['AntaresFile'] = antares_result
+        temp_concatenated['BalmorelFile'] = balmorel_result
+        concated = pd.concat((concated, temp_concatenated), ignore_index=True)
 
-    # print(antares_ptx.loc[antares_ptx.Value > 0, :])
+        print(antares_result)
+        print(balmorel_result)
+        print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
+        print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+
+    concated.to_csv('Workflow/OverallResults/PtX_demand_comparison.csv')
