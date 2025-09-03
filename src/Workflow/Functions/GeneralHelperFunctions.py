@@ -443,7 +443,7 @@ class AntaresOutput:
     """
     A class for handling Antares outputs, based on Antares 8.7
     """
-    
+
     def __init__(self, result_name: str, folder_name: str='Antares', wk_dir: str='.'):
         # Set path to result
         self.path = os.path.join(wk_dir, folder_name, 'output', result_name)
@@ -504,16 +504,16 @@ class AntaresOutput:
         """
         
         # Choose function
-        if type(node_or_nodes) == str:
+        if type(node_or_nodes) is str:
             func = self.load_area_results
         else:
             func = self.load_link_results
             
-        if self.mc_years != None:
+        if self.mc_years is not None:
             for mc_year in self.mc_years:
                 
                 # Create temporary variable at first mc_year
-                if not('temp' in locals()):
+                if 'temp' not in locals():
                     # Load
                     temp = func(node_or_nodes, result_type, temporal, mc_year)
                     
