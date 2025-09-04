@@ -15,14 +15,13 @@ import matplotlib.pyplot as plt
 from typing import Union
 from functools import wraps
 from pybalmorel import MainResults
-from pybalmorel.utils import symbol_to_df 
 import shutil
 import os
 import time
 import sys
 import configparser
-import gams
 import click
+from pathlib import Path
 
 #%% ------------------------------- ###
 ###          1. Logging etc.        ###
@@ -442,16 +441,43 @@ def ReadIncFilePrefix(name, incfile_prefix_path, weather_year):
 class AntaresOutput:
     """
     A class for handling Antares outputs, based on Antares 8.7
+
+    Will assume that an Antares study exist in current directory
+    and get the latest result by default.
     """
 
-    def __init__(self, result_name: str, folder_name: str='Antares', wk_dir: str='.'):
-        # Set path to result
-        self.path = os.path.join(wk_dir, folder_name, 'output', result_name)
+    def __init__(self, result_name: str = 'latest', folder_name: str='Antares', wk_dir: str='.'):
+
+        result_folder=Path(folder_name).joinpath('output')
+        
+        # Find latest, if that was chosen (default)
+        if result_name.lower() == 'latest':
+            results=[
+                path for path in result_folder.iterdir()
+                if 'eco' in str(path)
+            ]
+            most_recent=[
+                result.stat().st_ctime for result in results
+            ]
+            most_recent = most_recent.index(np.max(most_recent))
+            self.path = results[most_recent]
+        else:
+            # Set path to result
+            self.path = result_folder.joinpath(result_name)
+
+        if self.path.exists():
+            print(f'Found {self.path}')
+            self.path = str(self.path)
+        else:
+            raise FileNotFoundError(f"Couldnt find {self.path}!")
+
         try:
             self.mc_years = os.listdir(os.path.join(self.path, 'economy/mc-ind'))
             self.mc_years.sort()
+            print(f'MC years: {self.mc_years}')
         except FileNotFoundError:
             self.mc_years = None
+            
         self.name = result_name
         self.wk_dir = wk_dir
         
