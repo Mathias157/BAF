@@ -173,5 +173,20 @@ def eutests(ctx):
 
     concated.to_csv('Workflow/OverallResults/PtX_demand_comparison_EUtests.csv')
 
+@CLI.command()
+@click.pass_context
+@click.argument('balmorel_result', required=True)
+def latest(ctx, balmorel_result: str):
+    """Get the most recent Antares output and compare to Balmorel file"""
+
+    balmorel_ptx, antares_ptx = get_ptx_results(
+        'latest',
+        balmorel_result,
+        ctx.obj['gams_system_directory']
+    )
+
+    print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
+    print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+
 if __name__ == "__main__":
     CLI()
