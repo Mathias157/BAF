@@ -3,14 +3,20 @@ from GeneralHelperFunctions import AntaresOutput
 from pybalmorel import MainResults
 from itertools import product
 from configparser import ConfigParser
+import click
 
 
 def get_ptx_results(
     antares_result: str, balmorel_result: str, gams_system_directory: str
 ):
     # Load Results
+    scenario_name = (
+        balmorel_result
+        .replace('MainResults_', '')
+        .replace('_Iter0.gdx', '')
+    )
     conf = ConfigParser()
-    conf.read("Config.ini")
+    conf.read(f"Workflow/MetaResults/{scenario_name}_meta.ini")
     antout = AntaresOutput(antares_result)
     mr = MainResults(
         balmorel_result,
@@ -55,53 +61,38 @@ def get_ptx_results(
         :, ["Model", "Category", "Region", "Value"]
     ], antares_ptx.loc[:, ["Model", "Category", "Region", "Value"]]
 
+@click.group()
+@click.pass_context
+@click.option('--gams-directory', type=str, default='/appl/gams/47.6.0/', help='System directory of GAMS')
+def CLI(ctx, gams_directory: str):
+    
+    ctx.ensure_object(dict)
+    ctx.obj['gams_system_directory'] = gams_directory
 
-def clustersize_Kmeansinit_tempres_sensitivity(gams_system_directory: str):
+@CLI.command()
+@click.pass_context
+def clustersize(ctx):
+    """
+    Sensitivity analyses on the cluster size (amount of supply curves developed)
+    compared to the first kernel smoothed tests at small-scale.
+    """
+
+    gams_system_directory = ctx.obj['gams_system_directory']
+
     balmorel_results = [
         "MainResults_baf_test_new_fullyear_Iter0.gdx",
         "MainResults_baf_test_new_Iter0.gdx",
     ]
     antares_results = [
-        "20250627-2347eco-baf_test_new_clsize1000_nr5_y-2050",
-        "20250627-2330eco-baf_test_new_clsize1000_nr4_y-2050",
-        "20250627-2314eco-baf_test_new_clsize1000_nr3_y-2050",
-        "20250627-2257eco-baf_test_new_clsize1000_nr2_y-2050",
         "20250627-2241eco-baf_test_new_clsize1000_nr1_y-2050",
-        "20250627-2224eco-baf_test_new_clsize100_nr5_y-2050",
-        "20250627-2219eco-baf_test_new_clsize100_nr4_y-2050",
-        "20250627-2215eco-baf_test_new_clsize100_nr3_y-2050",
-        "20250627-2210eco-baf_test_new_clsize100_nr2_y-2050",
         "20250627-2205eco-baf_test_new_clsize100_nr1_y-2050",
-        "20250627-2200eco-baf_test_new_clsize20_nr5_y-2050",
-        "20250627-2158eco-baf_test_new_clsize20_nr4_y-2050",
-        "20250627-2155eco-baf_test_new_clsize20_nr3_y-2050",
-        "20250627-2152eco-baf_test_new_clsize20_nr2_y-2050",
         "20250627-2149eco-baf_test_new_clsize20_nr1_y-2050",
-        "20250627-2146eco-baf_test_new_clsize7_nr5_y-2050",
-        "20250627-2144eco-baf_test_new_clsize7_nr4_y-2050",
-        "20250627-2141eco-baf_test_new_clsize7_nr3_y-2050",
-        "20250627-2139eco-baf_test_new_clsize7_nr2_y-2050",
         "20250627-2136eco-baf_test_new_clsize7_nr1_y-2050",
-        "20250627-2134eco-baf_test_new_fullyear_clsize1000_nr5_y-2050",
-        "20250627-2045eco-baf_test_new_fullyear_clsize1000_nr4_y-2050",
-        "20250627-1954eco-baf_test_new_fullyear_clsize1000_nr3_y-2050",
-        "20250627-1903eco-baf_test_new_fullyear_clsize1000_nr2_y-2050",
         "20250627-1815eco-baf_test_new_fullyear_clsize1000_nr1_y-2050",
-        "20250627-1722eco-baf_test_new_fullyear_clsize100_nr5_y-2050",
-        "20250627-1713eco-baf_test_new_fullyear_clsize100_nr4_y-2050",
-        "20250627-1704eco-baf_test_new_fullyear_clsize100_nr3_y-2050",
-        "20250627-1655eco-baf_test_new_fullyear_clsize100_nr2_y-2050",
         "20250627-1646eco-baf_test_new_fullyear_clsize100_nr1_y-2050",
-        "20250627-1637eco-baf_test_new_fullyear_clsize20_nr5_y-2050",
-        "20250627-1633eco-baf_test_new_fullyear_clsize20_nr4_y-2050",
-        "20250627-1629eco-baf_test_new_fullyear_clsize20_nr3_y-2050",
-        "20250627-1625eco-baf_test_new_fullyear_clsize20_nr2_y-2050",
         "20250627-1620eco-baf_test_new_fullyear_clsize20_nr1_y-2050",
-        "20250627-1616eco-baf_test_new_fullyear_clsize7_nr5_y-2050",
-        "20250627-1612eco-baf_test_new_fullyear_clsize7_nr4_y-2050",
-        "20250627-1609eco-baf_test_new_fullyear_clsize7_nr3_y-2050",
-        "20250627-1606eco-baf_test_new_fullyear_clsize7_nr2_y-2050",
         "20250627-1602eco-baf_test_new_fullyear_clsize7_nr1_y-2050",
+        "20250707-1359eco-baf_test_new_all_hours_fix_clsize1248_nr1_y-2050",
         "20250718-1530eco-baf_test_new_vectorised_ksmooth",
     ]
 
@@ -112,20 +103,23 @@ def clustersize_Kmeansinit_tempres_sensitivity(gams_system_directory: str):
         if "fullyear" in antares_result:
             balmorel_result = balmorel_results[0]
             scenario = "fullyear"
-        else:
+        elif "ksmooth" not in antares_result:
             balmorel_result = balmorel_results[1]
             scenario = "timeslices"
-        scenario = "vectorised_ksmooth"
+        else:
+            scenario = "vectorised_ksmooth"
 
         balmorel_ptx, antares_ptx = get_ptx_results(
             antares_result, balmorel_result, gams_system_directory
         )
 
         # Get metadata
-        # cluster_size = int(antares_result[antares_result.find('clsize'):].split('_')[0].replace('clsize', ''))
-        # iteration = int(antares_result[antares_result.find('nr'):].split('_')[0].replace('nr', ''))
-        cluster_size = 1248
-        iteration = 1
+        if 'ksmooth' not in antares_result:
+            cluster_size = int(antares_result[antares_result.find('clsize'):].split('_')[0].replace('clsize', ''))
+            iteration = int(antares_result[antares_result.find('nr'):].split('_')[0].replace('nr', ''))
+        else:
+            cluster_size = 1248
+            iteration = 1
 
         # Assign metadata
         balmorel_ptx["clustersize"] = cluster_size
@@ -141,14 +135,17 @@ def clustersize_Kmeansinit_tempres_sensitivity(gams_system_directory: str):
         balmorel_temp = pd.concat((balmorel_temp, balmorel_ptx), ignore_index=True)
 
     pd.concat((antares_temp, balmorel_temp), ignore_index=True).to_csv(
-        "PtX_demand_comparison.csv"
+        "Workflow/OverallResults/PtX_demand_comparison_clustersize.csv"
     )
 
+@CLI.command()
+@click.pass_context
+def eutests(ctx):
+    """
+    The first tests with kernel smoothing on European scale
+    """
 
-if __name__ == "__main__":
-    gams_system_directory = "/opt/gams/48.5"
-    gams_system_directory = "/appl/gams/47.6.0"
-    # clustersize_Kmeansinit_tempres_sensitivity(gams_system_directory)
+    gams_system_directory = ctx.obj['gams_system_directory']
 
     concated = pd.DataFrame()
     for balmorel_result, antares_result in [
@@ -174,4 +171,7 @@ if __name__ == "__main__":
         print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
         print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
 
-    concated.to_csv('Workflow/OverallResults/PtX_demand_comparison.csv')
+    concated.to_csv('Workflow/OverallResults/PtX_demand_comparison_EUtests.csv')
+
+if __name__ == "__main__":
+    CLI()

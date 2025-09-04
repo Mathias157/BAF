@@ -1081,9 +1081,10 @@ def model_supply_curves_in_antares(
     # Set load
     np.savetxt(antares_input.path_load[virtual_area], load, delimiter="\t", fmt="%g")
 
-    # Set transmission capacity equal to the load
+    # Set transmission capacity to virtual area 10x the availability, 
+    # to ensure equal electricity prices at all hours.
     create_transmission_input(
-        "./", "Antares", region, virtual_area, [load.max(), 0], 0.1
+        "./", "Antares", region, virtual_area, [load.max()*10, 0], 0.1
     )
 
     # Set availability
