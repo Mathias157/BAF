@@ -7,7 +7,7 @@ import click
 
 
 def get_ptx_results(
-    antares_result: str, balmorel_result: str, gams_system_directory: str
+    antares_result: str, balmorel_result: str, gams_system_directory: str, scenario_folder: str = 'base'
 ):
     # Load Results
     scenario_name = (
@@ -20,7 +20,7 @@ def get_ptx_results(
     antout = AntaresOutput(antares_result)
     mr = MainResults(
         balmorel_result,
-        paths="Balmorel/base/model",
+        paths=f"Balmorel/{scenario_folder}/model",
         system_directory=gams_system_directory,
     )
 
@@ -62,7 +62,7 @@ def get_ptx_results(
     ], antares_ptx.loc[:, ["Model", "Category", "Region", "Value"]]
 
 @click.pass_context
-def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str):
+def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str, scenario_folder: str = 'base'):
 
     gams_system_directory = ctx.obj['gams_system_directory']
 
@@ -72,6 +72,7 @@ def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str):
                 antares_result,
                     balmorel_result,
                     gams_system_directory,
+                    scenario_folder
                 )
 
         temp_concatenated = pd.concat((balmorel_ptx, antares_ptx), ignore_index=True)
@@ -137,7 +138,7 @@ def clustersize(ctx):
             scenario = "vectorised_ksmooth"
 
         balmorel_ptx, antares_ptx = get_ptx_results(
-            antares_result, balmorel_result, gams_system_directory
+            antares_result, balmorel_result, gams_system_directory 
         )
 
         # Get metadata
@@ -190,6 +191,15 @@ def ens_cost_sens():
     ]
 
     collect_ptx_results(antbalm_list, 'ens_cost_sens')
+
+@CLI.command()
+def temporal_sens():
+
+    antbalm_list = [
+        ["MainResults_W52T24_dist_WY2000_Iter0.gdx", "20250905-1854eco-w52t24_dist_wy2000_iter0_y-2050"]
+    ]
+
+    collect_ptx_results(antbalm_list, 'temporal-sens', 'W52T24_dist_WY2000')
  
 @CLI.command()
 @click.pass_context
