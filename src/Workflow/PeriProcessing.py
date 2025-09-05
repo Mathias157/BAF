@@ -1083,10 +1083,11 @@ def create_demand_response(
     unserved_energy_cost.read("Antares/input/thermal/areas.ini")
 
     for commodity in commodities:
-        # Compute supply curves from Balmorel results
+        # Get all input parameters in proper format for all weather years
         all_parameters = get_supply_curve_parameters_all(
             result, scenario, year, commodity
         )  # all, for later
+        # Get parameters used for Balmorel optimisation (temporally aggregated)
         fit_parameters = get_supply_curve_parameters_fit(
             result, scenario, year, commodity, temporal_resolution
         )  # for fitting to Balmorel results
@@ -1095,6 +1096,7 @@ def create_demand_response(
         )
 
         del fit_parameters
+        continue
 
         model_func = partial(
             model_demand_response,
@@ -1362,6 +1364,8 @@ def main(ctx, sc_name: str, year: str):
     m.load_incfiles(SC_folder)
     electricity_demand = symbol_to_df(m.input_data[SC_folder], "DE")
     electricity_profiles = symbol_to_df(m.input_data[SC_folder], "DE_VAR_T")
+    ctx.obj['input_data'] = m.input_data[SC_folder]
+    ctx.obj['electricity_profiles'] = electricity_profiles
 
     # Input data from this scenario (Initialisation.py will overwrite scenario_input_data.gdx when a new master run is initiated)
     GDATA = (
@@ -1420,6 +1424,9 @@ def main(ctx, sc_name: str, year: str):
     # Temporal resolution
     balmorel_index, hour_index = get_balmorel_time_and_hours(res)
     temporal_resolution = {"balmorel_index": balmorel_index, "hour_index": hour_index}
+    ctx.obj['S_all'] = ['S0%d'%i for i in range(1, 10)] + ['S%d'%i for i in range(10, 53)]
+    ctx.obj['T_all'] = ['T00%d'%i for i in range(1, 10)] + ['T0%d'%i for i in range(10, 100)] + ['T%d'%i for i in range(100, 169)]
+    ctx.obj['ST_all'] = pd.MultiIndex.from_product((ctx.obj['S_all'], ctx.obj['T_all']))
 
     # Renewable Capacities
     fAntTechno, cap = antares_vre_capacities(

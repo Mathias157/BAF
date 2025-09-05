@@ -18,6 +18,7 @@ import pickle
 from sklearn.cluster import KMeans
 import os
 import configparser
+from pybalmorel.utils import symbol_to_df
 from pybalmorel import Balmorel, MainResults
 from .GeneralHelperFunctions import (
     load_OSMOSE_data,
@@ -43,6 +44,59 @@ def load_OSMOSE_data_to_context(ctx, data, stoch_year_data):
 
     ctx.obj[data] = stoch_year_data
 
+@click.pass_context
+def collect_balmorel_input_data(ctx, data: str):
+    db = ctx.obj['input_data']
+
+    if data == 'load':
+        inputdata = (
+            ctx.obj['electricity_profiles']
+            .query('DEUSER == "RESE"')
+            .pivot_table(index=['SSS', 'TTT'], columns='RRR', values='Value', aggfunc='sum')
+        )
+
+    elif data == 'heat':
+        inputdata = (
+            symbol_to_df(db, 'DH_VAR_T')
+            .query('AAA.str.contains("SPACEHEAT") and DHUSER == "RESIDENTIAL"')
+            .pivot_table(index=['SSS', 'TTT'], columns='AAA', values='Value', aggfunc='sum')
+        )
+
+        inputdata.columns = inputdata.columns.str.replace('_IDVU-SPACEHEAT', '')
+
+    elif data == 'onshore_wind':
+        inputdata = (
+            symbol_to_df(db, 'WND_VAR_T')
+            .query('AAA.str.contains("_A")')
+            .pivot_table(index=['SSS', 'TTT'], columns='AAA', values='Value', aggfunc='sum')
+        )
+
+        inputdata.columns = inputdata.columns.str.replace('_A', '')
+
+    elif data == 'offshore_wind':
+        inputdata = (
+            symbol_to_df(db, 'WND_VAR_T')
+            .query('AAA.str.contains("_OFF")')
+            .pivot_table(index=['SSS', 'TTT'], columns='AAA', values='Value', aggfunc='sum')
+        )
+
+        inputdata.columns = inputdata.columns.str.replace('_OFF', '')
+
+    elif data == 'solar_pv':
+        inputdata = (
+            symbol_to_df(db, 'SOLE_VAR_T')
+            .query('AAA.str.contains("_A")')
+            .pivot_table(index=['SSS', 'TTT'], columns='AAA', values='Value', aggfunc='sum')
+        )
+
+        inputdata.columns = inputdata.columns.str.replace('_A', '')
+
+    # Make sure that zeros are included, which the GAMS API don't
+    inputdata = inputdata.reindex(ctx.obj['ST_all'], fill_value=0)
+    inputdata.index.names = ['Season', 'Time']
+    inputdata.columns.name = 'Region'
+
+    return inputdata
 
 @click.pass_context
 def get_inverse_residual_load(
@@ -201,8 +255,7 @@ def get_exo_demand(
         all_data[data].index.name = "time_id"
 
         if not (to_create_antares_input):
-            all_data[data] = all_data[data].loc[hour_index]
-            all_data[data].index = balmorel_index
+            all_data[data] = collect_balmorel_input_data(data).loc[balmorel_index]
 
     # Calculate exogenous demand profiles
     el_demand = (
@@ -286,8 +339,7 @@ def get_vre_availability(
         all_data[data].index.name = "time_id"
 
         if not (to_create_antares_input):
-            all_data[data] = all_data[data].loc[hour_index]
-            all_data[data].index = balmorel_index
+            all_data[data] = collect_balmorel_input_data(data).loc[balmorel_index]
 
     # Calculate VRE profiles
     capacities = (
