@@ -139,7 +139,7 @@ def store_capcred(CC, i, year, BalmArea, tech, tech_cap, val):
 ### ------------------------------- ###
 
 ### 3.1 LDC Curve and Plot Function
-def doLDC(array, n_bins, plot=False, fig = None, ax = None):
+def doLDC(array, n_bins, plot=False, ax = None, **kwargs):
     """Make load duration curve from timeseries
 
     Args:
@@ -156,13 +156,18 @@ def doLDC(array, n_bins, plot=False, fig = None, ax = None):
     curve = data[1][:-1][::-1]
     
     if plot:
-        if (fig == None) | (ax == None): 
+        # Normalisation
+        n_hours = len(array) 
+        max_val = array.max()
+
+        if ax == None: 
             fig, ax = plt.subplots()
-            ax.plot(np.cumsum(duration), curve)
+            ax.plot(np.cumsum(duration)/n_hours*8736, curve/max_val*100, **kwargs)
+            return duration, curve, fig, ax
         else:
-            ax.plot(np.cumsum(duration), curve)
+            ax.plot(np.cumsum(duration)/n_hours*8736, curve/max_val*100, **kwargs)
+            return duration, curve
     
-        return duration, curve, fig, ax
     else:
         return duration, curve
 

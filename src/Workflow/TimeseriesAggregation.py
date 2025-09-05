@@ -12,11 +12,13 @@ Docs: https://tsam.readthedocs.io/en/latest/gettingStartedDoc.html
 ###        0. Script Settings       ###
 ### ------------------------------- ###
 
-import matplotlib.pyplot as plt
+import click
 import pandas as pd
 import numpy as np
 from pybalmorel import Balmorel, IncFile
 from pybalmorel.utils import symbol_to_df
+from Functions.GeneralHelperFunctions import doLDC
+from pathlib import Path
 import os
 try:
     import tsam.timeseriesaggregation as tsam
@@ -33,6 +35,8 @@ def collect_timeseries(scenario: str,
 
     ### 1.1 Read Profiles GDX
     m = Balmorel(balmorel_model_folder, gams_system_directory=gams_system_directory)
+    if overwrite_input_data:
+        print(f'Overwriting input data for scenario {scenario} in {balmorel_model_folder}')
     m.load_incfiles(scenario, overwrite=overwrite_input_data)
     
     ### Get spatial resolution
@@ -137,7 +141,7 @@ def collect_timeseries(scenario: str,
 
     return m, df
 
-def format_and_save_profiles(typPeriods, method, weather_year, Nperiods, db):
+def format_and_save_profiles(typPeriods, method, weather_year, Nperiods, db, balmorel_model_folder):
     ### Create All S and T index
     S = np.array(['S0%d'%i for i in range(1, 10)] + ['S%d'%i for i in range(10, 53)])
     T = ['T00%d'%i for i in range(1, 10)] + ['T0%d'%i for i in range(10, 100)] + ['T%d'%i for i in range(100, 169)]
@@ -200,13 +204,15 @@ def format_and_save_profiles(typPeriods, method, weather_year, Nperiods, db):
                             prefix="SET T(TTT)  'Time periods within a season in the simulation'\n/\n",
                             body=', '.join(T),
                             suffix="\n/;")}
+
+    path_to_data = f'{balmorel_model_folder}/{aggregation_scenario}/data/'
     for incfile in ['DE_VAR_T', 'DH_VAR_T',
                     'WND_VAR_T', 'SOLE_VAR_T',
                     'WTRRRVAR_T', 'WTRRSVAR_S',
                     'HYRSDATA']:
         incfiles[incfile] = IncFile(name=incfile, 
-                                    prefix=f"TABLE {incfile}({", ".join(db[incfile].domains_as_strings)}) '{db[incfile].text}'\n",
-                                    path='Balmorel/%s/data/'%aggregation_scenario, suffix='\n;')
+                                    prefix=f"TABLE {incfile}({', ' .join(db[incfile].domains_as_strings)}) '{db[incfile].text}'\n",
+                                    path=path_to_data, suffix='\n;')
         
         # Load specific formatting
         if 'DE' in incfile or 'DH' in incfile:
@@ -222,8 +228,8 @@ def format_and_save_profiles(typPeriods, method, weather_year, Nperiods, db):
         # HYRSDATA specific formatting
         if incfile == 'HYRSDATA':
             incfiles[incfile].prefix = f"TABLE HYRSDATA1(HYRSDATASET, SSS, AAA) '{db[incfile].text}'\n"
-            incfiles[incfile].suffix = f"\n;\nHYRSDATA(AAA, HYRSDATASET, SSS) = HYRSDATA1(HYRSDATASET, SSS, AAA);"
-            incfiles[incfile].suffix += f"\nHYRSDATA1(HYRSDATASET, SSS, AAA) = 0;"
+            incfiles[incfile].suffix = "\n;\nHYRSDATA(AAA, HYRSDATASET, SSS) = HYRSDATA1(HYRSDATASET, SSS, AAA);"
+            incfiles[incfile].suffix += "\nHYRSDATA1(HYRSDATASET, SSS, AAA) = 0;"
 
     # Set bodies
     incfiles['DE_VAR_T'].body = loadseries.to_string()
@@ -238,21 +244,33 @@ def format_and_save_profiles(typPeriods, method, weather_year, Nperiods, db):
     for key in incfiles.keys():
         incfiles[key].save()
 
+    ## Make empty addon files
+    for empty_file in ['INDIVUSERS_DH_VAR_T.inc', 'INDUSTRY_DH_VAR_T.inc']:
+        Path(path_to_data).joinpath(empty_file).touch()
 
-### ------------------------------- ###
 ###        2. Main Function         ###
 ### ------------------------------- ###
+### ------------------------------- ###
 
-
+@click.command()
+@click.argument('scenario', default = 'base', type=str)
+@click.argument('typical_periods', default = 5, type=int)
+@click.argument('hours_per_period', default = 24, type=int)
+@click.option('--weather-year', default = 2000, type=int)
+@click.option('--method', default='dist', type=str)
+@click.option('--balmorel-model-folder', default = 'Balmorel', type=str)
+@click.option('--include-GMAXFS', default = False, type=bool)
+@click.option('--gams-system-directory', default = '/appl/gams/47.6.0', type=str)
+@click.option('--overwrite-input-data', default=False, type=bool)
 def temporal_aggregation(scenario: str, 
                          typical_periods: int, 
                          hours_per_period: int, 
-                         method: str = 'distribution', 
-                         weather_year: int = 2012,
-                         balmorel_model_folder: str = '.',
-                         include_GMAXFS: bool = False,
-                         gams_system_directory: str | None = None,
-                         overwrite_input_data: bool = False):
+                         method: str,
+                         weather_year: int,
+                         balmorel_model_folder: str,
+                         include_gmaxfs: bool,
+                         gams_system_directory: str | None,
+                         overwrite_input_data: bool):
     """_summary_
 
     Args:
@@ -262,11 +280,11 @@ def temporal_aggregation(scenario: str,
         method (str, optional): Aggregation method. Defaults to 'distribution', options are: K-means, K-medoids, Distribution preserving (default) and random choice  
         weather_year (int): The weather year the data belong to
         balmorel_model_folder (str, optional): The path to the Balmorel folder. Defaults to '.', i.e. in the working directory.
-        include_GMAXFS (bool, optional): Include seasonal fuel availability variations. Defaults to False.
+        include_gmaxfs (bool, optional): Include seasonal fuel availability variations. Defaults to False.
         gams_system_directory (str | None, optional): The GAMS system directory. Defaults to None, which should make the gams API find it itself if in path.
     """
 
-    model, df = collect_timeseries(scenario, balmorel_model_folder, gams_system_directory, weather_year, include_GMAXFS, overwrite_input_data)
+    model, df = collect_timeseries(scenario, balmorel_model_folder, gams_system_directory, weather_year, include_gmaxfs, overwrite_input_data)
 
     # Using a Random Choice    
     if method == 'random':
@@ -282,7 +300,7 @@ def temporal_aggregation(scenario: str,
         # Sort chronologically
         agg_steps.sort()
 
-        format_and_save_profiles(df.iloc[agg_steps], 'random', weather_year, (typical_periods, hours_per_period), model.input_data[scenario])
+        format_and_save_profiles(df.iloc[agg_steps], 'random', weather_year, (typical_periods, hours_per_period), model.input_data[scenario], balmorel_model_folder)
 
         # Also save a small note with the chosen timesteps
         with open('Balmorel/%s/picked_times.txt'%('W%dT%d_rand_weather_year%d'%(typical_periods, hours_per_period, weather_year)), 'w') as f:
@@ -319,22 +337,9 @@ def temporal_aggregation(scenario: str,
 
         typPeriods = aggregation.createTypicalPeriods()
 
-
-        format_and_save_profiles(typPeriods, method, weather_year, (typical_periods, hours_per_period), model.input_data[scenario])
+        format_and_save_profiles(typPeriods, method, weather_year, (typical_periods, hours_per_period), model.input_data[scenario], balmorel_model_folder)
 
 if __name__ == '__main__':
     
-    typical_periods = 5
-    hours_per_period = 24
-    method='dist'
-    scenario = 'base'
-    weather_year = 2000
-    balmorel_model_folder = 'Balmorel'
-    include_GMAXFS = False
-    gams_system_directory = '/opt/gams/48.5'
-    
-    temporal_aggregation(scenario, typical_periods, hours_per_period,
-                         method, weather_year, balmorel_model_folder, 
-                         gams_system_directory=gams_system_directory, 
-                         )
+    temporal_aggregation()
     
