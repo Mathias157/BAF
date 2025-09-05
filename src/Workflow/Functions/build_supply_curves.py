@@ -1084,7 +1084,7 @@ def model_supply_curves_in_antares(
     # Set transmission capacity to virtual area 10x the availability, 
     # to ensure equal electricity prices at all hours.
     create_transmission_input(
-        "./", "Antares", region, virtual_area, [load.max()*10, 0], 0.1
+        "./", "Antares", region, virtual_area, [load.max()*10000, 0], 0.1
     )
 
     # Set availability

@@ -61,6 +61,33 @@ def get_ptx_results(
         :, ["Model", "Category", "Region", "Value"]
     ], antares_ptx.loc[:, ["Model", "Category", "Region", "Value"]]
 
+@click.pass_context
+def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str):
+
+    gams_system_directory = ctx.obj['gams_system_directory']
+
+    concated = pd.DataFrame()
+    for balmorel_result, antares_result in antbalm_result_list:
+        balmorel_ptx, antares_ptx = get_ptx_results(
+                antares_result,
+                    balmorel_result,
+                    gams_system_directory,
+                )
+
+        temp_concatenated = pd.concat((balmorel_ptx, antares_ptx), ignore_index=True)
+        temp_concatenated['AntaresFile'] = antares_result
+        temp_concatenated['BalmorelFile'] = balmorel_result
+        concated = pd.concat((concated, temp_concatenated), ignore_index=True)
+
+        print(antares_result)
+        print(balmorel_result)
+        print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
+        print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+
+    concated.to_csv(f'Workflow/OverallResults/PtX_demand_comparison_{csv_filename}.csv')
+
+
+
 @click.group()
 @click.pass_context
 @click.option('--gams-directory', type=str, default='/appl/gams/47.6.0/', help='System directory of GAMS')
@@ -139,40 +166,31 @@ def clustersize(ctx):
     )
 
 @CLI.command()
-@click.pass_context
-def eutests(ctx):
+def eutests():
     """
     The first tests with kernel smoothing on European scale
     """
 
-    gams_system_directory = ctx.obj['gams_system_directory']
-
-    concated = pd.DataFrame()
-    for balmorel_result, antares_result in [
+    antbalm_list = [
         ["MainResults_EUtest_S4T56_Iter0.gdx", "20250902-2142eco-eutest_s4t56_2_5pctbw_iter0_y-2050"],
         ["MainResults_EUtest_S4T56_Iter0.gdx", "20250901-1609eco-eutest_s4t56_iter0_y-2050"],
         ["MainResults_EUtest_S4T168_Iter0.gdx","20250901-1639eco-eutest_s4t168_iter0_y-2050"],
         ["MainResults_EUFictDem_S4T56_Iter0.gdx", "20250902-1913eco-eufictdem_s4t56_2_5pctbw_iter0_y-2050"],
         ["MainResults_EUFictDem_S4T56_Iter0.gdx","20250830-1817eco-eufictdem_s4t56_iter0_y-2050" ],
-    ]:
-        balmorel_ptx, antares_ptx = get_ptx_results(
-            antares_result,
-            balmorel_result,
-            gams_system_directory,
-        )
+    ]
 
-        temp_concatenated = pd.concat((balmorel_ptx, antares_ptx), ignore_index=True)
-        temp_concatenated['AntaresFile'] = antares_result
-        temp_concatenated['BalmorelFile'] = balmorel_result
-        concated = pd.concat((concated, temp_concatenated), ignore_index=True)
+    collect_ptx_results(antbalm_list, 'EUtests')
 
-        print(antares_result)
-        print(balmorel_result)
-        print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
-        print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+@CLI.command()
+def ens_cost_sens():
 
-    concated.to_csv('Workflow/OverallResults/PtX_demand_comparison_EUtests.csv')
+    antbalm_list = [["MainResults_baf_test_new_Iter0.gdx", "20250904-1906eco-baf_test_new_ksmooth_highxcap_iter0_y-2050"],
+        ["MainResults_baf_test_new_Iter0.gdx", "20250904-2148eco-baf_test_new_ksmooth_highxcap_allequalenscost_iter0_y-2050"], 
+        ["MainResults_baf_test_new_Iter0.gdx", "20250905-0945eco-baf_test_new_ksmooth_hxcap_eqensc_nothermscbuild_iter0_y-2050"],
+    ]
 
+    collect_ptx_results(antbalm_list, 'ens_cost_sens')
+ 
 @CLI.command()
 @click.pass_context
 @click.argument('balmorel_result', required=True)

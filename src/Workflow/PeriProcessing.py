@@ -1124,13 +1124,21 @@ def create_demand_response(
 
         # Set unserved energy cost
         for region in regional_unserved_energy_costs.keys():
+            # print(
+            #     f"setting unserved energy cost in {region} to {regional_unserved_energy_costs[region]}"
+            # )
+            # unserved_energy_cost.set(
+            #     "unserverdenergycost",
+            #     region,
+            #     str(regional_unserved_energy_costs[region]),
+            # )
             print(
-                f"setting unserved energy cost in {region} to {regional_unserved_energy_costs[region]}"
+                f"setting unserved energy cost in {region} to 3000 €/MWh"
             )
             unserved_energy_cost.set(
                 "unserverdenergycost",
                 region,
-                str(regional_unserved_energy_costs[region]),
+                str(3000),
             )
 
         for cluster in scenario_builder_values:
