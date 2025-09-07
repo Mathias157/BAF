@@ -1058,6 +1058,7 @@ def create_demand_response(
     temporal_resolution: dict,
     parameter_x: str,
     parameter_y: str,
+    area_region_relation: pd.DataFrame,
     style: str = "report",
 ):
     """Create demand response curves for all hours per season
@@ -1092,13 +1093,13 @@ def create_demand_response(
             result, scenario, year, commodity, temporal_resolution
         )  # for fitting to Balmorel results
         prices_demands[commodity] = get_prices_demands(
-            scenario, year, commodity, fit_parameters, fuel_consumption, el_prices
+            scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, area_region_relation
         )
 
         del fit_parameters
 
-        model_func = partial(
-            model_demand_response,
+        kernel_smooth_func = partial(
+            kernel_smooth_area,
             commodity,
             weather_years,
             all_parameters,
@@ -1108,23 +1109,34 @@ def create_demand_response(
             antares_input,
         )
 
+        antares_input_func = partial(
+            antares_input_region,
+            weather_years,
+            all_parameters, 
+            parameter_x,
+            parameter_y,
+            antares_input,
+            commodity,
+        )
+
         del all_parameters
 
         # Make fits in parallel
-        regions = list(prices_demands[commodity].keys())
+        areas = list(prices_demands[commodity].keys())
         regional_unserved_energy_costs = [
-            unserved_energy_cost.getfloat("unserverdenergycost", region.lower())
-            for region in regions
+            unserved_energy_cost.getfloat("unserverdenergycost", area_region_relation.loc[area, 'RRR'].lower())
+            for area in areas
         ]
         print(
-            f"Starting to batch {regions} with current unserved energy costs: {regional_unserved_energy_costs}"
+            f"Starting to batch {areas} with current unserved energy costs: {regional_unserved_energy_costs}"
         )
         regional_unserved_energy_costs, scenario_builder_values = process_in_batches(
-            regions, regional_unserved_energy_costs, model_func
+            areas, regional_unserved_energy_costs, kernel_smooth_func, area_region_relation, antares_input_func
         )
 
         # Set unserved energy cost
-        for region in regional_unserved_energy_costs.keys():
+        regions = pd.Series(regional_unserved_energy_costs.keys()).str.split('_', expand=True)[0]
+        for region in regions:
             # print(
             #     f"setting unserved energy cost in {region} to {regional_unserved_energy_costs[region]}"
             # )
@@ -1151,23 +1163,64 @@ def create_demand_response(
 
 
 def process_in_batches(
-    regions, regional_unserved_energy_costs, model_func, batch_size=33
+    areas, regional_unserved_energy_costs, kernel_smooth_func, area_region_relation, antares_input_func, batch_size=33
 ):
     """Process regions in smaller batches to control memory usage"""
     all_unserved_costs = {}
     all_scenario_values = []
 
-    for i in range(0, len(regions), batch_size):
-        batch_regions = regions[i : i + batch_size]
-        batch_costs = regional_unserved_energy_costs[i : i + batch_size]
-        batch_args = list(zip(batch_regions, batch_costs))
 
+    # Kernel smoothing for all areas in parallel
+    with Pool() as pool:
+        batch_results = pool.starmap(kernel_smooth_func, areas)
+
+    # Create demand response from kernel smoothed planes in parallel batches
+    regions = area_region_relation.loc[areas, 'RRR'].unique()
+    for i in range(0, len(regions), batch_size):
+ 
         print(
-            f"Processing batch {i // batch_size + 1}/{(len(regions) - 1) // batch_size + 1}"
+            f"Processing batch {i // batch_size + 1}/{(len(areas) - 1) // batch_size + 1}"
         )
 
+        batch_regions = regions[i : i + batch_size]
+        batch_unserved_costs = regional_unserved_energy_costs[i : i + batch_size]
+
+        # Sum kernel smoothed planes to region level
+        batch_data = []
+        for region, unserved_cost in zip(batch_regions, batch_unserved_costs):
+
+            for result in batch_results:
+                # Get area result
+                area = next(iter(result))
+                
+                # Skip result if not related to region
+                if area_region_relation.loc[area, 'RRR'] != region:
+                    continue
+
+                # Initiate z_cap, z_price, x0 and y0 if not in locals()
+                if 'z_capacity' not in locals():
+                    z_capacity, z_price, x0, y0 = result[area]
+
+                    print(f'Size of {area} result:')
+                    print('z_capacity\n', z_capacity)
+                    print('z_price\n', z_price)
+                    print('x0\n', x0)
+                    print('y0\n', y0)
+                    
+                # Otherwise, add to previous. Might not work since results are missing and not zero in GAMS output
+                else:
+                    z_capacity += result[area][0]
+                    # z_price += result[area][1]
+                    # x0 += result[area][2]
+                    # y0 += result[area][3]
+
+            # Append to batch_data and delete z_price so it will be re-initiated
+            batch_data.append((unserved_cost, region, z_capacity, z_price, x0, y0))
+            del z_capacity
+
+
         with Pool() as pool:
-            batch_results = pool.starmap(model_func, batch_args)
+            batch_results = pool.starmap(antares_input_func, batch_data)
 
         # Process batch results
         for unserved_cost, scenario_vals in batch_results:
@@ -1180,7 +1233,7 @@ def process_in_batches(
     return all_unserved_costs, all_scenario_values
 
 
-def model_demand_response(
+def kernel_smooth_area(
     commodity: str,
     weather_years: list,
     all_parameters: pd.DataFrame,
@@ -1188,32 +1241,40 @@ def model_demand_response(
     parameter_y: str,
     prices_demands: dict,
     antares_input: AntaresInput,
-    region: str,
-    unserved_energy_cost_region: float,
-):
+    area: str,
+    ):
     # Do kernel smoothing
     print(
-        f"Kernel smoothing {parameter_x} and {parameter_y} for {commodity} in {region}"
+        f"Kernel smoothing {parameter_x} and {parameter_y} for {commodity} in {area}"
     )
     z_capacity, x0, y0 = do_kernel_smoothing(
-        prices_demands[commodity][region],
+        prices_demands[commodity][area],
         parameter_x,
         parameter_y,
         "capacity",
+        0.05,
+        0.05,
         plot=True,
-        plot_name=f"ksmooth_{commodity}_{region}.png",
+        plot_name=f"ksmooth_{commodity}_{area}.png",
     )
     z_price, x1, y1 = do_kernel_smoothing(
-        prices_demands[commodity][region],
+        prices_demands[commodity][area],
         parameter_x,
         parameter_y,
         "price",
+        0.05,
+        0.05,
         plot=True,
-        plot_name=f"ksmooth_{commodity}_{region}.png",
+        plot_name=f"ksmooth_{commodity}_{area}.png",
     )
 
     if not (np.all(x0 == x1) and np.all(y0 == y1)):
         raise ValueError("x and y were not similar from kernel smoothing output!")
+
+    return {area : (z_capacity, z_price, x0, y0)}
+
+def antares_input_region(weather_years, all_parameters, parameter_x, parameter_y,
+                       antares_input, commodity, unserved_energy_cost_region, region, z_capacity, z_price, x0, y0):
 
     # Create demand response
     unserved_energy_cost, scenario_builder_values = model_supply_curves_in_antares(
@@ -1234,7 +1295,7 @@ def model_demand_response(
     return unserved_energy_cost, scenario_builder_values
 
 
-# %% ------------------------------- ###
+### ------------------------------- ###
 ###         2. Main Function        ###
 ### ------------------------------- ###
 
@@ -1401,12 +1462,13 @@ def main(ctx, sc_name: str, year: str):
     GMAXFS = symbol_to_df(
         m.input_data[SC_folder], "GMAXFS", ["Y", "CRA", "F", "S", "Value"]
     )
+    RRRAAA = (
+        symbol_to_df(m.input_data[SC_folder], 'RRRAAA')
+        .pivot_table(index='AAA', values='RRR', aggfunc='sum')
+    )
     CCCRRR = (
-        pd.DataFrame(
-            [rec.keys for rec in m.input_data[SC_folder]["CCCRRR"]], columns=["C", "R"]
-        )
-        .groupby(by=["C"])
-        .aggregate({"R": ", ".join})
+        symbol_to_df(m.input_data[SC_folder], 'CCCRRR', cols=['C', 'R'])
+        .pivot_table(index='C', values='R', aggfunc=lambda x : ", ".join(x))
     )
 
     # Loading MainResults
@@ -1428,39 +1490,39 @@ def main(ctx, sc_name: str, year: str):
     ctx.obj['ST_all'] = pd.MultiIndex.from_product((ctx.obj['S_all'], ctx.obj['T_all']))
 
     # Renewable Capacities
-    fAntTechno, cap = antares_vre_capacities(
-        res.db[SC], B2A_ren, A2B_regi, GDATA, ANNUITYCG, fAntTechno, i, year
-    )
-
-    # Thermal Capacities
-    fAntTechno = antares_thermal_capacities(
-        res.db[SC],
-        A2B_regi,
-        A2B_regi_h2,
-        BalmTechs,
-        GDATA,
-        FPRICE,
-        FDATA,
-        EMI_POL,
-        ANNUITYCG,
-        cap,
-        i,
-        year,
-        fAntTechno,
-    )
-
-    # Storage Capacities
-    fAntTechno = antares_storage_capacities(
-        res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
-    )
-
-    # Transmission Capacities
-    antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
-
-    # Exogenous Electricity Demand Profile
-    antares_exogenous_electricity_demand(
-        electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
-    )
+    # fAntTechno, cap = antares_vre_capacities(
+    #     res.db[SC], B2A_ren, A2B_regi, GDATA, ANNUITYCG, fAntTechno, i, year
+    # )
+    #
+    # # Thermal Capacities
+    # fAntTechno = antares_thermal_capacities(
+    #     res.db[SC],
+    #     A2B_regi,
+    #     A2B_regi_h2,
+    #     BalmTechs,
+    #     GDATA,
+    #     FPRICE,
+    #     FDATA,
+    #     EMI_POL,
+    #     ANNUITYCG,
+    #     cap,
+    #     i,
+    #     year,
+    #     fAntTechno,
+    # )
+    #
+    # # Storage Capacities
+    # fAntTechno = antares_storage_capacities(
+    #     res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
+    # )
+    #
+    # # Transmission Capacities
+    # antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
+    #
+    # # Exogenous Electricity Demand Profile
+    # antares_exogenous_electricity_demand(
+    #     electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
+    # )
 
     # Resource Constraints
     # antares_weekly_resource_constraints(A2B_regi, B2A_ren,
@@ -1477,6 +1539,7 @@ def main(ctx, sc_name: str, year: str):
         temporal_resolution,
         parameter_x,
         parameter_y,
+        RRRAAA,
         style,
     )
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)

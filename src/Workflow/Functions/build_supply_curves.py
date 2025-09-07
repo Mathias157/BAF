@@ -903,6 +903,7 @@ def get_prices_demands(
     parameters: pd.DataFrame,
     fuel_consumption: pd.DataFrame,
     el_prices: pd.DataFrame,
+    area_region_relation: pd.DataFrame
 ):
     """Create seasonal curves for hydrogen and heat for every region in a scenario
 
@@ -932,24 +933,26 @@ def get_prices_demands(
     df2_temp.loc[idx, "Value"] = 0
 
     # Prepare parameters to iterate through
-    regions = df1_temp.Region.unique()
-    parameter_names = [
-        col for col in parameters.columns if not (col in ["Region", "Season", "Time"])
-    ]
+    areas = df1_temp.Area.unique()
+    # parameter_names = [
+    #     col for col in parameters.columns if not (col in ["Region", "Season", "Time"])
+    # ]
 
     # Prepare fit result data
     output = {}
 
-    for region in regions:
+    for area in areas:
         # Get regional parameters and amount of clusters
+        region = area_region_relation.loc[area, 'RRR'] 
+        print(region)
         region_parameters = parameters.query("Region == @region")
 
         print(
-            f"Getting electricity price and consumptions for {commodity} in {region}..."
+            f"Getting electricity price and demands for {commodity} in {area}, related to region {region}..."
         )
 
         demands = (
-            df1_temp.query(f'Fuel=="ELECTRIC" and Region=="{region}"')
+            df1_temp.query(f'Fuel=="ELECTRIC" and Area=="{area}"')
             .pivot_table(index=["Season", "Time"], values="Value", aggfunc="sum")
             .reset_index()
         )
@@ -965,7 +968,7 @@ def get_prices_demands(
             prices[["Season", "Time", "Value"]], on=["Season", "Time"]
         ).rename(columns={"Value": "price"})
 
-        output[region] = region_parameters.drop(columns=["Season", "Time"])
+        output[area] = region_parameters.drop(columns=["Season", "Time"])
 
     return output
 

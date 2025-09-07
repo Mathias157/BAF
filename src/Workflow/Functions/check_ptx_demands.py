@@ -196,10 +196,21 @@ def ens_cost_sens():
 def temporal_sens():
 
     antbalm_list = [
-        ["MainResults_W52T24_dist_WY2000_Iter0.gdx", "20250905-1854eco-w52t24_dist_wy2000_iter0_y-2050"]
+        ["MainResults_W52T24_dist_WY2000_Iter0.gdx", "20250907-1236eco-w52t24_dist_wy2000_ksmooth_bw10pct_iter0_y-2050"]
     ]
 
     collect_ptx_results(antbalm_list, 'temporal-sens', 'W52T24_dist_WY2000')
+
+@CLI.command()
+def bandwidth():
+ 
+    antbalm_list = [
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250907-1034eco-baf_test_fullyear_ksmooth_overfit_iter0_y-2050"],
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250907-1114eco-baf_test_fullyear_ksmooth_bw10pct_iter0_y-2050"]
+    ]
+
+    collect_ptx_results(antbalm_list, 'bandwidth')
+
  
 @CLI.command()
 @click.pass_context
@@ -210,7 +221,8 @@ def latest(ctx, balmorel_scenario: str):
     balmorel_ptx, antares_ptx = get_ptx_results(
         'latest',
         'MainResults_'+balmorel_scenario+'.gdx',
-        ctx.obj['gams_system_directory']
+        ctx.obj['gams_system_directory'],
+        'W52T24_dist_WY2000'
     )
 
     print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
