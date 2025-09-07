@@ -203,13 +203,13 @@ def temporal_sens():
  
 @CLI.command()
 @click.pass_context
-@click.argument('balmorel_result', required=True)
-def latest(ctx, balmorel_result: str):
+@click.argument('balmorel_scenario', required=True)
+def latest(ctx, balmorel_scenario: str):
     """Get the most recent Antares output and compare to Balmorel file"""
 
     balmorel_ptx, antares_ptx = get_ptx_results(
         'latest',
-        balmorel_result,
+        'MainResults_'+balmorel_scenario+'.gdx',
         ctx.obj['gams_system_directory']
     )
 
