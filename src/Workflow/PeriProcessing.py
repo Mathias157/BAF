@@ -1169,10 +1169,9 @@ def process_in_batches(
     all_unserved_costs = {}
     all_scenario_values = []
 
-
     # Kernel smoothing for all areas in parallel
     with Pool() as pool:
-        batch_results = pool.starmap(kernel_smooth_func, areas)
+        batch_results = pool.starmap(kernel_smooth_func, list(zip(areas)))
 
     # Create demand response from kernel smoothed planes in parallel batches
     regions = area_region_relation.loc[areas, 'RRR'].unique()
@@ -1202,10 +1201,10 @@ def process_in_batches(
                     z_capacity, z_price, x0, y0 = result[area]
 
                     print(f'Size of {area} result:')
-                    print('z_capacity\n', z_capacity)
-                    print('z_price\n', z_price)
-                    print('x0\n', x0)
-                    print('y0\n', y0)
+                    print(f'z_capacity {len(z_capacity)}\n', z_capacity)
+                    print(f'z_price {len(z_price)}\n', z_price)
+                    print(f'x0 {len(x0)}\n', x0)
+                    print(f'y0 {len(y0)}\n', y0)
                     
                 # Otherwise, add to previous. Might not work since results are missing and not zero in GAMS output
                 else:
