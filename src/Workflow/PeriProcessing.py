@@ -1096,7 +1096,6 @@ def create_demand_response(
         )
 
         del fit_parameters
-        continue
 
         model_func = partial(
             model_demand_response,
