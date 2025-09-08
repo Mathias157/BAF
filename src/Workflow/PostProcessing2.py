@@ -58,6 +58,8 @@ def main():
     # antares_result="20250901-1639eco-eutest_s4t168_iter0_y-2050"           
     # antares_result="20250902-1913eco-eufictdem_s4t56_2_5pctbw_iter0_y-2050"
     # antares_result="20250902-2142eco-eutest_s4t56_2_5pctbw_iter0_y-2050"    
+    antares_result = "20250907-2256eco-baf_test_fullyear_ksmooth_area_iter0_y-2050"
+    antares_result = "20250908-1742eco-baf_test_fullyear_ksmooth_area_capexincluded_globalminmax_iter0_y-2050"
     
     # Region mappings
     with open("Pre-Processing/Output/A2B_regi.pkl", "rb") as f:

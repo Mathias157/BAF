@@ -80,6 +80,9 @@ def get_balmorel_time_and_hours(result: MainResults):
     
     return balmorel_index, hour_index
 
+S_list = ['S0%d'%i for i in range(1, 10)] + ['S%d'%i for i in range(10, 53)]                                        
+T_list = ['T00%d'%i for i in range(1, 10)] + ['T0%d'%i for i in range(10, 100)] + ['T%d'%i for i in range(100, 169)] 
+ST_index = pd.MultiIndex.from_product((S_list, T_list))
 
 #%% ------------------------------- ###
 ###           2. Dataframes         ###

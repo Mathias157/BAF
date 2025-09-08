@@ -283,7 +283,7 @@ def antares_thermal_capacities(
                             FDATA,
                             EMI_POL,
                             ANNUITYCG,
-                            include_capital_costs=False,
+                            include_capital_costs=True,
                         )
 
                         if not (pd.isna(mc_cost_temp)):
@@ -1145,14 +1145,15 @@ def create_demand_response(
             #     region,
             #     str(regional_unserved_energy_costs[region]),
             # )
-            print(
-                f"setting unserved energy cost in {region} to 3000 €/MWh"
-            )
-            unserved_energy_cost.set(
-                "unserverdenergycost",
-                region,
-                str(3000),
-            )
+            # print(
+            #     f"setting unserved energy cost in {region} to 3000 €/MWh"
+            # )
+            if 'heat' in region.lower() or 'hydrogen' in region.lower():
+                unserved_energy_cost.set(
+                    "unserverdenergycost",
+                    region,
+                    str(1000),
+                )
 
         for cluster in scenario_builder_values:
             # print(f"building scenario order for {cluster}")
@@ -1198,23 +1199,27 @@ def process_in_batches(
 
                 # Initiate z_cap, z_price, x0 and y0 if not in locals()
                 if 'z_capacity' not in locals():
-                    z_capacity, z_price, x0, y0 = result[area]
-
-                    print(f'Size of {area} result:')
-                    print(f'z_capacity {len(z_capacity)}\n', z_capacity)
-                    print(f'z_price {len(z_price)}\n', z_price)
-                    print(f'x0 {len(x0)}\n', x0)
-                    print(f'y0 {len(y0)}\n', y0)
-                    
+                    z_capacity, z_price, x0, y0, max_cap, min_cap = result[area]
+                   
                 # Otherwise, add to previous. Might not work since results are missing and not zero in GAMS output
                 else:
                     z_capacity += result[area][0]
                     # z_price += result[area][1]
                     # x0 += result[area][2]
                     # y0 += result[area][3]
+                    max_cap += result[area][4]
+                    min_cap += result[area][5]
+
+                print(f'Size of {area} result:')
+                print(f'z_capacity {len(z_capacity)}\n', z_capacity)
+                print(f'z_price {len(z_price)}\n', z_price)
+                print(f'x0 {len(x0)}\n', x0)
+                print(f'y0 {len(y0)}\n', y0)
+                print('max_cap\n', max_cap)
+                print('min_cap\n', min_cap)
 
             # Append to batch_data and delete z_price so it will be re-initiated
-            batch_data.append((unserved_cost, region, z_capacity, z_price, x0, y0))
+            batch_data.append((unserved_cost, region, z_capacity, z_price, x0, y0, max_cap, min_cap))
             del z_capacity
 
 
@@ -1246,13 +1251,18 @@ def kernel_smooth_area(
     print(
         f"Kernel smoothing {parameter_x} and {parameter_y} for {commodity} in {area}"
     )
+
+    max_cap = prices_demands[commodity][area]['capacity'].max()
+    min_cap = prices_demands[commodity][area]['capacity'].min()
+    print(f'Max and min for {area}: ', max_cap, min_cap, 'MW')
+
     z_capacity, x0, y0 = do_kernel_smoothing(
         prices_demands[commodity][area],
         parameter_x,
         parameter_y,
         "capacity",
-        0.05,
-        0.05,
+        0.005,
+        0.005,
         plot=True,
         plot_name=f"ksmooth_{commodity}_{area}.png",
     )
@@ -1261,8 +1271,8 @@ def kernel_smooth_area(
         parameter_x,
         parameter_y,
         "price",
-        0.05,
-        0.05,
+        0.005,
+        0.005,
         plot=True,
         plot_name=f"ksmooth_{commodity}_{area}.png",
     )
@@ -1270,10 +1280,11 @@ def kernel_smooth_area(
     if not (np.all(x0 == x1) and np.all(y0 == y1)):
         raise ValueError("x and y were not similar from kernel smoothing output!")
 
-    return {area : (z_capacity, z_price, x0, y0)}
+    return {area : (z_capacity, z_price, x0, y0, max_cap, min_cap)}
 
 def antares_input_region(weather_years, all_parameters, parameter_x, parameter_y,
-                       antares_input, commodity, unserved_energy_cost_region, region, z_capacity, z_price, x0, y0):
+                       antares_input, commodity, unserved_energy_cost_region, region, z_capacity, z_price, x0, y0,
+                         max_cap, min_cap):
 
     # Create demand response
     unserved_energy_cost, scenario_builder_values = model_supply_curves_in_antares(
@@ -1289,6 +1300,8 @@ def antares_input_region(weather_years, all_parameters, parameter_x, parameter_y
         commodity,
         region,
         unserved_energy_cost_region,
+        max_cap,
+        min_cap
     )
 
     return unserved_energy_cost, scenario_builder_values
@@ -1489,39 +1502,39 @@ def main(ctx, sc_name: str, year: str):
     ctx.obj['ST_all'] = pd.MultiIndex.from_product((ctx.obj['S_all'], ctx.obj['T_all']))
 
     # Renewable Capacities
-    # fAntTechno, cap = antares_vre_capacities(
-    #     res.db[SC], B2A_ren, A2B_regi, GDATA, ANNUITYCG, fAntTechno, i, year
-    # )
-    #
-    # # Thermal Capacities
-    # fAntTechno = antares_thermal_capacities(
-    #     res.db[SC],
-    #     A2B_regi,
-    #     A2B_regi_h2,
-    #     BalmTechs,
-    #     GDATA,
-    #     FPRICE,
-    #     FDATA,
-    #     EMI_POL,
-    #     ANNUITYCG,
-    #     cap,
-    #     i,
-    #     year,
-    #     fAntTechno,
-    # )
-    #
-    # # Storage Capacities
-    # fAntTechno = antares_storage_capacities(
-    #     res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
-    # )
-    #
-    # # Transmission Capacities
-    # antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
-    #
-    # # Exogenous Electricity Demand Profile
-    # antares_exogenous_electricity_demand(
-    #     electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
-    # )
+    fAntTechno, cap = antares_vre_capacities(
+        res.db[SC], B2A_ren, A2B_regi, GDATA, ANNUITYCG, fAntTechno, i, year
+    )
+
+    # Thermal Capacities
+    fAntTechno = antares_thermal_capacities(
+        res.db[SC],
+        A2B_regi,
+        A2B_regi_h2,
+        BalmTechs,
+        GDATA,
+        FPRICE,
+        FDATA,
+        EMI_POL,
+        ANNUITYCG,
+        cap,
+        i,
+        year,
+        fAntTechno,
+    )
+
+    # Storage Capacities
+    fAntTechno = antares_storage_capacities(
+        res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
+    )
+
+    # Transmission Capacities
+    antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
+
+    # Exogenous Electricity Demand Profile
+    antares_exogenous_electricity_demand(
+        electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
+    )
 
     # Resource Constraints
     # antares_weekly_resource_constraints(A2B_regi, B2A_ren,

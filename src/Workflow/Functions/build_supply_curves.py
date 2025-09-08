@@ -1060,6 +1060,8 @@ def model_supply_curves_in_antares(
     commodity: str,
     region: str,
     real_region_unserved_energy_cost: float,
+    global_max_cap: int,
+    global_min_cap: int
 ):
     # Placeholder for availability, electricity to commodity load, unserved energy cost (highest marginal price + 1 €/MWh) and the parameter for all years
     availability = {}
@@ -1076,6 +1078,16 @@ def model_supply_curves_in_antares(
     except FileNotFoundError:
         # already not existing
         pass
+
+    # Create global min and max at 0 and 500 €/MWh respectively
+    antares_input.create_thermal(
+        virtual_area, "0_europermwh", "lole", True, global_max_cap, 0
+    )
+    availability['0_europermwh'] = np.ones((8760, len(weather_years)))*global_max_cap - global_min_cap
+    antares_input.create_thermal(
+        virtual_area, "1000_europermwh", "lole", True, global_min_cap, 1000
+    )
+    availability['1000_europermwh'] = np.ones((8760, len(weather_years)))*global_min_cap
 
     # Map the parameters not captured by Balmorel timeslices to the closest fitted parameter
     print(
@@ -1113,27 +1125,32 @@ def model_supply_curves_in_antares(
         cluster_name = f"{price:.0f}_europermwh"
         if not (cluster_name in availability.keys()):
             availability[cluster_name] = np.zeros((8760, len(weather_years)))
-            max_cap = capacity.max().max()
-        elif availability[cluster_name].max() > capacity:
-            max_cap = availability[cluster_name].max()
-        else:
-            max_cap = capacity.max().max()
+        #     max_cap = capacity.max().max()
+        # elif availability[cluster_name].max() > capacity:
+        #     max_cap = availability[cluster_name].max()
+        # else:
+        #     max_cap = capacity.max().max()
 
         config, cluster_series_path, prepro_path = antares_input.create_thermal(
-            virtual_area, cluster_name, "lole", True, max_cap, price
+            virtual_area, cluster_name, "lole", True, global_max_cap, price
         )
 
         row_indices = capacity.index.values
         col_indices = capacity.columns.values - 1982
         row_mesh, col_mesh = np.meshgrid(row_indices, col_indices, indexing="ij")
 
-        # Set availability of virtual cluster
-        availability[cluster_name][row_mesh, col_mesh] += capacity.values
+        # Set availability of cluster
+        availability[cluster_name][row_mesh, col_mesh]   += capacity.values
+        
+    # Adjust cluster availablities to global min, and the global max to all clusters
+    for cluster in availability.keys():
+        availability[cluster] -= global_min_cap
+        availability["0_europermwh"] -= availability[cluster]
 
-        # Set load
-        load[row_mesh, col_mesh] += capacity.values
+    # Set load to global max
+    load += global_max_cap
 
-    # Set load
+    # Set load, slightly higher so the marginal cost is always 3000 €/MWh
     np.savetxt(antares_input.path_load[virtual_area], load, delimiter="\t", fmt="%g")
 
     # Set transmission capacity to virtual area 10x the availability, 
