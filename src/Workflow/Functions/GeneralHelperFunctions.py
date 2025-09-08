@@ -15,14 +15,13 @@ import matplotlib.pyplot as plt
 from typing import Union
 from functools import wraps
 from pybalmorel import MainResults
-from pybalmorel.utils import symbol_to_df 
 import shutil
 import os
 import time
 import sys
 import configparser
-import gams
 import click
+from pathlib import Path
 
 #%% ------------------------------- ###
 ###          1. Logging etc.        ###
@@ -81,6 +80,9 @@ def get_balmorel_time_and_hours(result: MainResults):
     
     return balmorel_index, hour_index
 
+S_list = ['S0%d'%i for i in range(1, 10)] + ['S%d'%i for i in range(10, 53)]                                        
+T_list = ['T00%d'%i for i in range(1, 10)] + ['T0%d'%i for i in range(10, 100)] + ['T%d'%i for i in range(100, 169)] 
+ST_index = pd.MultiIndex.from_product((S_list, T_list))
 
 #%% ------------------------------- ###
 ###           2. Dataframes         ###
@@ -140,7 +142,7 @@ def store_capcred(CC, i, year, BalmArea, tech, tech_cap, val):
 ### ------------------------------- ###
 
 ### 3.1 LDC Curve and Plot Function
-def doLDC(array, n_bins, plot=False, fig = None, ax = None):
+def doLDC(array, n_bins, plot=False, ax = None, **kwargs):
     """Make load duration curve from timeseries
 
     Args:
@@ -157,16 +159,32 @@ def doLDC(array, n_bins, plot=False, fig = None, ax = None):
     curve = data[1][:-1][::-1]
     
     if plot:
-        if (fig == None) | (ax == None): 
+        # Normalisation
+        n_hours = len(array) 
+        max_val = array.max()
+
+        if ax == None: 
             fig, ax = plt.subplots()
-            ax.plot(np.cumsum(duration), curve)
+            ax.plot(np.cumsum(duration)/n_hours*8736, curve/max_val*100, **kwargs)
+            return duration, curve, fig, ax
         else:
-            ax.plot(np.cumsum(duration), curve)
+            ax.plot(np.cumsum(duration)/n_hours*8736, curve/max_val*100, **kwargs)
+            return duration, curve
     
-        return duration, curve, fig, ax
     else:
         return duration, curve
 
+def get_combined_obj_value(results: MainResults, capital_scenario_string: str = 'capacity', operational_scenario_string: str = 'dispatch', return_capex_opex_dfs: bool = False):
+    df=results.get_result('OBJ_YCR')
+    operational_costs = df.query(f'Scenario.str.contains("{operational_scenario_string}") and not (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
+    capital_costs = df.query(f'Scenario.str.contains("{capital_scenario_string}") and (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
+    obj_value = capital_costs.Value.sum() + operational_costs.Value.sum()
+    
+    if return_capex_opex_dfs:
+        return obj_value, capital_costs, operational_costs
+    else:
+        return obj_value
+    
 #%% ------------------------------- ###
 ###        4. Antares Input         ###
 ### ------------------------------- ###
@@ -224,6 +242,10 @@ def create_transmission_input(wk_dir, ant_study, area_from, area_to, trans_cap, 
             for k in range(8760):
                 f.write(str(int(trans_cap[1])) + '\n')  
         
+
+def log_time():
+    string = time.strftime('[%Y-%m-%d %H:%M]:', tuple(time.localtime()))
+    return string
 
 def get_marginal_costs(year, cap, idx_cap, fuel, GDATA, FPRICE, FDATA, EMI_POL, ANNUITYCG, include_capital_costs: bool = True):
     """Gets average marginal cost of generators in cap[idx_cap], provided VOM, fuel and emission policy data 
@@ -427,16 +449,43 @@ def ReadIncFilePrefix(name, incfile_prefix_path, weather_year):
 class AntaresOutput:
     """
     A class for handling Antares outputs, based on Antares 8.7
+
+    Will assume that an Antares study exist in current directory
+    and get the latest result by default.
     """
-    
-    def __init__(self, result_name: str, folder_name: str='Antares', wk_dir: str='.'):
-        # Set path to result
-        self.path = os.path.join(wk_dir, folder_name, 'output', result_name)
+
+    def __init__(self, result_name: str = 'latest', folder_name: str='Antares', wk_dir: str='.'):
+
+        result_folder=Path(folder_name).joinpath('output')
+        
+        # Find latest, if that was chosen (default)
+        if result_name.lower() == 'latest':
+            results=[
+                path for path in result_folder.iterdir()
+                if 'eco' in str(path)
+            ]
+            most_recent=[
+                result.stat().st_ctime for result in results
+            ]
+            most_recent = most_recent.index(np.max(most_recent))
+            self.path = results[most_recent]
+        else:
+            # Set path to result
+            self.path = result_folder.joinpath(result_name)
+
+        if self.path.exists():
+            print(f'Found {self.path}')
+            self.path = str(self.path)
+        else:
+            raise FileNotFoundError(f"Couldnt find {self.path}!")
+
         try:
             self.mc_years = os.listdir(os.path.join(self.path, 'economy/mc-ind'))
             self.mc_years.sort()
+            print(f'MC years: {self.mc_years}')
         except FileNotFoundError:
             self.mc_years = None
+            
         self.name = result_name
         self.wk_dir = wk_dir
         
@@ -489,16 +538,16 @@ class AntaresOutput:
         """
         
         # Choose function
-        if type(node_or_nodes) == str:
+        if type(node_or_nodes) is str:
             func = self.load_area_results
         else:
             func = self.load_link_results
             
-        if self.mc_years != None:
+        if self.mc_years is not None:
             for mc_year in self.mc_years:
                 
                 # Create temporary variable at first mc_year
-                if not('temp' in locals()):
+                if 'temp' not in locals():
                     # Load
                     temp = func(node_or_nodes, result_type, temporal, mc_year)
                     
@@ -697,6 +746,25 @@ def convert_int_to_mc_year(mc_year: int):
 #%% ------------------------------- ###
 ###          6. Utilities           ###
 ### ------------------------------- ###
+
+def set_scenariobuilder_values(element: str,
+                               weather_years = 35):
+    """Build the chronological weather year scenarios for an element, so weather years don't mix 
+
+    Args:
+        element (str): The name of the element, should include a '%d' for the weather year formatte
+        weather_years (int, optional): The amount of weather years. Defaults to 35.
+    """
+    
+    scenariobuilder = configparser.ConfigParser()
+    scenariobuilder.read('Antares/settings/scenariobuilder.dat')
+    
+    for weather_year in range(weather_years):
+        # print(f'formatting {element} to {element%weather_year} and value as {weather_year+1}')
+        scenariobuilder.set('default ruleset', element%weather_year, str(weather_year+1))
+        
+    with open('Antares/settings/scenariobuilder.dat', 'w') as f:
+        scenariobuilder.write(f)
 
 # By ChatGPT
 def find_and_copy_files(source_folder, destination_folder, file_contains):
