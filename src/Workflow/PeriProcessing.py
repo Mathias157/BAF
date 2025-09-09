@@ -548,7 +548,7 @@ def antares_storage_capacities(
         if power_cap > 1e-6:
             print(
                 "%s Li-Ion (Daily) Energy Capacity: <= %d MWh"
-                % (region, power_cap * 24)
+                % (region, power_cap * 168)
             )
         # Check GDATA, charge and discharge power capacities are the same
         # GDATA[(GDATA.G.str.find('BAT-LITHIO-PEAK') != -1) & ((GDATA.Par == 'GDSTOHUNLD') | (GDATA.Par == 'GDSTOHLOAD'))]
