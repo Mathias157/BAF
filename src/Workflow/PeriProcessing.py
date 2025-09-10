@@ -865,6 +865,10 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         
             # Apply supply curves to the Antares model
             unserved_energy_cost = model_supply_curves_in_antares(weather_years, all_parameters, supply_curves[commodity], antares_input, commodity, region, unserved_energy_cost)
+            unserved_energy_cost, scenariobuilder_values = model_supply_curves_in_antares(weather_years, all_parameters, supply_curves[commodity], antares_input, commodity, region, unserved_energy_cost)
+
+            for cluster in scenariobuilder_values:
+                set_scenariobuilder_values(cluster)
     
     # Store unserved
     with open('Antares/input/thermal/areas.ini', 'w') as f:

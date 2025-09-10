@@ -555,6 +555,7 @@ def model_supply_curves_in_antares(weather_years: list,
     availability = {}
     load = np.zeros((8760, len(weather_years)))
     highest_price = 0
+    scenariobuilder_values = []
     
     # Delete all thermal clusters in virtual region
     virtual_area = f'{region}_{commodity}'.lower()
@@ -624,6 +625,10 @@ def model_supply_curves_in_antares(weather_years: list,
     for cluster in availability.keys():
         np.savetxt(os.path.join(antares_input.path_thermal_clusters[virtual_area]['series'], cluster, 'series.txt'), 
                    availability[cluster], delimiter='\t', fmt='%g')
+
+        scenariobuilder_values.append(
+           f"t,{region.lower()}_{commodity.lower()},%d,{cluster.lower()}" 
+        )
     
     # Set unserved energy cost for virtual region
     unserved_energy_cost.set('unserverdenergycost', virtual_area, str(highest_price))
@@ -642,7 +647,7 @@ def model_supply_curves_in_antares(weather_years: list,
         with open('Antares/input/thermal/clusters/%s/list.ini'%region.lower(), 'w') as f:
             conf.write(f)
 
-    return unserved_energy_cost
+    return unserved_energy_cost, scenariobuilder_values
 
 ### ------------------------------- ###
 ###            2. Main              ###
