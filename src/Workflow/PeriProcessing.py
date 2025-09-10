@@ -28,7 +28,7 @@ import click
 import os
 import pickle
 import configparser
-from Functions.GeneralHelperFunctions import create_transmission_input, get_marginal_costs, get_efficiency, get_capex, set_cluster_attribute, AntaresInput, get_balmorel_time_and_hours, data_context
+from Functions.GeneralHelperFunctions import create_transmission_input, get_marginal_costs, get_efficiency, get_capex, set_cluster_attribute, AntaresInput, get_balmorel_time_and_hours, data_context, set_scenariobuilder_values, log_time
 from Functions.build_supply_curves import get_supply_curves, get_supply_curve_parameters_fit, get_supply_curve_parameters_all, load_OSMOSE_data_to_context, model_supply_curves_in_antares
 from Functions.physicality_of_antares_solution import BalmorelFullTimeseries
 from pybalmorel import Balmorel, MainResults
@@ -93,8 +93,7 @@ def antares_vre_capacities(db: gams.GamsDatabase,
                 area_config.set(B2A_ren[tech], 'nominalcapacity', str(tech_cap))
                 area_config.set(B2A_ren[tech], 'enabled', 'true')
             else:
-                area_config.set(B2A_ren[tech], 'nominalcapacity', '0')
-                area_config.set(B2A_ren[tech], 'enabled', 'false')
+                pass
                                     
             # Save data
             # ASSUMPTION: Peak production = 95% of Capacity (See pre-processing script)
@@ -411,7 +410,7 @@ def antares_transmission_capacities(db: gams.GamsDatabase,
                                     A2B_regi: dict,
                                     A2B_regi_h2: dict,
                                     year: str):
-    """Creates transmission capacities 
+    """Creates transmission capacities
 
     Args:
         db (gams.GamsDatabase): _description_
@@ -420,75 +419,46 @@ def antares_transmission_capacities(db: gams.GamsDatabase,
         year (str): _description_
     """
 
-    print('\nTransmission capacities to Antares...\n')
+    print("\nTransmission capacities to Antares...\n")
 
-    ### 4.1 Read All Links
-    links = pd.read_csv('Pre-Processing/Data/Links.csv', sep=';') # PRODUCED BY HAND...
+    # 4.1 Read Balmorel Results
+    trans = symbol_to_df(
+        db, "X_CAP_YCR", ["Y", "C", "RE", "RI", "Var", "Units", "Value"]
+    )
+    trans.loc[:, "Commodity"] = "ELECTRICITY"
 
-    ### 4.2 Read Balmorel Results
-    trans = symbol_to_df(db, "X_CAP_YCR", 
-                        ['Y', 'C', 'RE', 'RI', 'Var', 'Units', 'Value'])
-    trans.loc[:, 'Commodity'] = 'ELECTRICITY'
-    
-    print('Paranthesis is capacity in opposite direction')
-    ### 4.3 Go through all links
-    for n,row in links.iterrows():
-        
-        # Filter through capacities
-        idx = (trans.Commodity == row.carrier.upper()) & (trans.Y == year)
+    # 4.2 Read All Links
+    summed_trans_capacities = trans.query(f'Y == "{year}"').pivot_table(
+        index="RE",
+        columns="RI",
+        values="Value",
+        aggfunc=lambda x: np.sum(x) * 1e3,
+        fill_value=0,
+    )
 
-        # Choose correct dictionary
-        mapper = A2B_regi if row.carrier == 'electricity' else A2B_regi_h2
-        capsfunc = str.upper if row.carrier == 'electricity' else str.lower
-        
-        ## Capacity from
-        # Find areas from
-        if row.comment == 'from_aggregate':
-            idx2 = trans.RE != trans.RE    
-            for exp in mapper[capsfunc(row['from'])]:
-                idx2 = idx2 | (trans.RE == exp)
-        else:
-            # Harmonised spatial resolution
-            idx2 = trans.RE == mapper[capsfunc(row['from'])][0]
-        
-        # Find areas toE
-        if row.comment == 'to_aggregate':
-            idx3 = trans.RI != trans.RI
-            for imp in mapper[capsfunc(row['to'])]:
-                idx3 = idx3 | (trans.RI == imp)
-        else:
-            # Harmonised spatial resolution
-            idx3 = trans.RI == mapper[capsfunc(row['to'])][0]
-        
-        # Sum capacity
-        trans_cap_from = trans.loc[idx & idx2 & idx3, 'Value'].sum() * 1e3 # MW
+    print("Paranthesis is capacity in opposite direction")
+    # 4.3 Go through all links
+    for export_region in summed_trans_capacities.index:
+        for import_region in summed_trans_capacities.columns:
+            if summed_trans_capacities.loc[export_region, import_region] > 1e-3:
+                export_cap = summed_trans_capacities.loc[export_region, import_region]
+                import_cap = summed_trans_capacities.loc[import_region, export_region]
+                print(
+                    f"{export_region} - {import_region} {export_cap:0.0f} MW ({import_cap:0.0f} MW)"
+                )
 
-        ## Capacity to
-        # Find areas from
-        if row.comment == 'from_aggregate':
-            idx2 = trans.RE != trans.RE    
-            for exp in mapper[capsfunc(row['to'])]:
-                idx2 = idx2 | (trans.RE == exp)
-        else:
-            # Harmonised spatial resolution
-            idx2 = trans.RE == mapper[capsfunc(row['to'])][0]
-        
-        # Find areas toE
-        if row.comment == 'to_aggregate':
-            idx3 = trans.RI != trans.RI
-            for imp in mapper[capsfunc(row['from'])]:
-                idx3 = idx3 | (trans.RI == imp)
-        else:
-            # Harmonised spatial resolution
-            idx3 = trans.RI == mapper[capsfunc(row['from'])][0]
-        
-        # Sum capacity
-        trans_cap_to = trans.loc[idx & idx2 & idx3, 'Value'].sum() * 1e3 # MW
-        print(row['from'], row['to'],trans_cap_from.astype(int), '(',trans_cap_to.astype(int), ') MW')
+                create_transmission_input(
+                    "./",
+                    "Antares",
+                    export_region,
+                    import_region,
+                    [export_cap, import_cap],
+                    0.01,
+                )
 
-
-        # Save it 
-        create_transmission_input('./', 'Antares', row['from'], row['to'], [trans_cap_from, trans_cap_to], 0.01)
+                # Make sure that it will skip this connection the next time
+                summed_trans_capacities.loc[export_region, import_region] = 0
+                summed_trans_capacities.loc[import_region, export_region] = 0
 
 
 def antares_exogenous_electricity_demand(electricity_profiles: pd.DataFrame,
@@ -773,7 +743,7 @@ def demand_response_constraint_RHS(scenario: str, year: int,
         .results[scenario]
         .get_result('G_CAP_YCRAF')
         .rename(columns={'Region' : 'RRR', 'Area' : 'AAA'})
-        .query(f'Year == "{year}" and Commodity == "{commodity.upper()}" and {balmorel_timeseries.symbols[commodity]['node_name']} == "{node}" and Technology in ["INTERSEASONAL-HEAT-STORAGE", "INTRASEASONAL-HEAT-STORAGE", "H2-STORAGE"]')
+        .query(f'Year == "{year}" and Commodity == "{commodity.upper()}" and {balmorel_timeseries.symbols[commodity]["node_name"]} == "{node}" and Technology in ["INTERSEASONAL-HEAT-STORAGE", "INTRASEASONAL-HEAT-STORAGE", "H2-STORAGE"]')
         ['Value']
         .mul(1e3)
         .sum()
@@ -856,15 +826,17 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
     for commodity in commodities:
         
         # Compute supply curves from Balmorel results
+        print(log_time(), f'Getting parameters for {commodity}')
         all_parameters = get_supply_curve_parameters_all(result, scenario, year, commodity) # all, for later
         fit_parameters = get_supply_curve_parameters_fit(result, scenario, year, commodity, temporal_resolution) # for fitting to Balmorel results
+        print(log_time(), f'Getting supply curves for {commodity}')
         supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, 100, plot_overall_curves=True, style=style)
         regions = supply_curves[commodity].keys()
         
         for region in regions:
         
             # Apply supply curves to the Antares model
-            unserved_energy_cost = model_supply_curves_in_antares(weather_years, all_parameters, supply_curves[commodity], antares_input, commodity, region, unserved_energy_cost)
+            print(log_time(), f'Modelling demand response in {region}')
             unserved_energy_cost, scenariobuilder_values = model_supply_curves_in_antares(weather_years, all_parameters, supply_curves[commodity], antares_input, commodity, region, unserved_energy_cost)
 
             for cluster in scenariobuilder_values:
@@ -991,40 +963,40 @@ def main(ctx, sc_name: str, year: str):
     temporal_resolution = {'balmorel_index' : balmorel_index,
                            'hour_index' : hour_index}
     
-    # Renewable Capacities
-    fAntTechno, cap = antares_vre_capacities(res.db[SC], B2A_ren, A2B_regi, 
-                                             GDATA, ANNUITYCG,
-                                             fAntTechno, i, year)
-            
-    # Thermal Capacities
-    fAntTechno = antares_thermal_capacities(res.db[SC], A2B_regi, A2B_regi_h2, 
-                                            BalmTechs, GDATA, FPRICE, 
-                                            FDATA, EMI_POL, ANNUITYCG, 
-                                            cap, i, year, fAntTechno)
-
-    # Storage Capacities
-    fAntTechno = antares_storage_capacities(res.db[SC], A2B_regi, 
-                                            cap, GDATA, ANNUITYCG,
-                                            fAntTechno, i, year)            
-
-    # Transmission Capacities
-    antares_transmission_capacities(res.db[SC], A2B_regi,
-                                    A2B_regi_h2, year)    
-
-    # Exogenous Electricity Demand Profile
-    antares_exogenous_electricity_demand(electricity_profiles, 
-                                         electricity_demand, DISLOSSEL, 
-                                         A2B_regi, year)
+    # # Renewable Capacities
+    # fAntTechno, cap = antares_vre_capacities(res.db[SC], B2A_ren, A2B_regi, 
+    #                                          GDATA, ANNUITYCG,
+    #                                          fAntTechno, i, year)
+    #
+    # # Thermal Capacities
+    # fAntTechno = antares_thermal_capacities(res.db[SC], A2B_regi, A2B_regi_h2, 
+    #                                         BalmTechs, GDATA, FPRICE, 
+    #                                         FDATA, EMI_POL, ANNUITYCG, 
+    #                                         cap, i, year, fAntTechno)
+    #
+    # # Storage Capacities
+    # fAntTechno = antares_storage_capacities(res.db[SC], A2B_regi, 
+    #                                         cap, GDATA, ANNUITYCG,
+    #                                         fAntTechno, i, year)            
+    #
+    # # Transmission Capacities
+    # antares_transmission_capacities(res.db[SC], A2B_regi,
+    #                                 A2B_regi_h2, year)    
+    #
+    # # Exogenous Electricity Demand Profile
+    # antares_exogenous_electricity_demand(electricity_profiles, 
+    #                                      electricity_demand, DISLOSSEL, 
+    #                                      A2B_regi, year)
 
     # Resource Constraints
-    antares_weekly_resource_constraints(A2B_regi, B2A_ren,
-                                        BalmTechs, year, 
-                                        GDATA, GMAXF, GMAXFS,
-                                        CCCRRR, cap)
+    # antares_weekly_resource_constraints(A2B_regi, B2A_ren,
+    #                                     BalmTechs, year, 
+    #                                     GDATA, GMAXF, GMAXFS,
+    #                                     CCCRRR, cap)
     
     # Demand response 
     create_demand_response(ctx.obj['weather_years'], res, SC, year, temporal_resolution, style)
-    create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
+    # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
 
     print('\n|--------------------------------------------------|')   
     print('              END OF PERI-PROCESSING')
