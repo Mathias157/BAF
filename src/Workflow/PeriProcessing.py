@@ -27,6 +27,7 @@ import os
 import pickle
 import configparser
 from multiprocessing import Pool
+from functools import partial
 from Functions.GeneralHelperFunctions import create_transmission_input, get_marginal_costs, get_efficiency, get_capex, set_cluster_attribute, AntaresInput, get_balmorel_time_and_hours, data_context, set_scenariobuilder_values, log_time
 from Functions.build_supply_curves import get_supply_curves, get_supply_curve_parameters_fit, get_supply_curve_parameters_all, load_OSMOSE_data_to_context, model_supply_curves_in_antares
 from Functions.physicality_of_antares_solution import BalmorelFullTimeseries
@@ -35,7 +36,7 @@ from pybalmorel import Balmorel, MainResults
 from pybalmorel.utils import symbol_to_df
 
 
-# %% ------------------------------- ###
+### ------------------------------- ###
 ###           1. Functions          ###
 ### ------------------------------- ###
 def antares_vre_capacities(
@@ -174,7 +175,10 @@ def antares_thermal_capacities(
     ant_input = AntaresInput("Antares")
 
     # Hourly hydrogen price
-    h2_price_hourly = symbol_to_df(db, "H2_PRICE_YCRST")
+    try:
+        h2_price_hourly = symbol_to_df(db, "H2_PRICE_YCRST")
+    except gams.GamsException:
+        print('No hydrogen results')
 
     # Get production
 
@@ -1081,15 +1085,31 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, 1000, plot_overall_curves=True, style=style)
         regions = supply_curves[commodity].keys()
         
-        for region in regions:
-        
-            # Apply supply curves to the Antares model
-            print(log_time(), f'Modelling demand response in {region}')
-            unserved_energy_cost, scenariobuilder_values = model_supply_curves_in_antares(weather_years, all_parameters, supply_curves[commodity], antares_input, commodity, region, unserved_energy_cost)
+        model_func = partial(
+            model_supply_curves_in_antares,
+            weather_years, 
+            all_parameters, 
+            supply_curves[commodity], 
+            antares_input, 
+            commodity, 
+            unserved_energy_cost
+        )
 
+        # Apply supply curves to the Antares model
+        print(f'Batch processing {regions}')
+        with Pool() as pool:
+            batch_results = pool.starmap(
+                model_func,
+                list(zip(regions))
+            )
+
+        for region, unserved_energy_cost_value, scenariobuilder_values in batch_results:
             for cluster in scenariobuilder_values:
                 set_scenariobuilder_values(cluster)
     
+            unserved_energy_cost.set('unserverdenergycost', f'{region}_{commodity}'.lower(), str(unserved_energy_cost_value[0]))
+            unserved_energy_cost.set('unserverdenergycost', region.lower(), str(unserved_energy_cost_value[1]))
+
     # Store unserved
     with open('Antares/input/thermal/areas.ini', 'w') as f:
         unserved_energy_cost.write(f)
@@ -1367,40 +1387,40 @@ def main(ctx, sc_name: str, year: str):
     ctx.obj['T_all'] = ['T00%d'%i for i in range(1, 10)] + ['T0%d'%i for i in range(10, 100)] + ['T%d'%i for i in range(100, 169)]
     ctx.obj['ST_all'] = pd.MultiIndex.from_product((ctx.obj['S_all'], ctx.obj['T_all']))
 
-    # Renewable Capacities
-    fAntTechno, cap = antares_vre_capacities(
-        res.db[SC], B2A_ren, A2B_regi, GDATA, ANNUITYCG, fAntTechno, i, year
-    )
-
-    # Thermal Capacities
-    fAntTechno = antares_thermal_capacities(
-        res.db[SC],
-        A2B_regi,
-        A2B_regi_h2,
-        BalmTechs,
-        GDATA,
-        FPRICE,
-        FDATA,
-        EMI_POL,
-        ANNUITYCG,
-        cap,
-        i,
-        year,
-        fAntTechno,
-    )
-
-    # Storage Capacities
-    fAntTechno = antares_storage_capacities(
-        res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
-    )
-
-    # Transmission Capacities
-    antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
-
-    # Exogenous Electricity Demand Profile
-    antares_exogenous_electricity_demand(
-        electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
-    )
+    # # Renewable Capacities
+    # fAntTechno, cap = antares_vre_capacities(
+    #     res.db[SC], B2A_ren, A2B_regi, GDATA, ANNUITYCG, fAntTechno, i, year
+    # )
+    #
+    # # Thermal Capacities
+    # fAntTechno = antares_thermal_capacities(
+    #     res.db[SC],
+    #     A2B_regi,
+    #     A2B_regi_h2,
+    #     BalmTechs,
+    #     GDATA,
+    #     FPRICE,
+    #     FDATA,
+    #     EMI_POL,
+    #     ANNUITYCG,
+    #     cap,
+    #     i,
+    #     year,
+    #     fAntTechno,
+    # )
+    #
+    # # Storage Capacities
+    # fAntTechno = antares_storage_capacities(
+    #     res.db[SC], A2B_regi, cap, GDATA, ANNUITYCG, fAntTechno, i, year
+    # )
+    #
+    # # Transmission Capacities
+    # antares_transmission_capacities(res.db[SC], A2B_regi, A2B_regi_h2, year)
+    #
+    # # Exogenous Electricity Demand Profile
+    # antares_exogenous_electricity_demand(
+    #     electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
+    # )
 
     # Resource Constraints
     # antares_weekly_resource_constraints(A2B_regi, B2A_ren,
