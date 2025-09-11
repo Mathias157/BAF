@@ -8,10 +8,9 @@ src/.snakemake
 gurobi.log
 key
 Logs/
-
+*.csv
 
 !Antares/input/bindingconstraints/bindingconstraints.ini
-src/Balmorel/base/logerror/*
 src/Balmorel/base/data/COMBTECH_G.inc
 src/Balmorel/base/data/SOLE_VAR_T.inc
 src/Balmorel/base/data/WND_VAR_T.inc
@@ -42,7 +41,6 @@ Balmorel/base/bui/gamsscr/*.*
 !GDATA.xlsx
 !job_creation.sh
 
-Balmorel/*
 !Balmorel/base/model
 !Balmorel/base/addons
 !Balmorel/base/auxils
