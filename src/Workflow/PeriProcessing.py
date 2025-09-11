@@ -365,7 +365,6 @@ def antares_storage_capacities(db: gams.GamsDatabase,
     ### 3.2 Battery Storage
     for region in A2B_regi.keys():
         
-        
         energy_cap = 0
         power_cap = 0
         capex = 0
@@ -830,7 +829,7 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         all_parameters = get_supply_curve_parameters_all(result, scenario, year, commodity) # all, for later
         fit_parameters = get_supply_curve_parameters_fit(result, scenario, year, commodity, temporal_resolution) # for fitting to Balmorel results
         print(log_time(), f'Getting supply curves for {commodity}')
-        supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, 100, plot_overall_curves=True, style=style)
+        supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, 1000, plot_overall_curves=True, style=style)
         regions = supply_curves[commodity].keys()
         
         for region in regions:
@@ -934,25 +933,20 @@ def main(ctx, sc_name: str, year: str):
     
     ## All input data (should have been loaded in initialisation)
     m = Balmorel('Balmorel', gams_system_directory=gams_system_directory)
-    m.load_incfiles(SC_folder)
+    m.load_incfiles(SC_folder, overwrite=True)
     electricity_demand = symbol_to_df(m.input_data[SC_folder], 'DE')
     electricity_profiles = symbol_to_df(m.input_data[SC_folder], 'DE_VAR_T')
 
     ## Input data from the latest run    
-    ws = gams.GamsWorkspace(system_directory=gams_system_directory)
-    all_endofmodel_path = pathlib.Path('Balmorel/%s/model/all_endofmodel.gdx'%SC_folder)
-    ALLENDOFMODEL = ws.add_database_from_gdx(str(all_endofmodel_path.resolve()))
-    GDATA = symbol_to_df(ALLENDOFMODEL, 'GDATA', ['G', 'Par', 'Value']).groupby(by=['G', 'Par']).aggregate({'Value' : 'sum'})
-    FDATA = symbol_to_df(ALLENDOFMODEL, 'FDATA', ['F', 'Type', 'Value']).groupby(by=['F', 'Type']).aggregate({'Value' : 'sum'})
-    FPRICE = symbol_to_df(ALLENDOFMODEL, 'FUELPRICE1', ['Y', 'R', 'F', 'Value']).groupby(by=['Y', 'R', 'F']).aggregate({'Value' : 'sum'})
-    EMI_POL = symbol_to_df(ALLENDOFMODEL, 'EMI_POL', ['Y', 'C', 'Group', 'Par', 'Value']).groupby(by=['Y', 'C', 'Group', 'Par']).aggregate({'Value' : 'sum'})
-    ANNUITYCG = symbol_to_df(ALLENDOFMODEL, 'ANNUITYCG', ['C', 'G', 'Value']).groupby(by=['C', 'G']).aggregate({'Value' : 'sum'})
-    DISLOSSEL = symbol_to_df(ALLENDOFMODEL, 'DISLOSS_E', ['R', 'Value']).pivot_table(index='R', values='Value')
-    GMAXF = symbol_to_df(ALLENDOFMODEL, 'IGMAXF', ['Y', 'CRA', 'F', 'Value'])
-    GMAXFS = symbol_to_df(ALLENDOFMODEL, 'GMAXFS', ['Y', 'CRA', 'F', 'S', 'Value'])
+    GDATA = symbol_to_df(m.input_data[SC_folder], 'GDATA', ['G', 'Par', 'Value']).groupby(by=['G', 'Par']).aggregate({'Value' : 'sum'})
+    FDATA = symbol_to_df(m.input_data[SC_folder], 'FDATA', ['F', 'Type', 'Value']).groupby(by=['F', 'Type']).aggregate({'Value' : 'sum'})
+    FPRICE = symbol_to_df(m.input_data[SC_folder], 'FUELPRICE1', ['Y', 'R', 'F', 'Value']).groupby(by=['Y', 'R', 'F']).aggregate({'Value' : 'sum'})
+    EMI_POL = symbol_to_df(m.input_data[SC_folder], 'EMI_POL', ['Y', 'C', 'Group', 'Par', 'Value']).groupby(by=['Y', 'C', 'Group', 'Par']).aggregate({'Value' : 'sum'})
+    ANNUITYCG = symbol_to_df(m.input_data[SC_folder], 'ANNUITYCG', ['C', 'G', 'Value']).groupby(by=['C', 'G']).aggregate({'Value' : 'sum'})
+    DISLOSSEL = symbol_to_df(m.input_data[SC_folder], 'DISLOSS_E', ['R', 'Value']).pivot_table(index='R', values='Value')
+    # GMAXF = symbol_to_df(m.input_data[SC_folder], 'IGMAXF', ['Y', 'CRA', 'F', 'Value'])
+    # GMAXFS = symbol_to_df(m.input_data[SC_folder], 'GMAXFS', ['Y', 'CRA', 'F', 'S', 'Value'])
     CCCRRR = pd.DataFrame([rec.keys for rec in ALLENDOFMODEL['CCCRRR']], columns=['C', 'R']).groupby(by=['C']).aggregate({'R' : ', '.join})
-    del ALLENDOFMODEL, ws # Release some memory
-
 
     ## Loading MainResults
     print('Loading results for year %s from Balmorel/%s/model/MainResults_%s.gdx\n'%(year, SC_folder, SC))
@@ -963,37 +957,37 @@ def main(ctx, sc_name: str, year: str):
     temporal_resolution = {'balmorel_index' : balmorel_index,
                            'hour_index' : hour_index}
     
-    # # Renewable Capacities
-    # fAntTechno, cap = antares_vre_capacities(res.db[SC], B2A_ren, A2B_regi, 
-    #                                          GDATA, ANNUITYCG,
-    #                                          fAntTechno, i, year)
-    #
-    # # Thermal Capacities
-    # fAntTechno = antares_thermal_capacities(res.db[SC], A2B_regi, A2B_regi_h2, 
-    #                                         BalmTechs, GDATA, FPRICE, 
-    #                                         FDATA, EMI_POL, ANNUITYCG, 
-    #                                         cap, i, year, fAntTechno)
-    #
-    # # Storage Capacities
-    # fAntTechno = antares_storage_capacities(res.db[SC], A2B_regi, 
-    #                                         cap, GDATA, ANNUITYCG,
-    #                                         fAntTechno, i, year)            
-    #
-    # # Transmission Capacities
-    # antares_transmission_capacities(res.db[SC], A2B_regi,
-    #                                 A2B_regi_h2, year)    
-    #
-    # # Exogenous Electricity Demand Profile
-    # antares_exogenous_electricity_demand(electricity_profiles, 
-    #                                      electricity_demand, DISLOSSEL, 
-    #                                      A2B_regi, year)
+    # Renewable Capacities
+    fAntTechno, cap = antares_vre_capacities(res.db[SC], B2A_ren, A2B_regi, 
+                                             GDATA, ANNUITYCG,
+                                             fAntTechno, i, year)
+
+    # Thermal Capacities
+    fAntTechno = antares_thermal_capacities(res.db[SC], A2B_regi, A2B_regi_h2, 
+                                            BalmTechs, GDATA, FPRICE, 
+                                            FDATA, EMI_POL, ANNUITYCG, 
+                                            cap, i, year, fAntTechno)
+
+    # Storage Capacities
+    fAntTechno = antares_storage_capacities(res.db[SC], A2B_regi, 
+                                            cap, GDATA, ANNUITYCG,
+                                            fAntTechno, i, year)            
+
+    # Transmission Capacities
+    antares_transmission_capacities(res.db[SC], A2B_regi,
+                                    A2B_regi_h2, year)    
+
+    # Exogenous Electricity Demand Profile
+    antares_exogenous_electricity_demand(electricity_profiles, 
+                                         electricity_demand, DISLOSSEL, 
+                                         A2B_regi, year)
 
     # Resource Constraints
     # antares_weekly_resource_constraints(A2B_regi, B2A_ren,
     #                                     BalmTechs, year, 
     #                                     GDATA, GMAXF, GMAXFS,
     #                                     CCCRRR, cap)
-    
+    #
     # Demand response 
     create_demand_response(ctx.obj['weather_years'], res, SC, year, temporal_resolution, style)
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
