@@ -19,9 +19,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pybalmorel.utils import symbol_to_df
 from pybalmorel.formatting import balmorel_colours
-from .Functions.Formatting import newplot, set_style, stacked_bar
-from .Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput
-from .Functions.antaresViz import stacked_plot
+from Functions.Formatting import newplot, set_style, stacked_bar
+from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput
 import warnings
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
@@ -746,8 +745,8 @@ def old_plotting(ctx, obj, cap, cap_F, pro, proH2, eltrans, dem, emi):
     ###          3. AntaresViz          ###
     ### ------------------------------- ###
 
-    if ctx.obj['plotantaresViz'] == 'y':
-        stacked_plot()
+    # if ctx.obj['plotantaresViz'] == 'y':
+    #     stacked_plot()
         
 @click.pass_context
 def store_and_zip(ctx):
@@ -1001,6 +1000,7 @@ def collect_results(ctx, scenario: str):
     fig, ax = plt.subplots()
     balmorel_colours['Spilled'] = 'black'
     balmorel_colours['WOOD'] = 'orange'
+    balmorel_colours['DUMMY'] = 'orange'
     pro.pivot_table(index='Model', columns='F', values='Value', aggfunc='sum').plot(ax=ax, 
                                                                                     kind='bar', 
                                                                                     stacked=True,

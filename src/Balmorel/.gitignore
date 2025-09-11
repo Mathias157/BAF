@@ -1,4 +1,4 @@
-base/model/225*
+**/model/225*
 **/*.~*
 **/*.gdx
 **/*.accdb
@@ -13,8 +13,7 @@ base/model/225*
 **/*.gpr
 **/*.dat
 **/*.cmd
-**/data
-**/data/*.inc
+base/data
 **/model/Balmorel.l*
 **/output/economic/*.*
 /base/bui/gamsscr/*.*

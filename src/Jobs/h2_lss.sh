@@ -3,7 +3,7 @@
 ### -- specify queue --
 #BSUB -q man
 ### -- set the job Name --
-#BSUB -J noh2_lhs_fullyear
+#BSUB -J h2_lss_fullyear
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 10
 ### -- specify that we need a certain architecture --
@@ -24,8 +24,8 @@
 #BSUB -N
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
-#BSUB -o ./Logs/noh2_lhs_fullyear_%J.out
-#BSUB -e ./Logs/noh2_lhs_fullyear_%J.err
+#BSUB -o ./Logs/h2_lss_fullyear_%J.out
+#BSUB -e ./Logs/h2_lss_fullyear_%J.err
 # here follow the commands you want to execute with input.in as the input file
 
 ### Load modules and find binaries
@@ -36,7 +36,7 @@ export PATH=/zhome/c0/2/105719/Desktop/Antares-8.7.0/bin:$PATH
 export PATH=/appl/gams/47.6.0:$PATH
 export PATH=~/.pixi/bin:$PATH
 
-for name in noh2_lhs_fullyear; do
+for name in h2_lss_fullyear; do
   # Rename Config_SCX.ini to Config.ini (make active)
   # mv Config_${name}.ini "Config.ini"
 
@@ -44,7 +44,7 @@ for name in noh2_lhs_fullyear; do
   # ~/.pixi/bin/pixi run python Master.py
 
   # Running Balmorel
-  cd Balmorel/noh2_lhs/model
+  cd Balmorel/h2_lss/model
   gams Balmorel --scenario_name $name --threads $LSB_DJOB_NUMPROC
 
   # for year in 2050; do
@@ -68,4 +68,3 @@ for name in noh2_lhs_fullyear; do
   # Rename Config.ini to Config_SCX.ini (make inactive)
   # mv Config.ini "Config_${name}.ini"
 done
-

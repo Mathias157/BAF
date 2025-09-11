@@ -12,7 +12,7 @@ generate-balmorel-hydro = "cd src && python Pre-Processing/preprocessing.py gene
 generate-balmorel-heat-series = "cd src && python Pre-Processing/preprocessing.py generate-balmorel-heat-series"
 preprocessing = "cd src && snakemake -s Jobs/preprocessing.smk"
 initialisation = "cd src && python -m Workflow.Initialisation" 
-periprocess = "cd src && python Workflow/PeriProcessing.py" 
+periprocess = "cd src && python -u Workflow/PeriProcessing.py" 
 space-aggregate-balmorel = "cd src && python Pre-Processing/spatial_aggregation.py"
 analyse = "cd src/Balmorel && python Analysis/analyse.py "
 
