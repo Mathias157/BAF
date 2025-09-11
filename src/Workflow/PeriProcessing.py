@@ -378,7 +378,7 @@ def antares_storage_capacities(db: gams.GamsDatabase,
             capex += get_capex(sto, idx_sto, GDATA, ANNUITYCG)
         
         if power_cap > 1e-6:
-            print('%s Li-Ion (Daily) Energy Capacity: <= %d MWh'%(region, power_cap*24))
+            print('%s Li-Ion (Daily) Energy Capacity: <= %d MWh'%(region, power_cap*168))
         # Check GDATA, charge and discharge power capacities are the same    
         # GDATA[(GDATA.G.str.find('BAT-LITHIO-PEAK') != -1) & ((GDATA.Par == 'GDSTOHUNLD') | (GDATA.Par == 'GDSTOHLOAD'))]
         
@@ -401,7 +401,7 @@ def antares_storage_capacities(db: gams.GamsDatabase,
         # Save technoeconomic data to file
         fAntTechno.loc[(i, year, region, 'battery'), 'OPEX'] = 0
         fAntTechno.loc[(i, year, region, 'battery'), 'CAPEX'] = capex
-        fAntTechno.loc[(i, year, region, 'battery'), 'Energy Capacity'] = power_cap*24 
+        fAntTechno.loc[(i, year, region, 'battery'), 'Energy Capacity'] = power_cap*168 
         fAntTechno.loc[(i, year, region, 'battery'), 'Power Capacity'] = power_cap 
 
     return fAntTechno
