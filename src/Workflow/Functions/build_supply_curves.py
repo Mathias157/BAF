@@ -789,7 +789,7 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
     with Pool() as pool:
         batch_results = pool.starmap(parallel_func, list(zip(clusters)))
 
-    resulting_curve = {batch_results[0] : batch_results[1] for i in batch_results} 
+    resulting_curve = {result[0] : result[1] for result in batch_results} 
 
     # Plot overall curve    
     if plot_all_curves or plot_overall_curves:
