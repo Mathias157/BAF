@@ -184,6 +184,23 @@ class BalmorelFullTimeseries:
         self.profiles[sc_folder][commodity][user] = absolute_profile 
 
         return absolute_profile
+    
+    def get_summed_profile(self, scenario: str, year: int, commodity: str, node: str):
+        commodity = commodity.lower()
+        users = (
+            self.set[commodity]
+            .query(f"{self.symbols[commodity]['node_name']} == '{node}'")
+            [self.symbols[commodity]['user']].unique()
+        )
+        
+        # Read demand profile, storage capacities and transmission capacity
+        
+        ## Demand from all users
+        profile = np.zeros(8736)
+        for user in users:
+            profile += self.get_input_profile(scenario, year, commodity, node, user).values[:,0]
+        
+        return profile
 
 #%% ------------------------------- ###
 ###            2. Main              ###

@@ -1,7 +1,9 @@
 
 * Include market value as estimated by Antares
+$ifi not %MARKETVAL%==yes $goto NoMarketValue
 $if     EXIST '../data/ANTBALM_MARKETVAL.inc' $INCLUDE         '../data/ANTBALM_MARKETVAL.inc';
 $if not EXIST '../data/ANTBALM_MARKETVAL.inc' $INCLUDE '../../base/data/ANTBALM_MARKETVAL.inc';
+$label NoMarketValue
 
 $ifi not %CAPCRED%==yes $goto NoCapCred
 * Include Electricity Generation Capacity Credits
@@ -41,7 +43,3 @@ $if     EXIST '../data/ANTBALM_FICTDH2.inc' $INCLUDE         '../data/ANTBALM_FI
 $if not EXIST '../data/ANTBALM_FICTDH2.inc' $INCLUDE '../../base/data/ANTBALM_FICTDH2.inc';
 $label NoFictDem
  
-* NO HEAT MODELLING
-DH(YYY,AAA,DHUSER) = 0;
-AGKN(AAA, G)$(GDATA(G,'GDTYPE') EQ GHOB OR GDATA(G,'GDTYPE') EQ GBPR OR GDATA(G,'GDTYPE') EQ GEXT OR GDATA(G,'GDTYPE') EQ GETOH OR GDATA(G,'GDTYPE') EQ GHSTOS OR GDATA(G,'GDTYPE') EQ GHSTO OR GDATA(G,'GDTYPE') EQ GSOLH) = 0;
-

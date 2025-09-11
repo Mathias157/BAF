@@ -143,12 +143,13 @@ def get_antares_results(ctx,
                 ant_cost['Year'] = year
                 ant_cost['Iter'] = ctx.obj['i'] 
                 Antobj = pd.concat((Antobj, ant_cost), ignore_index=True) 
-            except:
+            except FileNotFoundError:
                 # Just a safeguard if i made an error
-                print('Couldnt store Antares cost output')
+                print(f'Couldnt store Antares cost output for {ant_output}')
                 
             ## Electricity
             for area in ctx.obj['A2B_regi'].keys(): 
+                print(f'\nProduction in {area}...\n')
                 try:
                     f = ant_res.load_area_results(area, 'details', 'annual', ctx.obj['mc_choice']).iloc[:, 2:]
                     
@@ -163,7 +164,8 @@ def get_antares_results(ctx,
                             pro.loc[year, 'Antares', area, fuel, tech, ctx.obj['i']] = f[col].values[0]/1e6
                         else:
                             pro.loc[year, 'Antares', area, 'ELECTRIC', 'INTRASEASONAL-ELECT-STORAGE', ctx.obj['i']] = f[col].values[0]/1e6
-                        # print(f'Production of {tech} {fuel} was ', f[col].values[0]/1e6)
+                        print(f'Production of {tech} {fuel} was ', f[col].values[0]/1e6)
+
                         
                 except FileNotFoundError:
                     # print('No thermal generation in area %s'%area)
@@ -190,57 +192,6 @@ def get_antares_results(ctx,
                 pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']] = f.loc[0, 'H. STOR'] / 1e6
                 pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']] = f.loc[0, 'H. ROR'] / 1e6
                 
-                ## These are captures by z_bat and z_psp
-                # for hydro_area in ['00_psp_sto']:
-                #     try:
-                #         f = ant_res.load_link_results([hydro_area.replace('*', area), area], temporal='hourly', mc_year=ctx.obj['mc_choice'])
-                #         flow = f.loc[:, 'FLOW LIN.']
-                #         pro.loc[(year, 'Antares', area, 'ELECTRIC', 'INTRASEASONAL-ELECT-STORAGE', ctx.obj['i']), 'Value'] += flow.loc[flow > 0].sum() / 1e6  
-                        
-                #     except FileNotFoundError:
-                #         print('No connection between %s and %s'%(hydro_area.replace('*', area), area))                
-                #         pass
-                    
-                # # Battery here
-                # try:
-                #     f = ant_res.load_link_results(['0_bat_sto', area], temporal='annual', mc_year=ctx.obj['mc_choice'])
-                #     pro.loc[year, 'Antares', area, 'ELECTRIC', 'BATTERY', ctx.obj['i']] = f.loc[0, 'FLOW LIN.'] / 1e6
-                # except FileNotFoundError:
-                #     # No battery to ITCO, e.g.
-                #     pass
-            
-            ## Hydrogen
-            # for area in ctx.obj['A2B_regi_h2'].keys():
-                
-            #     # File
-            #     temp = ant_res.load_area_results(area, temporal='annual', mc_year=ctx.obj['mc_choice'])
-                
-            #     ## Emissions
-            #     emi.loc['Antares', ctx.obj['i'], year, area] = temp['CO2 EMIS.'].sum() / 1e3 # kton
-                
-            #     ## H2 Storages
-            #     proH2.loc[year, 'Antares', area, 'HYDROGEN', 'Large-scale Storage', ctx.obj['i']] = temp.loc[0, 'H. STOR'] / 1e6
-
-            #     temp = ant_res.load_link_results(['0_h2tank_turb', area], temporal='annual', mc_year=ctx.obj['mc_choice'])
-            #     proH2.loc[year, 'Antares', area, 'HYDROGEN', 'Tank Storage', ctx.obj['i']] = temp.loc[0, 'FLOW LIN.'] / 1e6
-                
-            #     # Electrolyser
-            #     temp = ant_res.load_link_results(['x_c3', area], temporal='annual', mc_year=ctx.obj['mc_choice'])
-            #     proH2.loc[year, 'Antares', area, 'ELECTRIC', 'ELECTROLYZER', ctx.obj['i']] = temp.loc[0, 'FLOW LIN.'] / 1e6
-
-            #     # SMR
-            #     try:
-            #         temp = ant_res.load_area_results(area, 'details', 'annual', ctx.obj['mc_choice'])
-            #         for col in [column for column in temp.columns if not(column in [area, 'annual'])]:
-            #             tech = col.split('_')[0]
-            #             fuel = col.split('_')[1]
-                        
-            #             # Save annual production
-            #             proH2.loc[year, 'Antares', area, fuel.upper(), tech.upper(), ctx.obj['i']] = temp[col].values[0]/1e6
-            #     except FileNotFoundError:
-            #         # No thermal generation
-            #         pass
-
     return Antobj, pro, emi
 
 @click.pass_context
@@ -1001,6 +952,8 @@ def collect_results(ctx, scenario: str):
     balmorel_colours['Spilled'] = 'black'
     balmorel_colours['WOOD'] = 'orange'
     balmorel_colours['DUMMY'] = 'orange'
+    balmorel_colours['WOODWASTE'] = 'orange'
+    balmorel_colours['RETORTGAS'] = 'orange'
     pro.pivot_table(index='Model', columns='F', values='Value', aggfunc='sum').plot(ax=ax, 
                                                                                     kind='bar', 
                                                                                     stacked=True,

@@ -1,0 +1,474 @@
+import pandas as pd
+from GeneralHelperFunctions import AntaresOutput
+from pybalmorel import MainResults
+from itertools import product
+from configparser import ConfigParser
+import click
+
+
+def get_ptx_results(
+    antares_result: str, balmorel_result: str, gams_system_directory: str, scenario_folder: str = 'base'
+):
+    # Load Results
+    scenario_name = (
+        balmorel_result
+        .replace('MainResults_', '')
+        .replace('_Iter0.gdx', '')
+    )
+    conf = ConfigParser()
+    conf.read(f"Workflow/MetaResults/{scenario_name}_meta.ini")
+    antout = AntaresOutput(antares_result)
+    mr = MainResults(
+        balmorel_result,
+        paths=f"Balmorel/{scenario_folder}/model",
+        system_directory=gams_system_directory,
+    )
+
+    ENDO_EL = pd.DataFrame({"Category", "Region", "Value"})
+
+    areas = conf.get("PreProcessing", "geographical_scope").replace(" ", "").split(",")
+    commodities = ["HEAT", "HYDROGEN"]
+
+<<<<<<< HEAD
+    # Get Antares PtX results
+    data = []
+    for area, commodity in product(areas, commodities):
+        res = antout.load_link_results(
+            [area, "_".join([area, commodity])], temporal="annual"
+        )["FLOW LIN."]
+
+        data.append(
+            {"Category": commodity, "Region": area, "Value": float(res.sum()) / 1e6}
+        )
+
+    ENDO_EL = pd.DataFrame(data)
+
+    # Get PtX Results from Balmorel
+    balmorel_ptx = (
+        mr.get_result("EL_DEMAND_YCR")
+        .query('Category in ["ENDOGENOUS_ELECT2HEAT", "ENDO_H2"]')
+        .replace({"Category": {"ENDOGENOUS_ELECT2HEAT": "HEAT", "ENDO_H2": "HYDROGEN"}})
+        .pivot_table(index=["Category", "Region"], values="Value", aggfunc="sum")
+        .reset_index()
+    )
+
+    # Get Antares PtX result in nice format
+    antares_ptx = ENDO_EL.reset_index().drop(columns="index")
+
+    balmorel_ptx["Model"] = "Balmorel"
+    antares_ptx["Model"] = "Antares"
+
+    return balmorel_ptx.loc[
+        :, ["Model", "Category", "Region", "Value"]
+    ], antares_ptx.loc[:, ["Model", "Category", "Region", "Value"]]
+
+@click.pass_context
+def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str):
+
+    gams_system_directory = ctx.obj['gams_system_directory']
+
+    concated = pd.DataFrame()
+    for balmorel_result, antares_result in antbalm_result_list:
+
+        if type(balmorel_result) is list:
+            scenario_folder = balmorel_result[1]
+            balmorel_result = balmorel_result[0]
+        else:
+            scenario_folder = 'base'
+
+        balmorel_ptx, antares_ptx = get_ptx_results(
+                antares_result,
+                    balmorel_result,
+                    gams_system_directory,
+                    scenario_folder
+                )
+
+        temp_concatenated = pd.concat((balmorel_ptx, antares_ptx), ignore_index=True)
+        temp_concatenated['AntaresFile'] = antares_result
+        temp_concatenated['BalmorelFile'] = balmorel_result
+        concated = pd.concat((concated, temp_concatenated), ignore_index=True)
+
+        print(antares_result)
+        print(balmorel_result)
+        print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
+        print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+
+    concated.to_csv(f'Workflow/OverallResults/PtX_demand_comparison_{csv_filename}.csv')
+
+
+
+@click.group()
+@click.pass_context
+@click.option('--gams-directory', type=str, default='/appl/gams/47.6.0/', help='System directory of GAMS')
+def CLI(ctx, gams_directory: str):
+    
+    ctx.ensure_object(dict)
+    ctx.obj['gams_system_directory'] = gams_directory
+
+@CLI.command()
+@click.pass_context
+def clustersize(ctx):
+    """
+    Sensitivity analyses on the cluster size (amount of supply curves developed)
+    compared to the first kernel smoothed tests at small-scale.
+    """
+
+    gams_system_directory = ctx.obj['gams_system_directory']
+
+    balmorel_results = [
+        "MainResults_baf_test_new_fullyear_Iter0.gdx",
+        "MainResults_baf_test_new_Iter0.gdx",
+    ]
+    antares_results = [
+        "20250627-2241eco-baf_test_new_clsize1000_nr1_y-2050",
+        "20250627-2205eco-baf_test_new_clsize100_nr1_y-2050",
+        "20250627-2149eco-baf_test_new_clsize20_nr1_y-2050",
+        "20250627-2136eco-baf_test_new_clsize7_nr1_y-2050",
+        "20250627-1815eco-baf_test_new_fullyear_clsize1000_nr1_y-2050",
+        "20250627-1646eco-baf_test_new_fullyear_clsize100_nr1_y-2050",
+        "20250627-1620eco-baf_test_new_fullyear_clsize20_nr1_y-2050",
+        "20250627-1602eco-baf_test_new_fullyear_clsize7_nr1_y-2050",
+        "20250707-1359eco-baf_test_new_all_hours_fix_clsize1248_nr1_y-2050",
+        "20250718-1530eco-baf_test_new_vectorised_ksmooth",
+    ]
+
+    antares_temp = pd.DataFrame({})
+    balmorel_temp = pd.DataFrame({})
+
+    for antares_result in antares_results:
+        if "fullyear" in antares_result:
+            balmorel_result = balmorel_results[0]
+            scenario = "fullyear"
+        elif "ksmooth" not in antares_result:
+            balmorel_result = balmorel_results[1]
+            scenario = "timeslices"
+        else:
+            scenario = "vectorised_ksmooth"
+
+        balmorel_ptx, antares_ptx = get_ptx_results(
+            antares_result, balmorel_result, gams_system_directory 
+        )
+
+        # Get metadata
+        if 'ksmooth' not in antares_result:
+            cluster_size = int(antares_result[antares_result.find('clsize'):].split('_')[0].replace('clsize', ''))
+            iteration = int(antares_result[antares_result.find('nr'):].split('_')[0].replace('nr', ''))
+        else:
+            cluster_size = 1248
+            iteration = 1
+
+        # Assign metadata
+        balmorel_ptx["clustersize"] = cluster_size
+        antares_ptx["clustersize"] = cluster_size
+        balmorel_ptx["iteration"] = iteration
+        antares_ptx["iteration"] = iteration
+        balmorel_ptx["scenario"] = scenario
+        antares_ptx["scenario"] = scenario
+
+        print("Cluster size: ", cluster_size, "Nr: ", iteration)
+
+        antares_temp = pd.concat((antares_temp, antares_ptx), ignore_index=True)
+        balmorel_temp = pd.concat((balmorel_temp, balmorel_ptx), ignore_index=True)
+
+    pd.concat((antares_temp, balmorel_temp), ignore_index=True).to_csv(
+        "Workflow/OverallResults/PtX_demand_comparison_clustersize.csv"
+    )
+
+@CLI.command()
+def eutests():
+    """
+    The first tests with kernel smoothing on European scale
+    """
+
+    antbalm_list = [
+        ["MainResults_EUtest_S4T56_Iter0.gdx", "20250902-2142eco-eutest_s4t56_2_5pctbw_iter0_y-2050"],
+        ["MainResults_EUtest_S4T56_Iter0.gdx", "20250901-1609eco-eutest_s4t56_iter0_y-2050"],
+        ["MainResults_EUtest_S4T168_Iter0.gdx","20250901-1639eco-eutest_s4t168_iter0_y-2050"],
+        ["MainResults_EUFictDem_S4T56_Iter0.gdx", "20250902-1913eco-eufictdem_s4t56_2_5pctbw_iter0_y-2050"],
+        ["MainResults_EUFictDem_S4T56_Iter0.gdx","20250830-1817eco-eufictdem_s4t56_iter0_y-2050" ],
+    ]
+
+    collect_ptx_results(antbalm_list, 'EUtests')
+
+@CLI.command()
+def ens_cost_sens():
+
+    antbalm_list = [["MainResults_baf_test_new_Iter0.gdx", "20250904-1906eco-baf_test_new_ksmooth_highxcap_iter0_y-2050"],
+        ["MainResults_baf_test_new_Iter0.gdx", "20250904-2148eco-baf_test_new_ksmooth_highxcap_allequalenscost_iter0_y-2050"], 
+        ["MainResults_baf_test_new_Iter0.gdx", "20250905-0945eco-baf_test_new_ksmooth_hxcap_eqensc_nothermscbuild_iter0_y-2050"],
+        ["MainResults_baf_test_new_Iter0.gdx", "20250909-1123eco-baf_test_fullyear_ksmooth_area_capexincluded_glmima_loensc_05bw_mingen3x_iter0_y-2050"],
+    ]
+
+    collect_ptx_results(antbalm_list, 'ens_cost_sens')
+
+@CLI.command()
+def globalminmax_dr():
+    antbalm_list = [
+        ['MainResults_baf_test_fullyear_Iter0.gdx','20250908-1602eco-baf_test_fullyear_ksmooth_area_capexincluded_alwaysens_iter0_y-2050'],
+        ['MainResults_baf_test_fullyear_Iter0.gdx','20250908-1710eco-baf_test_fullyear_ksmooth_area_capexincluded_globalminmax_iter0_y-2050'],
+        ['MainResults_baf_test_fullyear_Iter0.gdx','20250908-1805eco-w52t24_dist_wy2000_ksmooth_area_capexincluded_globalminmax_lowerenscost_iter0_y-2050'],
+        ['MainResults_baf_test_fullyear_Iter0.gdx','20250909-1550eco-baf_test_fullyear_ksmooth_area_capexincluded_glmima_loensc_05bw_mingen3x_fixedbatweek_iter0_y-2050']
+    ]
+
+    collect_ptx_results(antbalm_list, 'globalminmax_dr')
+
+@CLI.command()
+def temporal_sens():
+
+    antbalm_list = [
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250907-1114eco-baf_test_fullyear_ksmooth_bw10pct_iter0_y-2050"],
+        [["MainResults_W52T24_dist_WY2000_Iter0.gdx", 'W52T24_dist_WY2000'], "20250907-1236eco-w52t24_dist_wy2000_ksmooth_bw10pct_iter0_y-2050"],
+        ["MainResults_baf_test_new_Iter0.gdx", "20250905-0945eco-baf_test_new_ksmooth_hxcap_eqensc_nothermscbuild_iter0_y-2050"]
+    ]
+
+    collect_ptx_results(antbalm_list, 'temporal-sens')
+
+@CLI.command()
+def bandwidth():
+ 
+    antbalm_list = [
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250627-1815eco-baf_test_new_fullyear_clsize1000_nr1_y-2050"],
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250907-1034eco-baf_test_fullyear_ksmooth_overfit_iter0_y-2050"],
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250907-1114eco-baf_test_fullyear_ksmooth_bw10pct_iter0_y-2050"],
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250907-2256eco-baf_test_fullyear_ksmooth_area_iter0_y-2050"],
+    ]
+
+    collect_ptx_results(antbalm_list, 'bandwidth')
+
+@CLI.command()
+def virginie():
+    antbalm_list = [
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250627-1815eco-baf_test_fullyear_clsize1000_nr1_iter0_y-2050"],
+        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250910-1713eco-baf_test_fullyear_iter0_y-2050"],
+    ]
+
+    collect_ptx_results(antbalm_list, 'virginie')
+ 
+@CLI.command()
+@click.pass_context
+@click.argument('balmorel_scenario', required=True)
+def latest(ctx, balmorel_scenario: str):
+    """Get the most recent Antares output and compare to Balmorel file"""
+
+    balmorel_ptx, antares_ptx = get_ptx_results(
+        'latest',
+        'MainResults_'+balmorel_scenario+'.gdx',
+        ctx.obj['gams_system_directory'],
+        # 'W52T24_dist_WY2000'
+    )
+
+    print(balmorel_ptx.to_string())
+    print(antares_ptx.to_string())
+    print('\nIn total:')
+    print(
+        pd.concat(
+            (
+                balmorel_ptx,
+                antares_ptx
+            ), ignore_index=True 
+        ).pivot_table(index='Category',
+                    columns='Model',
+                    values='Value',
+                    aggfunc='sum'),
+
+    )
+
+if __name__ == "__main__":
+    CLI()
+||||||| 9aefacd
+if __name__ == '__main__':
+    antares_result = '20250619-1638eco-baf_test_new_noh2_iter0_y-2050'
+    balmorel_result = 'MainResults_baf_test_new_noH2_Iter0.gdx'
+    gams_system_directory = '/opt/gams/48.5'
+    main(antares_result, balmorel_result, gams_system_directory)
+=======
+    # Get Antares PtX results
+    data = []
+    for area, commodity in product(areas, commodities):
+        res = antout.load_link_results(
+            [area, "_".join([area, commodity])], temporal="annual"
+        )["FLOW LIN."]
+
+        data.append(
+            {"Category": commodity, "Region": area, "Value": float(res.sum()) / 1e6}
+        )
+
+    ENDO_EL = pd.DataFrame(data)
+
+    # Get PtX Results from Balmorel
+    balmorel_ptx = (
+        mr.get_result("EL_DEMAND_YCR")
+        .query('Category in ["ENDOGENOUS_ELECT2HEAT", "ENDO_H2"]')
+        .replace({"Category": {"ENDOGENOUS_ELECT2HEAT": "HEAT", "ENDO_H2": "HYDROGEN"}})
+        .pivot_table(index=["Category", "Region"], values="Value", aggfunc="sum")
+        .reset_index()
+    )
+
+    # Get Antares PtX result in nice format
+    antares_ptx = ENDO_EL.reset_index().drop(columns="index")
+
+    balmorel_ptx["Model"] = "Balmorel"
+    antares_ptx["Model"] = "Antares"
+
+    return balmorel_ptx.loc[
+        :, ["Model", "Category", "Region", "Value"]
+    ], antares_ptx.loc[:, ["Model", "Category", "Region", "Value"]]
+
+@click.pass_context
+def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str, scenario_folder: str = 'base'):
+
+    gams_system_directory = ctx.obj['gams_system_directory']
+
+    concated = pd.DataFrame()
+    for balmorel_result, antares_result in antbalm_result_list:
+        balmorel_ptx, antares_ptx = get_ptx_results(
+                antares_result,
+                    balmorel_result,
+                    gams_system_directory,
+                    scenario_folder
+                )
+
+        temp_concatenated = pd.concat((balmorel_ptx, antares_ptx), ignore_index=True)
+        temp_concatenated['AntaresFile'] = antares_result
+        temp_concatenated['BalmorelFile'] = balmorel_result
+        concated = pd.concat((concated, temp_concatenated), ignore_index=True)
+
+        print(antares_result)
+        print(balmorel_result)
+        print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
+        print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+
+    concated.to_csv(f'Workflow/OverallResults/PtX_demand_comparison_{csv_filename}.csv')
+
+
+
+@click.group()
+@click.pass_context
+@click.option('--gams-directory', type=str, default='/appl/gams/47.6.0/', help='System directory of GAMS')
+def CLI(ctx, gams_directory: str):
+    
+    ctx.ensure_object(dict)
+    ctx.obj['gams_system_directory'] = gams_directory
+
+@CLI.command()
+@click.pass_context
+def clustersize(ctx):
+    """
+    Sensitivity analyses on the cluster size (amount of supply curves developed)
+    compared to the first kernel smoothed tests at small-scale.
+    """
+
+    gams_system_directory = ctx.obj['gams_system_directory']
+
+    balmorel_results = [
+        "MainResults_baf_test_new_fullyear_Iter0.gdx",
+        "MainResults_baf_test_new_Iter0.gdx",
+    ]
+    antares_results = [
+        "20250627-2241eco-baf_test_new_clsize1000_nr1_y-2050",
+        "20250627-2205eco-baf_test_new_clsize100_nr1_y-2050",
+        "20250627-2149eco-baf_test_new_clsize20_nr1_y-2050",
+        "20250627-2136eco-baf_test_new_clsize7_nr1_y-2050",
+        "20250627-1815eco-baf_test_new_fullyear_clsize1000_nr1_y-2050",
+        "20250627-1646eco-baf_test_new_fullyear_clsize100_nr1_y-2050",
+        "20250627-1620eco-baf_test_new_fullyear_clsize20_nr1_y-2050",
+        "20250627-1602eco-baf_test_new_fullyear_clsize7_nr1_y-2050",
+        "20250707-1359eco-baf_test_new_all_hours_fix_clsize1248_nr1_y-2050",
+        "20250718-1530eco-baf_test_new_vectorised_ksmooth",
+    ]
+
+    antares_temp = pd.DataFrame({})
+    balmorel_temp = pd.DataFrame({})
+
+    for antares_result in antares_results:
+        if "fullyear" in antares_result:
+            balmorel_result = balmorel_results[0]
+            scenario = "fullyear"
+        elif "ksmooth" not in antares_result:
+            balmorel_result = balmorel_results[1]
+            scenario = "timeslices"
+        else:
+            scenario = "vectorised_ksmooth"
+
+        balmorel_ptx, antares_ptx = get_ptx_results(
+            antares_result, balmorel_result, gams_system_directory 
+        )
+
+        # Get metadata
+        if 'ksmooth' not in antares_result:
+            cluster_size = int(antares_result[antares_result.find('clsize'):].split('_')[0].replace('clsize', ''))
+            iteration = int(antares_result[antares_result.find('nr'):].split('_')[0].replace('nr', ''))
+        else:
+            cluster_size = 1248
+            iteration = 1
+
+        # Assign metadata
+        balmorel_ptx["clustersize"] = cluster_size
+        antares_ptx["clustersize"] = cluster_size
+        balmorel_ptx["iteration"] = iteration
+        antares_ptx["iteration"] = iteration
+        balmorel_ptx["scenario"] = scenario
+        antares_ptx["scenario"] = scenario
+
+        print("Cluster size: ", cluster_size, "Nr: ", iteration)
+
+        antares_temp = pd.concat((antares_temp, antares_ptx), ignore_index=True)
+        balmorel_temp = pd.concat((balmorel_temp, balmorel_ptx), ignore_index=True)
+
+    pd.concat((antares_temp, balmorel_temp), ignore_index=True).to_csv(
+        "Workflow/OverallResults/PtX_demand_comparison_clustersize.csv"
+    )
+
+@CLI.command()
+def eutests():
+    """
+    The first tests with kernel smoothing on European scale
+    """
+
+    antbalm_list = [
+        ["MainResults_EUtest_S4T56_Iter0.gdx", "20250902-2142eco-eutest_s4t56_2_5pctbw_iter0_y-2050"],
+        ["MainResults_EUtest_S4T56_Iter0.gdx", "20250901-1609eco-eutest_s4t56_iter0_y-2050"],
+        ["MainResults_EUtest_S4T168_Iter0.gdx","20250901-1639eco-eutest_s4t168_iter0_y-2050"],
+        ["MainResults_EUFictDem_S4T56_Iter0.gdx", "20250902-1913eco-eufictdem_s4t56_2_5pctbw_iter0_y-2050"],
+        ["MainResults_EUFictDem_S4T56_Iter0.gdx","20250830-1817eco-eufictdem_s4t56_iter0_y-2050" ],
+    ]
+
+    collect_ptx_results(antbalm_list, 'EUtests')
+
+@CLI.command()
+def ens_cost_sens():
+
+    antbalm_list = [["MainResults_baf_test_new_Iter0.gdx", "20250904-1906eco-baf_test_new_ksmooth_highxcap_iter0_y-2050"],
+        ["MainResults_baf_test_new_Iter0.gdx", "20250904-2148eco-baf_test_new_ksmooth_highxcap_allequalenscost_iter0_y-2050"], 
+        ["MainResults_baf_test_new_Iter0.gdx", "20250905-0945eco-baf_test_new_ksmooth_hxcap_eqensc_nothermscbuild_iter0_y-2050"],
+    ]
+
+    collect_ptx_results(antbalm_list, 'ens_cost_sens')
+
+@CLI.command()
+def temporal_sens():
+
+    antbalm_list = [
+        ["MainResults_W52T24_dist_WY2000_Iter0.gdx", "20250905-1854eco-w52t24_dist_wy2000_iter0_y-2050"]
+    ]
+
+    collect_ptx_results(antbalm_list, 'temporal-sens', 'W52T24_dist_WY2000')
+ 
+@CLI.command()
+@click.pass_context
+@click.argument('balmorel_scenario', required=True)
+def latest(ctx, balmorel_scenario: str):
+    """Get the most recent Antares output and compare to Balmorel file"""
+
+    balmorel_ptx, antares_ptx = get_ptx_results(
+        'latest',
+        'MainResults_'+balmorel_scenario+'.gdx',
+        ctx.obj['gams_system_directory']
+    )
+
+    print("Balmorel:\t%0.0f TWh" % balmorel_ptx.Value.sum())
+    print("Antares: \t%0.0f TWh" % antares_ptx.Value.sum())
+
+if __name__ == "__main__":
+    CLI()
+>>>>>>> EU-system

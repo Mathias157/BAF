@@ -4,6 +4,9 @@ src/Antares/logs/
 src/Balmorel/base/auxils
 src/Pre-Processing/Data
 src/Pre-Processing/Representative periods/*.png
+src/Pre-Processing/Output/genmodel*.csv
+src/Balmorel/operun/capexp_data
+src/Balmorel/analysis/output
 src/.snakemake
 gurobi.log
 key

@@ -793,8 +793,10 @@ $setglobal ADDGROUP_DEMAND_SHIFT
 
 
 *--------------------ANTARES SOFT-LINK--------------------------------------------------------------
-$setglobal ANTBALM
+$setglobal ANTBALM yes
 *!option yes
+
+$setglobal FICTDEM yes
 
 * NOTE: The following options are chosen by the BAF framework 
 * Only change these if working with Balmorel stand-alone!

@@ -1,0 +1,107 @@
+###!/bin/sh
+### General options
+### -- specify queue --
+#BSUB -q man
+### -- set the job Name --
+#BSUB -J online_training_test
+### -- ask for number of cores (default: 1) --
+#BSUB -n 10
+### -- specify that the cores must be on the same host --
+#BSUB -R "span[hosts=1]"
+### -- specify that we need X GB of memory per core/slot --
+#BSUB -R "rusage[mem=2GB]"
+### -- specify that we want the job to get killed if it exceeds X GB per core/slot --
+#BSUB -M 2.1GB
+### -- set walltime limit: hh:mm --
+#BSUB -W 24:00
+### -- set the email address --
+#BSUB -u mberos@dtu.dk
+### -- send notification at start --
+##BSUB -B
+### -- send notification at completion --
+#BSUB -N
+### -- Specify the output and error file. %J is the job-id --
+### -- -o and -e mean append, -oo and -eo mean overwrite --
+#BSUB -o ./Logs/online_training_test_%J.out
+#BSUB -e ./Logs/online_training_test_%J.err
+# here follow the commands you want to execute with input.in as the input file
+
+### Path to GAMS binary and pixi
+export PATH=/opt/gams/48.5:$PATH
+export PATH=/zhome/c0/2/105719/.pixi/bin:$PATH
+
+epoch=0
+name='test2'
+
+### Pretraining
+pixi run python Workflow/Functions/neural_network.py pretrain "${name}_operun" 5
+cd Balmorel
+
+while [ $epoch -le 201 ]
+do
+    for runtype in capacity dispatch operun; do
+
+        # Copy most results from disaggregated run to simex
+        # if [ $runtype = "dispatch" ]; then
+        #     cp -f ./simex_${name}_ZCEHX/*.gdx ./simex
+        # fi
+
+        # Seasonal heuristic for synfuel demand
+        # python analysis/peri-process.py ${name}_ZCEHX seasonal-synfuel 
+        
+        # Remove previous data and copy new
+        # rm operun/data/*.inc 
+        # cp -f ${name}/data/*.inc operun/data/
+
+        # Copy S and T
+        rm operun/data/*.inc
+        if [ $runtype = "capacity" ]; then
+            cp -f operun/capexp_data/*.inc operun/data
+        else
+            # If not capacity, then use base/data !
+            
+            cp -f operun/S.inc operun/data/
+            cp -f "operun/T_${runtype}.inc" "operun/data/T.inc"
+
+            # Choose balopt
+            mv "operun/model/balopt_${runtype}.opt" "operun/model/balopt.opt"
+        fi
+
+        # # Disaggregate capacities
+        # if [ $name != "base" ]; then
+        #     python simex/oper-input.py disagg $name base
+        # else
+        #     echo "Skipping disaggregation due to running ${name} scenario"
+        # fi
+
+        # Running Balmorel 
+        cd operun/model 
+        gams Balmorel --scenario_name "${name}_${runtype}_E${epoch}"
+
+        # Exit, if there are errors
+        if [ $? -ne 0 ]; then
+            echo "GAMS execution failed for scenario ${name}_${runtype}_E${epoch}"
+            exit 1
+        fi
+        
+        cd ../../
+
+        # Copy the simex folder
+        # cp simex -r simex_$name
+
+        if [ $runtype != "capacity" ]; then
+            # Rename balopt back
+            mv "operun/model/balopt.opt" "operun/model/balopt_${runtype}.opt"
+        fi
+
+        # Analyse adequacy
+        # analyse adequacy ${name}_operun --nth-max 3
+    done
+    
+    pixi run python analysis/analyse.py adequacy "${name}_operun" $epoch
+
+  cd ../
+  pixi run python Workflow/Functions/neural_network.py train "${name}_operun" $epoch
+  cd Balmorel
+  ((epoch++))
+done

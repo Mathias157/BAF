@@ -1,0 +1,1 @@
+pixi run python Workflow/Functions/online_learning.py %1

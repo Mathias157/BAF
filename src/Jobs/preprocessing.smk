@@ -15,6 +15,7 @@ rule all:
             "Antares/input/renewables/series/es/onshore/series.txt",
             "Balmorel/base/data/WND_VAR_T.inc",
             "Balmorel/base/data/WTRRRVAR_T.inc",
+            "Balmorel/base/data/done.txt",
             "Balmorel/base/data/DH_VAR_T.inc"
         ]
 
@@ -53,7 +54,15 @@ rule generate_balmorel_timeseries:
             "Pre-Processing/Data/IncFile PreSuffixes/DE_VAR_T.inc",
         ]
     output:
-        "Balmorel/base/data/WND_VAR_T.inc"
+        [
+            "Balmorel/base/data/WNDFLH.inc",
+            "Balmorel/base/data/WNDFLH_OFF.inc",
+            "Balmorel/base/data/SOLEFLH.inc",
+            "Balmorel/base/data/WND_VAR_T.inc",
+            "Balmorel/base/data/WND_VAR_T_OFF.inc",
+            "Balmorel/base/data/SOLE_VAR_T.inc",
+            "Balmorel/base/data/DE_VAR_T.inc",
+        ]
     shell:
         preprocessing_cli_cmd + "generate-balmorel-timeseries"
 
@@ -70,7 +79,13 @@ rule generate_balmorel_hydro:
     params:
         geo_scope=geographical_scope
     output:
-        "Balmorel/base/data/WTRRRVAR_T.inc"
+        [
+            "Balmorel/base/data/WTRRRFLH.inc",
+            "Balmorel/base/data/WTRRSFLH.inc",
+            "Balmorel/base/data/WTRRRVAR_T.inc",
+            "Balmorel/base/data/WTRRSVAR_S.inc",
+            "Balmorel/base/data/HYRSMAXVOL_G.inc",
+        ]
     shell:
         preprocessing_cli_cmd + "generate-balmorel-hydro"
 
@@ -82,6 +97,19 @@ rule generate_balmorel_heat_series:
             "Pre-Processing/Data/IncFile PreSuffixes/INDIVUSERS_DH_VAR_T.inc",
         ]
     output:
-        "Balmorel/base/data/DH_VAR_T.inc"
+        [
+            "Balmorel/base/data/DH_VAR_T.inc",
+            "Balmorel/base/data/INDIVUSERS_DH_VAR_T.inc",
+        ]
     shell:
         preprocessing_cli_cmd + "generate-balmorel-heat-series"
+
+
+# Rule for generating Balmorel timeseries for heat
+rule generate_balmorel_annual_heat_adjustment:
+    output:
+        [
+            "Balmorel/base/data/done.txt"
+        ]
+    shell:
+        preprocessing_cli_cmd + "generate-balmorel-annual-heat-adjustment"

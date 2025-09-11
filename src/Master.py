@@ -28,12 +28,13 @@ import matplotlib.pyplot as plt
 import subprocess
 from runpy import run_module
 import os
+if ('Workflow' in __file__) | ('Pre-Processing' in __file__):
+    os.chdir(os.path.dirname(os.path.dirname(__file__)))
 import sys
 import platform
 import configparser
 from Workflow.Functions.GeneralHelperFunctions import ErrorLog, log_process_time, check_antares_compilation
-from Workflow.PeriProcessing import peri_process
-
+       
 ### 0.0 Load configuration file
 Config = configparser.ConfigParser()
 Config.read('Config.ini')
@@ -71,12 +72,13 @@ OS = platform.platform().split('-')[0] # Assuming that linux will be == HPC!
 
 ### 0.2 Find Directories 
 wk_dir = os.path.dirname(os.path.realpath(__file__)) 
-gams_path = Config.get('RunMetaData', 'gams_system_directory')
 # On HPC (assuming linux = HPC)
 if OS == 'Linux':
+  gams_path = "/appl/gams/47.6.0"
   antares_path = r'/zhome/c0/2/105719/Desktop/Antares-8.7.0/bin'
 # On desktop PC
 else:
+  gams_path = r"C:\GAMS\45"
   antares_path = r'C:\Program Files\RTE\Antares\8.6.1\bin'
 
 ### 0.3 logging
@@ -101,6 +103,11 @@ else:
 # Get iteration start
 StartIter = Config.getint('RunMetaData', 'StartIteration')
 i = StartIter
+
+# Make metadata
+Config.set('RunMetaData', 'CurrentIter', str(i))
+with open('Workflow/MetaResults/%s_meta.ini'%SC, 'w') as f:
+  Config.write(f)
 
 if test_mode or i == 0:
   t_start = time()
@@ -127,7 +134,7 @@ while (not(convergence)) & (N_errors == 0) & (i <= MaxIteration):
     os.chdir(wk_dir + '/Balmorel/%s/model'%SC_folder)
     # On HPC
     if OS == 'Linux':
-      balm_cmd = ['gams', 'Balmorel.gms', '--scenario_name=%s_Iter%d'%(SC, i), 'threads=20'] + BalmCmds # For HPC
+      balm_cmd = ['gams', 'Balmorel.gms', '--scenario_name=%s_Iter%d'%(SC, i), '--threads=$LSB_DJOB_NUMPROC'] + BalmCmds # For HPC
     # On Desktop
     else:
       balm_cmd = gams_path + '/gams "Balmorel.gms" --scenario_name=%s_Iter%d '%(SC, i) + ' '.join(BalmCmds)
@@ -151,16 +158,16 @@ while (not(convergence)) & (N_errors == 0) & (i <= MaxIteration):
     if N_errors > 0:
       break
 
-  # PeriProcessing -> Antares executions to optimize all years
+  # Peri-Processing -> Antares executions to optimize all years
   for year in Y:
     
     # Only run reference year in Antares if first iteration
     if year == ref_year and i != 0:
       continue
     
-    ### 2.2 Run PeriProcessing
+    ### 2.2 Run Peri-Processing
     
-    # Check if another instance is running PeriProcessing or if Antares is still compiling 
+    # Check if another instance is running Peri-Processing or if Antares is still compiling 
     compile_finished, N_errors = check_antares_compilation(5*60, 5, N_errors)
     
     # Stop here, if there's an error
@@ -168,18 +175,19 @@ while (not(convergence)) & (N_errors == 0) & (i <= MaxIteration):
       break
     
     t_start = time()
-    peri_process(SC, str(year))
+    out = run_module('Workflow.Peri-Processing', init_globals={'year' : str(year),
+                                                               'SC_name' : SC})        
     sys.stdout.flush()
     t_stop = time()
     log_process_time('Workflow/OverallResults/%s_ProcessTime.csv'%SC, 
-                  i, 'PeriProcessing', t_stop - t_start)
+                  i, 'Peri-Processing', t_stop - t_start)
 
     ### 2.3 Run Antares
     ant_run_name = '%s_Iter%d_Y-%d'%(SC, i, year)
     if OS == 'Linux':
-        ant_cmd = ['antares-8.7-solver', 'Antares', '-n', ant_run_name, '--parallel'] # Notice: No name in this case!
+        ant_cmd = ['antares-8.6-solver', 'Antares', '-n', ant_run_name, '--parallel'] # Notice: No name in this case!
     else:
-        ant_cmd = '"' + antares_path + '/antares-8.7-solver" -i "Antares" -n %s'%ant_run_name + ' --parallel'
+        ant_cmd = '"' + antares_path + '/antares-8.6-solver" -i "Antares" -n %s'%ant_run_name + ' --parallel'
     
     t_start = time()
     if test_mode:
@@ -246,4 +254,13 @@ while (not(convergence)) & (N_errors == 0) & (i <= MaxIteration):
 print('Subprocess errors: %d'%N_errors)
 print(error_log)
 
+#%% ------------------------------- ###
+###           3. Analysis           ###
+### ------------------------------- ###
+ 
+if N_errors == 0:
+  run_module('Workflow.Analysis', init_globals={'SC' : SC})
+  sys.stdout.flush()
+
+  os.chdir(wk_dir)
   

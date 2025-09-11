@@ -761,8 +761,11 @@ def set_scenariobuilder_values(element: str,
     
     for weather_year in range(weather_years):
         # print(f'formatting {element} to {element%weather_year} and value as {weather_year+1}')
-        scenariobuilder.set('default ruleset', element%weather_year, str(weather_year+1))
-        
+        try:
+            scenariobuilder.set('default ruleset', element%weather_year, str(weather_year+1))
+        except configparser.DuplicateOptionError: 
+            pass
+
     with open('Antares/settings/scenariobuilder.dat', 'w') as f:
         scenariobuilder.write(f)
 
