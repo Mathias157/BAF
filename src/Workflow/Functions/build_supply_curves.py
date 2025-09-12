@@ -1042,7 +1042,12 @@ def model_supply_curves_in_antares(weather_years: list,
                                    unserved_energy_cost: configparser.ConfigParser,
                                    region: str
                                    ):
-    
+ 
+    # Placeholder for availability, electricity to commodity load, unserved energy cost (highest marginal price + 1 €/MWh) and the parameter for all years
+    availability = {}
+    load = np.zeros((8760, len(weather_years)))
+    highest_price = 0
+    scenariobuilder_values = []
 
     # Delete all thermal clusters in virtual region
     virtual_area = f'{region}_{commodity}'.lower()
@@ -1056,16 +1061,14 @@ def model_supply_curves_in_antares(weather_years: list,
     # Return nothing if there's no supply curves for this region
     if region not in supply_curves.keys():
         log(f'No supply curves for {commodity} in {region}')
+
+        np.savetxt(antares_input.path_load[virtual_area], load, delimiter='\t', fmt='%g')
+            
+        create_transmission_input('./', 'Antares', region, virtual_area, [0, 0], 0.1)
         return
 
     log(f'Modelling demand response in {region}')
-
-    # Placeholder for availability, electricity to commodity load, unserved energy cost (highest marginal price + 1 €/MWh) and the parameter for all years
-    availability = {}
-    load = np.zeros((8760, len(weather_years)))
-    highest_price = 0
-    scenariobuilder_values = []
-       
+ 
     # Map the parameters not captured by Balmorel timeslices to the closest fitted parameter
     fitted_parameters = supply_curves[region].keys()  
     log(f'Fitting {commodity} for region {region}')  
