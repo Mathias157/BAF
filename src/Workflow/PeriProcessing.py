@@ -28,7 +28,7 @@ import pickle
 import configparser
 from multiprocessing import Pool
 from functools import partial
-from Functions.GeneralHelperFunctions import create_transmission_input, get_marginal_costs, get_efficiency, get_capex, set_cluster_attribute, AntaresInput, get_balmorel_time_and_hours, data_context, set_scenariobuilder_values, log_time, log
+from Functions.GeneralHelperFunctions import create_transmission_input, get_marginal_costs, get_efficiency, get_capex, set_cluster_attribute, AntaresInput, get_balmorel_time_and_hours, data_context, set_scenariobuilder_values, log_time, log, write_8760_series
 from Functions.build_supply_curves import get_supply_curves, get_supply_curve_parameters_fit, get_supply_curve_parameters_all, load_OSMOSE_data_to_context, model_supply_curves_in_antares
 from Functions.physicality_of_antares_solution import BalmorelFullTimeseries
 from Functions.kernel_2Dsmoothing import do_kernel_smoothing
@@ -546,11 +546,14 @@ def antares_storage_capacities(
                 f.write(str(int(energy_cap/2)) + '\n')
         
         set_cluster_attribute('z_%s_bat_1'%region.lower(), 'nominalcapacity', energy_cap, '00_xtra')
+        write_8760_series('Antares/input/thermal/series/00_xtra/z_%s_bat_1'%region.lower(), energy_cap)
         set_cluster_attribute('z_%s_bat_2'%region.lower(), 'nominalcapacity', energy_cap, '00_xtra')
+        write_8760_series('Antares/input/thermal/series/00_xtra/z_%s_bat_2'%region.lower(), energy_cap)
 
                     
         ### 'Pumping' Capacity (Charge)
         set_cluster_attribute('z_bat_gen', 'nominalcapacity', power_cap, region)
+        write_8760_series(f'Antares/input/thermal/series/{region.lower()}/z_{region.lower()}_bat_2', power_cap)
         
         create_transmission_input('./', 'Antares', '00_BAT_STO', region.lower(), [0, power_cap], 0)
         if power_cap > 1e-6:
@@ -574,6 +577,7 @@ def antares_storage_capacities(
         set_cluster_attribute(
             "z_%s_bat_1" % region.lower(), "nominalcapacity", energy_cap, "00_xtra"
         )
+
         set_cluster_attribute(
             "z_%s_bat_2" % region.lower(), "nominalcapacity", energy_cap, "00_xtra"
         )
