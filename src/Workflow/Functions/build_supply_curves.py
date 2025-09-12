@@ -771,9 +771,6 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
     region_parameters = parameters.query('Region == @region')
     clusters = region_parameters['Cluster'].unique()
     
-    print('='*20, '\n', f'Fitting supply curves for {commodity} in {region}...')
-    print('='*20)
-
     parallel_func = partial(
         process_cluster,
         scenario,
@@ -1046,14 +1043,7 @@ def model_supply_curves_in_antares(weather_years: list,
                                    region: str
                                    ):
     
-    print(log_time(), f'Modelling demand response in {region}')
 
-    # Placeholder for availability, electricity to commodity load, unserved energy cost (highest marginal price + 1 €/MWh) and the parameter for all years
-    availability = {}
-    load = np.zeros((8760, len(weather_years)))
-    highest_price = 0
-    scenariobuilder_values = []
-    
     # Delete all thermal clusters in virtual region
     virtual_area = f'{region}_{commodity}'.lower()
 
@@ -1062,10 +1052,23 @@ def model_supply_curves_in_antares(weather_years: list,
     except FileNotFoundError:
         # already not existing
         pass
-    
+ 
+    # Return nothing if there's no supply curves for this region
+    if region not in supply_curves.keys():
+        log(f'No supply curves for {commodity} in {region}')
+        return
+
+    log(f'Modelling demand response in {region}')
+
+    # Placeholder for availability, electricity to commodity load, unserved energy cost (highest marginal price + 1 €/MWh) and the parameter for all years
+    availability = {}
+    load = np.zeros((8760, len(weather_years)))
+    highest_price = 0
+    scenariobuilder_values = []
+       
     # Map the parameters not captured by Balmorel timeslices to the closest fitted parameter
     fitted_parameters = supply_curves[region].keys()  
-    print(f'Fitting {commodity} for region {region}')  
+    log(f'Fitting {commodity} for region {region}')  
     idx_mapped = map_closest_parameters(all_parameters, fitted_parameters, region)
     
     for parameter in fitted_parameters:

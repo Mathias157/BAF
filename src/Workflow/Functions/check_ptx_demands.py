@@ -94,6 +94,7 @@ def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str):
 
     concated.to_csv(f'Workflow/OverallResults/PtX_demand_comparison_{csv_filename}.csv')
 
+    return concated
 
 
 @click.group()
@@ -246,26 +247,26 @@ def virginie():
 @CLI.command()
 @click.pass_context
 @click.argument('balmorel_scenario', required=True)
-def latest(ctx, balmorel_scenario: str):
+@click.argument('scenario_folder', required=False, default='base')
+def latest(ctx, balmorel_scenario: str, scenario_folder:str):
     """Get the most recent Antares output and compare to Balmorel file"""
 
     balmorel_ptx, antares_ptx = get_ptx_results(
         'latest',
         'MainResults_'+balmorel_scenario+'.gdx',
         ctx.obj['gams_system_directory'],
-        # 'W52T24_dist_WY2000'
+        scenario_folder    
     )
 
-    print(balmorel_ptx.to_string())
-    print(antares_ptx.to_string())
+    results = pd.concat(
+        (
+            balmorel_ptx,
+            antares_ptx
+    ), ignore_index=True).sort_values(by=['Region', 'Category'])
+
+    print(results.to_string())
     print('\nIn total:')
-    print(
-        pd.concat(
-            (
-                balmorel_ptx,
-                antares_ptx
-            ), ignore_index=True 
-        ).pivot_table(index='Category',
+    print(results.pivot_table(index='Category',
                     columns='Model',
                     values='Value',
                     aggfunc='sum'),
