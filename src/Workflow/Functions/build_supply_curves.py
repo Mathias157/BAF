@@ -788,10 +788,10 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
 
     # Collect result
     resulting_curves = {result[0] : {} for result in batch_results} 
-    log(f'Resulting curve: {resulting_curves}')
+    # log(f'Resulting curve: {resulting_curves}')
     for region in resulting_curves.keys():
         resulting_curves[region] = {result[1] : result[2] for result in batch_results if result[0] == region}
-        log(f'Resulting curve for {region}: {resulting_curves[region]}')
+        # log(f'Resulting curve for {region}: {resulting_curves[region]}')
 
         # Plot overall curve    
         if plot_overall_curves:
