@@ -748,88 +748,90 @@ def get_supply_curves(scenario: str,
     ## Cluster parameters 
     parameters = parameters.groupby('Region').apply(lambda x: cluster_values(x, cluster_size))
     
-    resulting_curves = {}
-    for region in regions:
-        resulting_curves[region] = get_curves(
-            scenario,
-            parameters,
-            commodity,
-            parameter_name,
-            df1_temp,
-            df2_temp,
-            plot_all_curves,
-            plot_overall_curves,
-            region
-        )
+    resulting_curves = get_curves(
+        scenario,
+        parameters,
+        commodity,
+        parameter_name,
+        df1_temp,
+        df2_temp,
+        plot_all_curves,
+        plot_overall_curves,
+        regions
+    )
 
     return resulting_curves
 
-def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_temp, plot_all_curves: bool, plot_overall_curves: bool, region: str):
+def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_temp, plot_all_curves: bool, plot_overall_curves: bool, regions: list):
 
     # Get regional parameters and amount of clusters
-    resulting_curve = {}
-    region_parameters = parameters.query('Region == @region')
-    clusters = region_parameters['Cluster'].unique()
+    resulting_curves = {}
+    clusters = parameters['Cluster'].unique()
     
     parallel_func = partial(
         process_cluster,
         scenario,
         commodity,
-        region,
         parameter_name,
-        region_parameters,
+        parameters,
         df1_temp,
         df2_temp,
-        plot_all_curves,
-        plot_overall_curves,
+        plot_all_curves
     )
     
-    log(f'Batching {len(clusters)} unique clusters')
+    log(f'Batching {len(clusters)}x{len(regions)} clusters x regions')
     with Pool() as pool:
-        batch_results = pool.starmap(parallel_func, list(zip(clusters)))
+        batch_results = pool.starmap(parallel_func, list(zip(
+            [cluster for region in regions for cluster in clusters],
+            [region for region in regions for cluster in clusters]
+        )))
 
-    resulting_curve = {result[0] : result[1] for result in batch_results} 
+    # Collect result
+    resulting_curves = {result[0] : {} for result in batch_results} 
+    log(f'Resulting curve: {resulting_curves}')
+    for region in resulting_curves.keys():
+        resulting_curves[region] = {result[1] : result[2] for result in batch_results if result[0] == region}
+        log(f'Resulting curve for {region}: {resulting_curves[region]}')
 
-    # Plot overall curve    
-    if plot_all_curves or plot_overall_curves:
-        fig_season, ax_parameter = plt.subplots(facecolor='none')
-        for parameter in resulting_curve.keys():
-            ax_parameter.plot(resulting_curve[parameter]['price'], 
-                            resulting_curve[parameter]['capacity'], 
-                            )
+        # Plot overall curve    
+        if plot_overall_curves:
+            fig_season, ax_parameter = plt.subplots(facecolor='none')
+            for parameter in resulting_curves[region].keys():
+                ax_parameter.plot(resulting_curves[region][parameter]['price'], 
+                                resulting_curves[region][parameter]['capacity'])
 
-        ax_parameter.set_title('Supply Curve for %s in %s'%(commodity, region))
-        ax_parameter.set_ylabel('MWh')
-        ax_parameter.set_xlabel('€/MWh')
-        ax_parameter.set_facecolor('none')
-        fig_season.savefig('Workflow/OverallResults/supply_curve_%s_%s.png'%(commodity, region),
-                            bbox_inches='tight')
+            ax_parameter.set_title('Supply Curve for %s in %s'%(commodity, region))
+            ax_parameter.set_ylabel('MWh')
+            ax_parameter.set_xlabel('€/MWh')
+            ax_parameter.set_facecolor('none')
+            fig_season.savefig('Workflow/OverallResults/supply_curve_%s_%s.png'%(commodity, region),
+                                        bbox_inches='tight')
 
-    return resulting_curve
+    return resulting_curves
+
 
 def process_cluster(
         scenario: str,
         commodity: str,
-        region: str,
         parameter_name: str,
         region_parameters,
         df1_temp,
         df2_temp,
         plot_all_curves,
-        plot_overall_curves,
-        cluster
+        cluster: int,
+        region: str
     ):
     
+    log(f'Processing cluster {cluster} for region {region}') 
+
     # Placeholders
     supply_curves_x, supply_curves_y = [], []
     
     # Find seasons and times of the unique parameter 
-    temp = region_parameters.query('Cluster == @cluster')[['Season', 'Time', parameter_name]]
+    temp = region_parameters.query('Cluster == @cluster and Region == @region')[['Season', 'Time', parameter_name]]
     average_parameter = np.round(temp[parameter_name].mean())
     seasons = temp['Season'].to_list()
     times = temp['Time'].to_list()
-    # print(f'Cluster {cluster}, Average {parameter_name} = {average_parameter}') 
-    # print(f'...for seasons {seasons} and times {times}')
     
     for area in df1_temp.query('Region == @region').Area.unique():
         
@@ -884,7 +886,7 @@ def process_cluster(
     resulting_curve = {'price' : np.round(combined_x),
                        'capacity' : np.round(combined_y)}
 
-    return average_parameter, resulting_curve
+    return region, average_parameter, resulting_curve
 
 
 def get_prices_demands(

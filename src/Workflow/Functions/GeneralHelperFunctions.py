@@ -250,7 +250,7 @@ def log_time():
 def log(*message: str | list):
     print(log_time(), *message)
 
-def get_marginal_costs(year, cap, idx_cap, fuel, GDATA, FPRICE, FDATA, EMI_POL, ANNUITYCG, include_capital_costs: bool = True):
+def get_marginal_costs(year, region, cap, idx_cap, fuel, GDATA, FPRICE, FDATA, EMI_POL, ANNUITYCG, include_capital_costs: bool = True):
     """Gets average marginal cost of generators in cap[idx_cap], provided VOM, fuel and emission policy data 
 
     Args:
@@ -294,7 +294,7 @@ def get_marginal_costs(year, cap, idx_cap, fuel, GDATA, FPRICE, FDATA, EMI_POL, 
         
         # Fuel cost
         try:
-            mc_cost_temp += FPRICE.loc[(year, 'DK', fuel), 'Value'] / GDATA.loc[(G, 'GDFE'), 'Value'] * Gcap / totalcap # Same prices everywhere as in DK
+            mc_cost_temp += FPRICE.loc[(year, region, fuel), 'Value'] / GDATA.loc[(G, 'GDFE'), 'Value'] * Gcap / totalcap # Same prices everywhere as in DK
             # print('Added fuel cost: ', mc_cost_temp)
         except:
             pass

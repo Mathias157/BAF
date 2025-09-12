@@ -262,6 +262,7 @@ def antares_thermal_capacities(
 
                         mc_cost_temp = get_marginal_costs(
                             year,
+                            balmorel_region,
                             cap,
                             idx_cap,
                             fuel,
@@ -1343,7 +1344,7 @@ def main(ctx, sc_name: str, year: str):
         .aggregate({"Value": "sum"})
     )
     FPRICE = (
-        symbol_to_df(m.input_data[SC_folder], "FUELPRICE1", ["Y", "R", "F", "Value"])
+        symbol_to_df(m.input_data[SC_folder], "FUELPRICE", ["Y", "R", "F", "Value"])
         .groupby(by=["Y", "R", "F"])
         .aggregate({"Value": "sum"})
     )
