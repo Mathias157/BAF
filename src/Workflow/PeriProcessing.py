@@ -62,7 +62,7 @@ def antares_vre_capacities(
         year (str): _description_
     """
 
-    print("\nVRE capacities to Antares...\n")
+    log("VRE capacities to Antares...")
 
     # 1.2 Capacities to dataframe
     cap = symbol_to_df(
@@ -121,7 +121,7 @@ def antares_vre_capacities(
                 "Antares/input/renewables/clusters/%s/list.ini" % region.lower(), "w"
             ) as configfile:
                 area_config.write(configfile)
-            print(region, B2A_ren[tech], round(tech_cap, 2), "MW")
+            log(region, B2A_ren[tech], round(tech_cap, 2), "MW")
 
             # Save technoeconomic data to file
             fAntTechno.loc[(i, year, region, tech), "CAPEX"] = capex
@@ -167,7 +167,7 @@ def antares_thermal_capacities(
         _type_: _description_
     """
 
-    print("\nThermal capacities to Antares...\n")
+    log("Thermal capacities to Antares...")
 
     # Get economic parameters
 
@@ -178,7 +178,7 @@ def antares_thermal_capacities(
     try:
         h2_price_hourly = symbol_to_df(db, "H2_PRICE_YCRST")
     except gams.GamsException:
-        print('No hydrogen results')
+        log('No hydrogen results')
 
     # Get production
 
@@ -254,7 +254,7 @@ def antares_thermal_capacities(
                     tech_cap += weight * cap.loc[idx_cap, "Value"].sum() * 1e3
                     # Get marginal costs of production
                     if cap.loc[idx_cap, "Value"].sum() * 1e3 > 1e-5:
-                        # print(tech, fuel)
+                        # log(tech, fuel)
                         eff += get_efficiency(cap, idx_cap, GDATA)
                         capex += get_capex(cap, idx_cap, GDATA, ANNUITYCG)
                         # The technology existed in this region, so increment by one (used to average after)
@@ -287,14 +287,14 @@ def antares_thermal_capacities(
                         em_factor = BalmTechs[tech][fuel]["CO2"] / eff
                     except ZeroDivisionError:
                         em_factor = 0
-                        print("This capacity was not used")
+                        log("This capacity was not used")
 
                     # No negative or zero marginal costs in Antares
                     if mc_cost <= 0:
                         mc_cost = 1
 
                 else:
-                    # print(region, tech, fuel, '\nCapacity: %0.2f MW\n'%tech_cap)
+                    # log(region, tech, fuel, '\nCapacity: %0.2f MW\n'%tech_cap)
                     enabled = "false"
                     em_factor = 0
 
@@ -331,12 +331,12 @@ def antares_thermal_capacities(
                         .pivot_table(index=["Season", "Time"], values="Value")
                         .index.unique()
                     )
-                    # print('Production hours of fuelcell in %s: '%region, fuellcell_production_hours)
+                    # log('Production hours of fuelcell in %s: '%region, fuellcell_production_hours)
 
                     regional_h2_prices = h2_price_hourly.query(
                         "RRR == @region and Y == @year"
                     ).pivot_table(index=["SSS", "TTT"], values="Value")
-                    # print('Price in those hours: ', regional_h2_prices.loc[fuellcell_production_hours])
+                    # log('Price in those hours: ', regional_h2_prices.loc[fuellcell_production_hours])
 
                     h2_fuelcell_meanprice = regional_h2_prices.loc[
                         fuellcell_production_hours, "Value"
@@ -344,7 +344,7 @@ def antares_thermal_capacities(
                     # increment marginal cost of fuelcell with hydrogen price at consumption hours
                     mc_cost += h2_fuelcell_meanprice
 
-                    print(
+                    log(
                         "Average price of hydrogen when fuel cell is producing:",
                         round(h2_fuelcell_meanprice),
                         "eur/MWh",
@@ -356,7 +356,7 @@ def antares_thermal_capacities(
                 # Save capacity timeseries (assuming no outage!)
                 temp = pd.Series(np.ones(8760) * tech_cap).astype(int)
                 if enabled == "true":
-                    print(
+                    log(
                         region,
                         tech,
                         fuel,
@@ -488,7 +488,7 @@ def antares_storage_capacities(
         _type_: _description_
     """
 
-    print("\nStorage capacities to Antares...\n")
+    log("Storage capacities to Antares...")
 
     # 3.1 Placeholders and data
     h2_tank_list = ""
@@ -533,11 +533,11 @@ def antares_storage_capacities(
             capex += get_capex(sto, idx_sto, GDATA, ANNUITYCG)
         
         if power_cap > 1e-6:
-            print('%s Li-Ion (Daily) Energy Capacity: <= %d MWh'%(region, power_cap*168))
+            log('%s Li-Ion (weekly) Energy Capacity: <= %d MWh'%(region, power_cap*168))
         # Check GDATA, charge and discharge power capacities are the same    
         # GDATA[(GDATA.G.str.find('BAT-LITHIO-PEAK') != -1) & ((GDATA.Par == 'GDSTOHUNLD') | (GDATA.Par == 'GDSTOHLOAD'))]
         
-        ### Daily Energy Capacity
+        ### weekly Energy Capacity
         with open('Antares/input/bindingconstraints/00_xtra_%s_bat_3_lt.txt'%region.lower(), 'w') as f:
             for day in range(366):
                 for hour in range(23): 
@@ -553,14 +553,14 @@ def antares_storage_capacities(
         
         create_transmission_input('./', 'Antares', '00_BAT_STO', region.lower(), [0, power_cap], 0)
         if power_cap > 1e-6:
-            print(
-                "%s Li-Ion (Daily) Energy Capacity: <= %d MWh"
+            log(
+                "%s Li-Ion (weekly) Energy Capacity: <= %d MWh"
                 % (region, power_cap * 24)
             )
         # Check GDATA, charge and discharge power capacities are the same
         # GDATA[(GDATA.G.str.find('BAT-LITHIO-PEAK') != -1) & ((GDATA.Par == 'GDSTOHUNLD') | (GDATA.Par == 'GDSTOHLOAD'))]
 
-        # Daily Energy Capacity
+        # weekly Energy Capacity
         with open(
             "Antares/input/bindingconstraints/00_xtra_%s_bat_3_lt.txt" % region.lower(),
             "w",
@@ -604,7 +604,7 @@ def antares_transmission_capacities(
         year (str): _description_
     """
 
-    print("\nTransmission capacities to Antares...\n")
+    log("Transmission capacities to Antares...")
 
     # 4.1 Read Balmorel Results
     trans = symbol_to_df(
@@ -621,14 +621,14 @@ def antares_transmission_capacities(
         fill_value=0,
     )
 
-    print("Paranthesis is capacity in opposite direction")
+    log("Paranthesis is capacity in opposite direction")
     # 4.3 Go through all links
     for export_region in summed_trans_capacities.index:
         for import_region in summed_trans_capacities.columns:
             if summed_trans_capacities.loc[export_region, import_region] > 1e-3:
                 export_cap = summed_trans_capacities.loc[export_region, import_region]
                 import_cap = summed_trans_capacities.loc[import_region, export_region]
-                print(
+                log(
                     f"{export_region} - {import_region} {export_cap:0.0f} MW ({import_cap:0.0f} MW)"
                 )
 
@@ -663,7 +663,7 @@ def antares_exogenous_electricity_demand(
         year (str): The model year
     """
 
-    print("Annual electricity demands to Antares...\n")
+    log("Annual electricity demands to Antares...\n")
 
     # Go through regions
     for region in A2B_regi.keys():
@@ -702,9 +702,9 @@ def antares_exogenous_electricity_demand(
             ann_dem += profiles.sum().sum()
             profile[:8736] += profiles.sum(axis=1)
 
-            print("Assigning to %s..." % (region))
+            log("Assigning to %s..." % (region))
 
-        print(
+        log(
             "Resulting annual electricity demand in %s = %0.2f TWh\n"
             % (region, ann_dem / 1e6)
         )
@@ -781,7 +781,7 @@ def antares_weekly_resource_constraints(
                 load = load - vre  # Residual load
 
             except EmptyDataError | configparser.NoOptionError:
-                print("No profile for %s in %s" % (VRE, region))
+                log("No profile for %s in %s" % (VRE, region))
 
         # Plot Residual LDC
         # fig, ax = plt.subplots()
@@ -839,8 +839,8 @@ def antares_weekly_resource_constraints(
                     )
                     for section in Config.sections():
                         if generator in Config.options(section):
-                            # print('%s is in section %s'%(generator, section))
-                            # print('Setting %s to efficiency %0.2f'%(generator, eff))
+                            # log('%s is in section %s'%(generator, section))
+                            # log('Setting %s to efficiency %0.2f'%(generator, eff))
                             Config.set(section, generator, str(round(1 / eff, 2)))
 
             # 6.3 Calculate Weekly Fuel Limits for all fuels but Muniwaste, if not already done
@@ -905,8 +905,8 @@ def antares_weekly_resource_constraints(
             )
             for section in Config.sections():
                 if generator in Config.options(section):
-                    # print('%s is in section %s'%(generator, section))
-                    # print('Setting %s to efficiency %0.2f'%(generator, eff))
+                    # log('%s is in section %s'%(generator, section))
+                    # log('Setting %s to efficiency %0.2f'%(generator, eff))
                     Config.set(section, generator, str(round(1 / eff, 2)))
 
         # Save configfile
@@ -928,7 +928,7 @@ def antares_weekly_resource_constraints(
             # Disaggregate, if Antares is higher resolved
             # weight += B2A_DE_weights[balmorel_region][region] / len(A2B_regi[region])
             weight += 1
-        # print('%s weight: %0.2f'%(region, weight))
+        # log('%s weight: %0.2f'%(region, weight))
 
         pot = GMAXFS.loc[idx & idx2].groupby(by=["S"]).aggregate({"Value": "sum"})
         with open(
@@ -1103,13 +1103,15 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
                 list(zip(regions))
             )
 
-        if batch_results:
-            for region, unserved_energy_cost_value, scenariobuilder_values in batch_results:
-                for cluster in scenariobuilder_values:
-                    set_scenariobuilder_values(cluster)
-        
-                unserved_energy_cost.set('unserverdenergycost', f'{region}_{commodity}'.lower(), str(unserved_energy_cost_value[0]))
-                unserved_energy_cost.set('unserverdenergycost', region.lower(), str(unserved_energy_cost_value[1]))
+        # Filter none values
+        batch_results = pd.Series(batch_results)
+        idx_none = batch_results.values != None
+        for region, unserved_energy_cost_value, scenariobuilder_values in batch_results[idx_none.index]:
+            for cluster in scenariobuilder_values:
+                set_scenariobuilder_values(cluster)
+
+            unserved_energy_cost.set('unserverdenergycost', f'{region}_{commodity}'.lower(), str(unserved_energy_cost_value[0]))
+            unserved_energy_cost.set('unserverdenergycost', region.lower(), str(unserved_energy_cost_value[1]))
         else: 
             log(f'No batch results for {commodity}')
 
@@ -1129,7 +1131,7 @@ def process_in_batches(
         batch_costs = regional_unserved_energy_costs[i : i + batch_size]
         batch_args = list(zip(batch_regions, batch_costs))
 
-        print(
+        log(
             f"Processing batch {i // batch_size + 1}/{(len(regions) - 1) // batch_size + 1}"
         )
 
@@ -1159,7 +1161,7 @@ def model_demand_response(
     unserved_energy_cost_region: float,
 ):
     # Do kernel smoothing
-    print(
+    log(
         f"Kernel smoothing {parameter_x} and {parameter_y} for {commodity} in {region}"
     )
     z_capacity, x0, y0 = do_kernel_smoothing(
@@ -1214,14 +1216,14 @@ def main(ctx, sc_name: str, year: str):
         sc_name (str): Scenario name
         year (str): Model year
     """
-    print("\n|--------------------------------------------------|")
-    print("              PERI-PROCESSING")
-    print("|--------------------------------------------------|\n")
+    log("|--------------------------------------------------|")
+    log("              PERI-PROCESSING")
+    log("|--------------------------------------------------|")
 
     # Metadata
     if sc_name == None:
         # Otherwise, read config from top level
-        print("Reading SC from Config.ini..")
+        log("Reading SC from Config.ini..")
         Config = configparser.ConfigParser()
         Config.read("Config.ini")
         sc_name = Config.get("RunMetaData", "SC")
@@ -1373,7 +1375,7 @@ def main(ctx, sc_name: str, year: str):
     )
 
     # Loading MainResults
-    print(
+    log(
         "Loading results for year %s from Balmorel/%s/model/MainResults_%s.gdx\n"
         % (year, SC_folder, SC)
     )
@@ -1435,9 +1437,9 @@ def main(ctx, sc_name: str, year: str):
     create_demand_response(ctx.obj['weather_years'], res, SC, year, temporal_resolution, style)
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
 
-    print("\n|--------------------------------------------------|")
-    print("              END OF PERI-PROCESSING")
-    print("|--------------------------------------------------|\n")
+    log("|--------------------------------------------------|")
+    log("              END OF PERI-PROCESSING")
+    log("|--------------------------------------------------|")
 
     # Set periprocessing_finished to true (will be set to true after peri-processing finishes)
     with open("Workflow/MetaResults/periprocessing_finished.txt", "w") as f:

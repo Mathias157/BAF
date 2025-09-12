@@ -247,8 +247,8 @@ def log_time():
     string = time.strftime('[%Y-%m-%d %H:%M]:', tuple(time.localtime()))
     return string
 
-def log(message: str):
-    print(log_time(), message)
+def log(*message: str | list):
+    print(log_time(), *message)
 
 def get_marginal_costs(year, cap, idx_cap, fuel, GDATA, FPRICE, FDATA, EMI_POL, ANNUITYCG, include_capital_costs: bool = True):
     """Gets average marginal cost of generators in cap[idx_cap], provided VOM, fuel and emission policy data 
