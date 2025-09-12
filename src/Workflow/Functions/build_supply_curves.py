@@ -742,7 +742,7 @@ def get_supply_curves(scenario: str,
     df2_temp.loc[idx, 'Value'] = 0 
     
     # Prepare parameters to iterate through and colors for plotting them
-    regions = df1_temp.Region.unique()
+    regions = df1_temp.Region.sort_values().unique()
     parameter_name = [col for col in parameters.columns if not(col in ['Region', 'Season', 'Time'])][0]
     
     ## Cluster parameters 
@@ -766,7 +766,7 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
 
     # Get regional parameters and amount of clusters
     resulting_curves = {}
-    clusters = parameters['Cluster'].unique()
+    clusters = parameters['Cluster'].sort_values().unique()
     
     parallel_func = partial(
         process_cluster,
