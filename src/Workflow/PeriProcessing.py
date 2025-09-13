@@ -28,7 +28,7 @@ import pickle
 import configparser
 from multiprocessing import Pool
 from functools import partial
-from Functions.GeneralHelperFunctions import create_transmission_input, get_marginal_costs, get_efficiency, get_capex, set_cluster_attribute, AntaresInput, get_balmorel_time_and_hours, data_context, set_scenariobuilder_values, log_time, log
+from Functions.GeneralHelperFunctions import create_transmission_input, get_marginal_costs, get_efficiency, get_capex, set_cluster_attribute, AntaresInput, get_balmorel_time_and_hours, data_context, set_scenariobuilder_values, log_time, log, write_8760_series
 from Functions.build_supply_curves import get_supply_curves, get_supply_curve_parameters_fit, get_supply_curve_parameters_all, load_OSMOSE_data_to_context, model_supply_curves_in_antares
 from Functions.physicality_of_antares_solution import BalmorelFullTimeseries
 from Functions.kernel_2Dsmoothing import do_kernel_smoothing
@@ -439,27 +439,6 @@ def antares_thermal_capacities(
             thermal_config.write(f)
         thermal_config.clear()
 
-        # 2.3 Get Electrolyser Capacity
-        idx_cap = (
-            (cap.Commodity == "HYDROGEN")
-            & (cap.Tech == "ELECTROLYZER")
-            & (cap.Y == year)
-        )
-        temp = cap.loc[idx_cap]
-
-        tech_cap = 0
-        eff = 0
-        N_reg = 0
-        for balmorel_region in A2B_regi[region]:
-            # weight = B2A_DE_weights[balmorel_region][region]
-            weight = 1
-            tech_cap += (
-                weight * temp[temp.R == balmorel_region].Value.sum() * 1e3
-            )  # MW H2 out
-            if temp.loc[temp.R == balmorel_region, "Value"].sum() * 1000 > 1e-6:
-                eff += get_efficiency(cap, idx_cap & (cap.R == balmorel_region), GDATA)
-                N_reg += 1
-
     return fAntTechno
 
 
@@ -511,7 +490,7 @@ def antares_storage_capacities(
             # Battery capacity
             energy_cap += (
                 sto.query(
-                    "R == @balmorel_region and Tech == 'INTRASEASONAL-ELECT-STORAGE' and G.str.contains('BAT-LITHIO-PEAK')"
+                    "R == @balmorel_region and Tech == 'INTRASEASONAL-ELECT-STORAGE' and G.str.contains('BAT-LITHIO')"
                 )
                 .loc[:, "Value"]
                 .sum()
@@ -534,9 +513,12 @@ def antares_storage_capacities(
             capex += get_capex(sto, idx_sto, GDATA, ANNUITYCG)
         
         if power_cap > 1e-6:
-            log('%s Li-Ion (weekly) Energy Capacity: <= %d MWh'%(region, power_cap*168))
-        # Check GDATA, charge and discharge power capacities are the same    
+            log('%s Li-Ion Power Capacity: = %d MW'%(region, power_cap))
+            log('%s Li-Ion (weekly) Energy Capacity: <= %d MWh'%(region, energy_cap))
+
         # GDATA[(GDATA.G.str.find('BAT-LITHIO-PEAK') != -1) & ((GDATA.Par == 'GDSTOHUNLD') | (GDATA.Par == 'GDSTOHLOAD'))]
+        # Check GDATA, charge and discharge power capacities are the same    
+
         
         ### weekly Energy Capacity
         with open('Antares/input/bindingconstraints/00_xtra_%s_bat_3_lt.txt'%region.lower(), 'w') as f:
@@ -546,50 +528,27 @@ def antares_storage_capacities(
                 f.write(str(int(energy_cap/2)) + '\n')
         
         set_cluster_attribute('z_%s_bat_1'%region.lower(), 'nominalcapacity', energy_cap, '00_xtra')
+        write_8760_series('Antares/input/thermal/series/00_xtra/z_%s_bat_1'%region.lower(), energy_cap)
         set_cluster_attribute('z_%s_bat_2'%region.lower(), 'nominalcapacity', energy_cap, '00_xtra')
+        write_8760_series('Antares/input/thermal/series/00_xtra/z_%s_bat_2'%region.lower(), energy_cap)
 
-                    
         ### 'Pumping' Capacity (Charge)
-        set_cluster_attribute('z_bat_gen', 'nominalcapacity', power_cap, region)
+        set_cluster_attribute('z_bat_gen', 'nominalcapacity', power_cap, region.lower())
+        set_cluster_attribute('z_bat_gen', 'marginal-cost', 1, region.lower())
+        set_cluster_attribute('z_bat_gen', 'market-bid-cost', 1, region.lower())
+        write_8760_series('Antares/input/thermal/series/%s/z_bat_gen'%region.lower(), power_cap)
         
         create_transmission_input('./', 'Antares', '00_BAT_STO', region.lower(), [0, power_cap], 0)
-        if power_cap > 1e-6:
-            log(
-                "%s Li-Ion (weekly) Energy Capacity: <= %d MWh"
-                % (region, power_cap * 24)
-            )
+
         # Check GDATA, charge and discharge power capacities are the same
         # GDATA[(GDATA.G.str.find('BAT-LITHIO-PEAK') != -1) & ((GDATA.Par == 'GDSTOHUNLD') | (GDATA.Par == 'GDSTOHLOAD'))]
-
-        # weekly Energy Capacity
-        with open(
-            "Antares/input/bindingconstraints/00_xtra_%s_bat_3_lt.txt" % region.lower(),
-            "w",
-        ) as f:
-            for day in range(366):
-                for hour in range(23):
-                    f.write(str(int(energy_cap)) + "\n")
-                f.write(str(int(energy_cap / 2)) + "\n")
-
-        set_cluster_attribute(
-            "z_%s_bat_1" % region.lower(), "nominalcapacity", energy_cap, "00_xtra"
-        )
-        set_cluster_attribute(
-            "z_%s_bat_2" % region.lower(), "nominalcapacity", energy_cap, "00_xtra"
-        )
-
-        # 'Pumping' Capacity (Charge)
-        set_cluster_attribute("z_bat_gen", "nominalcapacity", power_cap, region)
-
-        create_transmission_input(
-            "./", "Antares", "00_BAT_STO", region.lower(), [0, power_cap], 0
-        )
-
+        
         # Save technoeconomic data to file
         fAntTechno.loc[(i, year, region, 'battery'), 'OPEX'] = 0
         fAntTechno.loc[(i, year, region, 'battery'), 'CAPEX'] = capex
-        fAntTechno.loc[(i, year, region, 'battery'), 'Energy Capacity'] = power_cap*168 
+        fAntTechno.loc[(i, year, region, 'battery'), 'Energy Capacity'] = energy_cap
         fAntTechno.loc[(i, year, region, 'battery'), 'Power Capacity'] = power_cap 
+
     return fAntTechno
 
 
@@ -648,6 +607,7 @@ def antares_transmission_capacities(
 
 
 def antares_exogenous_electricity_demand(
+    result: MainResults,
     electricity_profiles: pd.DataFrame,
     electricity_demand: pd.DataFrame,
     DISLOSSEL: pd.DataFrame,
@@ -665,6 +625,12 @@ def antares_exogenous_electricity_demand(
     """
 
     log("Annual electricity demands to Antares...\n")
+
+    dist_trans_loss = (
+        result
+        .get_result('EL_DEMAND_YCR')
+        .query('Year == @year and Category in ["TRANS_LOSSES", "DIST_LOSSES", "ENDO_CCS"]')
+    )
 
     # Go through regions
     for region in A2B_regi.keys():
@@ -694,10 +660,12 @@ def antares_exogenous_electricity_demand(
                     profiles.loc[:, col] = (
                         profiles.loc[:, col]
                         * demand.loc[col, "Value"]
-                        / (1 - DISLOSSEL.loc[balmorel_region, "Value"])
                     )
                 else:
                     profiles.loc[:, col] = profiles.loc[:, col] * 0
+
+            # Add distribution and transmission loss as flat demand
+            # profiles += dist_trans_loss.query('Region == @balmorel_region').Value.sum() / 8784 * 1e6
 
             # Increment demand and add distribution loss
             ann_dem += profiles.sum().sum()
@@ -1344,9 +1312,8 @@ def main(ctx, sc_name: str, year: str):
         .aggregate({"Value": "sum"})
     )
     FPRICE = (
-        symbol_to_df(m.input_data[SC_folder], "FUELPRICE", ["Y", "R", "F", "Value"])
-        .groupby(by=["Y", "R", "F"])
-        .aggregate({"Value": "sum"})
+        symbol_to_df(m.input_data[SC_folder], "FUELPRICE", ["Y", "A", "F", "Value"])
+        .query('Y == @year')
     )
     EMI_POL = (
         symbol_to_df(
@@ -1425,7 +1392,7 @@ def main(ctx, sc_name: str, year: str):
 
     # Exogenous Electricity Demand Profile
     antares_exogenous_electricity_demand(
-        electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
+        res, electricity_profiles, electricity_demand, DISLOSSEL, A2B_regi, year
     )
 
     # Resource Constraints

@@ -69,7 +69,7 @@ def get_balmorel_results(ctx,
         temp.loc[:, 'Iter'] = ctx.obj['i']
         temp = temp.groupby(['Y', 'To', 'Iter', 'From']).aggregate({'Value' : 'sum'})
         h2trans = pd.concat((h2trans, temp))
-    except gams.control.GamsException:
+    except (gams.control.GamsException, ValueError):
         print('No hydrogen transmission')
 
     ## Get Demand
@@ -155,6 +155,7 @@ def get_antares_results(ctx,
                     
                     ## Thermal Generation
                     for col in [column for column in f.columns if not('.1' in column or '.2' in column or '.3' in column)]:
+                        print(col)
                         
                         tech = col.split('_')[0].upper()
                         fuel = col.split('_')[1].upper()
@@ -162,8 +163,10 @@ def get_antares_results(ctx,
                         # Save annual production
                         if not(tech == 'Z'):
                             pro.loc[year, 'Antares', area, fuel, tech, ctx.obj['i']] = f[col].values[0]/1e6
-                        else:
-                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'INTRASEASONAL-ELECT-STORAGE', ctx.obj['i']] = f[col].values[0]/1e6
+                        elif fuel == 'BAT':
+                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'BATTERY', ctx.obj['i']] = f[col].values[0]/1e6
+                        elif fuel == 'PSP':
+                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'PSP', ctx.obj['i']] = f[col].values[0]/1e6
                         print(f'Production of {tech} {fuel} was ', f[col].values[0]/1e6)
 
                         
@@ -182,6 +185,7 @@ def get_antares_results(ctx,
                                'SOLAR PV' : 'SUN'}
                 for ren in ['WIND OFFSHORE', 'WIND ONSHORE', 'SOLAR PV']:
                     pro.loc[year, 'Antares', area, translation[ren], ren, ctx.obj['i']] = f[ren].values[0] / 1e6
+                    print(f'Production of {ren} was ', pro.loc[(year, 'Antares', area, translation[ren], ren, ctx.obj['i']), 'Value'])
 
                 ## Spilled Energy (Mainly curtailment of VRE, but in principle thermal must-runs as well)
                 spilled = f['SPIL. ENRG'].values[0]             
@@ -190,7 +194,9 @@ def get_antares_results(ctx,
                 ## Hydro
                 # In area itself
                 pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']] = f.loc[0, 'H. STOR'] / 1e6
+                print('Production of hydro-reservoirs was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']), 'Value'])
                 pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']] = f.loc[0, 'H. ROR'] / 1e6
+                print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'])
                 
     return Antobj, pro, emi
 
@@ -961,7 +967,7 @@ def collect_results(ctx, scenario: str):
     print(pro.pivot_table(index=['Model', 'F'], values='Value', aggfunc='sum'))
     ax.set_ylabel('Electricity Generation (TWh)')
     ax.legend(bbox_to_anchor=(1.05, .5), loc='center left')
-    fig.savefig('Workflow/OverallResults/elec_gen.png', bbox_inches='tight')
+    fig.savefig(f'Workflow/OverallResults/{scenario}_elec_gen.png', bbox_inches='tight')
                 
 if __name__ == '__main__':
     collect_results()
