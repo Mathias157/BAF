@@ -362,9 +362,8 @@ def get_marginal_costs(
         try:
             mc_cost_temp += GDATA.loc[(G, "GDOMVCOST0"), "Value"] * Gcap / totalcap
             # print('Added VOMO cost: ', mc_cost_temp)
-        except:
-            # print('No VOM-Out defined cost')
-            pass
+        except KeyError:
+            print('No VOM-Out defined cost')
 
         # VOM defined on input
         try:
@@ -376,21 +375,24 @@ def get_marginal_costs(
                 / totalcap
             )
             # print('Added VOMI cost: ', mc_cost_temp)
-        except:
+        except KeyError:
             # print('No VOM-In defined cost')
             pass
 
         # Fuel cost
         try:
             mc_cost_temp += (
-                FPRICE.loc[(year, region, fuel), "Value"]
+                FPRICE
+                .query('F == @fuel and A.str.contains(@region)')                
+                .loc[:, 'Value']
+                .mean()
                 / GDATA.loc[(G, "GDFE"), "Value"]
                 * Gcap
                 / totalcap
             )  # Same prices everywhere as in DK
             # print('Added fuel cost: ', mc_cost_temp)
-        except:
-            pass
+        except KeyError:
+            log(f'No fuel cost for {region, G, fuel}')
 
         # Carbon cost
         try:
@@ -402,8 +404,8 @@ def get_marginal_costs(
             mc_cost_temp += (
                 tax * fuelemi / GDATA.loc[(G, "GDFE"), "Value"] * Gcap / totalcap
             )
-            # print('Added CO2 cost: ', mc_cost_temp)
-        except:
+            print('Added CO2 cost: ', mc_cost_temp)
+        except KeyError:
             pass
 
         if include_capital_costs:
