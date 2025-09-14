@@ -358,12 +358,16 @@ def get_marginal_costs(
     for G in cap[idx_cap].G.unique():
         Gcap = cap.loc[idx_cap & (cap.G == G), "Value"].sum() * 1e3  # MW
 
+        if Gcap < 1e-5:
+            continue
+
         # VOM defined on output
         try:
             mc_cost_temp += GDATA.loc[(G, "GDOMVCOST0"), "Value"] * Gcap / totalcap
             # print('Added VOMO cost: ', mc_cost_temp)
         except KeyError:
-            print('No VOM-Out defined cost')
+            # print('No VOM-Out defined cost')
+            pass
 
         # VOM defined on input
         try:
@@ -394,6 +398,7 @@ def get_marginal_costs(
         except KeyError:
             log(f'No fuel cost for {region, G, fuel}')
 
+
         # Carbon cost
         try:
             country = cap[idx_cap].C.values[0]
@@ -404,7 +409,7 @@ def get_marginal_costs(
             mc_cost_temp += (
                 tax * fuelemi / GDATA.loc[(G, "GDFE"), "Value"] * Gcap / totalcap
             )
-            print('Added CO2 cost: ', mc_cost_temp)
+            # print('Added CO2 cost: ', mc_cost_temp)
         except KeyError:
             pass
 
@@ -414,17 +419,20 @@ def get_marginal_costs(
             # A flat / 8760 distribution is not realistic
 
             # CAPEX
-            try:
-                # Get endogenous share
-                endo_share = (
-                    cap.query('Var == "ENDOGENOUS"')
-                    .loc[idx_cap & (cap.G == G), "Value"]
-                    .sum()
-                    * 1e3
-                    / Gcap
-                )
+            # Get endogenous share
+            endo_share = (
+                cap.query('Var == "ENDOGENOUS"')
+                .loc[idx_cap & (cap.G == G), "Value"]
+                .sum()
+                * 1e3
+                / Gcap
+            )
+
+            if endo_share < 1e-5:
+                pass
+            else:
                 # print(f'Endogenous share for {G}: {endo_share*100} %')
-                mc_cost_temp += (
+                capex_cost = (
                     GDATA.loc[(G, "GDINVCOST0"), "Value"]
                     * 1e6
                     / 8760
@@ -433,16 +441,18 @@ def get_marginal_costs(
                     * ANNUITYCG.loc[(country, G), "Value"]
                     / totalcap
                 )
-
-            except:
-                pass
+                # print('Added CAPEX part', capex_cost)
+                mc_cost_temp += capex_cost
 
             # Fixed O&M
             try:
-                mc_cost_temp += (
+                fom_cost = (
                     GDATA.loc[(G, "GDOMFCOST0"), "Value"] * 1e3 / 8760 * Gcap / totalcap
                 )
+                # print('Added FOM part', fom_cost)
+                mc_cost_temp += fom_cost
             except:
+                # print('No fixed costs')
                 pass
 
     return mc_cost_temp
