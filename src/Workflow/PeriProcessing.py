@@ -271,7 +271,7 @@ def antares_thermal_capacities(
                             FDATA,
                             EMI_POL,
                             ANNUITYCG,
-                            include_capital_costs=False,
+                            include_capital_costs=True,
                         )
 
                         if not (pd.isna(mc_cost_temp)):
@@ -660,7 +660,7 @@ def antares_exogenous_electricity_demand(
                     profiles.loc[:, col] = (
                         profiles.loc[:, col]
                         * demand.loc[col, "Value"]
-                    )
+                    ) / (1 - DISLOSSEL.loc[balmorel_region, "Value"])
                 else:
                     profiles.loc[:, col] = profiles.loc[:, col] * 0
 

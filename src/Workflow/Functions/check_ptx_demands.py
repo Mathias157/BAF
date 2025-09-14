@@ -240,10 +240,14 @@ def virginie():
     antbalm_list = [
         ["MainResults_baf_test_fullyear_Iter0.gdx", "20250627-1815eco-baf_test_fullyear_clsize1000_nr1_iter0_y-2050"],
         ["MainResults_baf_test_fullyear_Iter0.gdx", "20250910-1713eco-baf_test_fullyear_iter0_y-2050"],
-        [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250912-1127eco-noh2_fullyear_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx"    , "h2"], "20250912-0913eco-h2_fullyear_iter0_y-2050"],
-        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250912-1208eco-h2_lss_fullyear_iter0_y-2050"],
-        # ["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", ""],
+        [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0014eco-noh2_fullyear_iter0_y-2050"],
+        [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0829eco-noh2_fullyear_wdisloss_iter0_y-2050"],
+        [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0858eco-noh2_fullyear_wdisloss_wcapex_iter0_y-2050"],
+        [["MainResults_h2_fullyear_Iter0.gdx"    , "h2"], "20250914-0029eco-h2_fullyear_iter0_y-2050"],
+        [["MainResults_h2_fullyear_Iter0.gdx"    , "h2"], "20250914-0844eco-h2_fullyear_wdisloss_iter0_y-2050"],
+        [["MainResults_h2_fullyear_Iter0.gdx"    , "h2"], "20250914-0914eco-h2_fullyear_wdisloss_wcapex_iter0_y-2050"],
+        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250914-1227eco-h2_lss_fullyear_wdisloss_wcapex_iter0_y-2050"],
+        # ["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"],
     ]
 
     collect_ptx_results(antbalm_list, 'virginie')
