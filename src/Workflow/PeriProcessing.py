@@ -1078,8 +1078,6 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         # Filter none values
         batch_results = pd.Series(batch_results)
         idx = batch_results.values != None
-        print('Batch results: ', batch_results)
-        print('Batch results filtered: ', batch_results[idx])
         if len(batch_results[idx]) > 0:
             for region, unserved_energy_cost_value, scenariobuilder_values in batch_results[idx]:
                 for cluster in scenariobuilder_values:
