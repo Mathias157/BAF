@@ -390,6 +390,7 @@ def get_marginal_costs(
                 .query('F == @fuel and A.str.contains(@region)')                
                 .loc[:, 'Value']
                 .mean()
+                * 3.6 # From €/GJ to €/MWh
                 / GDATA.loc[(G, "GDFE"), "Value"]
                 * Gcap
                 / totalcap
