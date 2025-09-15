@@ -822,7 +822,7 @@ def process_cluster(
         region: str
     ):
     
-    log(f'Processing cluster {cluster} for region {region}') 
+    # log(f'Processing cluster {cluster} for region {region}') 
 
     # Placeholders
     supply_curves_x, supply_curves_y = [], []
@@ -873,6 +873,7 @@ def process_cluster(
                 ax.set_title(area)
                 ax.legend(loc='center left', bbox_to_anchor=(1.05, .5))
                 fig.savefig(f'Workflow/OverallResults/eldempricecurve_{commodity}_{area}_{tech}_{parameter_name}{average_parameter:0.2f}.png', bbox_inches='tight')
+                plt.close(fig)
             
     if len(supply_curves_x) != 0:
         # print('='*10, '\nsupply curves x:\n', supply_curves_x, '\nsupply curves y:\n', supply_curves_y)

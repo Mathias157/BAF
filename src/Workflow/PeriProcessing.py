@@ -1078,12 +1078,15 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         # Filter none values
         batch_results = pd.Series(batch_results)
         idx = batch_results.values != None
-        for region, unserved_energy_cost_value, scenariobuilder_values in batch_results[idx]:
-            for cluster in scenariobuilder_values:
-                set_scenariobuilder_values(cluster)
+        print('Batch results: ', batch_results)
+        print('Batch results filtered: ', batch_results[idx])
+        if len(batch_results[idx]) > 0:
+            for region, unserved_energy_cost_value, scenariobuilder_values in batch_results[idx]:
+                for cluster in scenariobuilder_values:
+                    set_scenariobuilder_values(cluster)
 
-            unserved_energy_cost.set('unserverdenergycost', f'{region}_{commodity}'.lower(), str(unserved_energy_cost_value[0]))
-            unserved_energy_cost.set('unserverdenergycost', region.lower(), str(unserved_energy_cost_value[1]))
+                unserved_energy_cost.set('unserverdenergycost', f'{region}_{commodity}'.lower(), str(unserved_energy_cost_value[0]))
+                unserved_energy_cost.set('unserverdenergycost', region.lower(), str(unserved_energy_cost_value[1]))
         else: 
             log(f'No batch results for {commodity}')
 
