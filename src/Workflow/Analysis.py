@@ -23,7 +23,20 @@ from pybalmorel.formatting import balmorel_colours
 from Functions.Formatting import newplot, set_style, stacked_bar
 from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput
 import warnings
-warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+
+warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+
+balmorel_colours["Spilled"] = "black"
+balmorel_colours["WOOD"] = "orange"
+balmorel_colours["DUMMY"] = "orange"
+balmorel_colours["WOODWASTE"] = "orange"
+balmorel_colours["RETORTGAS"] = "orange"
+balmorel_colours["CHP-EXTRACTION-CCS"] = "gray"
+balmorel_colours["CONDENSING-CCS"] = "gray"
+balmorel_colours["WIND OFFSHORE"] = balmorel_colours["WIND-OFF"]
+balmorel_colours["WIND ONSHORE"] = balmorel_colours["WIND-ON"]
+balmorel_colours["SOLAR PV"] = balmorel_colours["SOLAR-PV"]
+balmorel_colours["SPILLED"] = "lightblue"
 
 ### ------------------------------- ###
 ###          1. Functions           ###
