@@ -12,6 +12,7 @@ OS = platform.platform().split('-')[0]
 import matplotlib.pyplot as plt
 import shutil
 import os
+from pathlib import Path
 import click
 import pickle
 import configparser
@@ -841,14 +842,23 @@ def store_and_zip(ctx):
                 if ctx.obj['del_files']:
                     print('\nDeleting..')
                     shutil.rmtree(os.path.join(ctx.obj['wk_dir'], 'Antares/output', ant_file))
+
+@click.group()
+@click.pass_context
+@click.option('--dark', is_flag=True, default=False, help="Dark plots?")
+def CLI(ctx, dark):
+    # Context manager
+    ctx.ensure_object(dict)
+
+    if dark:
+        ctx.obj['fc'], ctx.obj['plotly_theme'] = set_style('ppt')
+    else: 
+        ctx.obj['fc'], ctx.obj['plotly_theme'] = set_style('report')
         
-@click.command()
+@CLI.command()
 @click.argument('scenario', type=str)
 @click.pass_context
 def collect_results(ctx, scenario: str):
-    
-    # Context manager
-    ctx.ensure_object(dict)
     
     Config = configparser.ConfigParser()
     Config.read('Workflow/MetaResults/%s_meta.ini'%scenario)
@@ -860,14 +870,9 @@ def collect_results(ctx, scenario: str):
     ctx.obj['plotprofiles'] = 'n' # Choose whether to plot profiles or not
     ctx.obj['plotantaresViz'] = 'n'
     ctx.obj['plotPFcomparison'] = False
-    style = Config.get('Analysis', 'plot_style')
     ctx.obj['plot_all'] = Config.getboolean('Analysis', 'plot_all')
     ctx.obj['zip_files'] = Config.getboolean('Analysis', 'zip_files')
     ctx.obj['del_files'] = Config.getboolean('Analysis', 'del_files')
-
-    ctx.obj['fc'], ctx.obj['plotly_theme'] = set_style(style)
-
-
         
     # Years
     years = np.array(Config.get('RunMetaData', 'Y').split(',')).astype(int)
@@ -953,7 +958,31 @@ def collect_results(ctx, scenario: str):
                     'proh2' : proH2,
                     'emi' : emi}, f)
 
-    # A more simple plot
+               
+@CLI.command()
+@click.argument('scenario', type=str, required=True)
+@click.option('--overwrite', is_flag=True, default=False, help="Collect results again, even if it exists")
+@click.pass_context
+def plot(ctx, scenario, overwrite):
+    
+    # Collect results if overwrite or if it doesn't exist
+    result_path = Path(f'Workflow/OverallResults/{scenario}_results.pkl')
+    if not result_path.exists() or overwrite:
+        print(f'Collecting {scenario} results...')
+        ctx.invoke(collect_results, scenario=scenario)
+
+    # Load results
+    with open(str(result_path), 'rb') as f:
+        results = pickle.load(f)
+
+    # Annual electricity generation    
+    fig, _ = plot_annual_electricity_generation(results, facecolor=ctx.obj['fc'])
+    fig.savefig(f'Workflow/OverallResults/{scenario}_elec_gen.png', bbox_inches='tight', transparent=True)
+
+    # Electricity generating profile per week
+
+def plot_annual_electricity_generation(results: dict, **kwargs):
+    pro = results['pro']
     fig, ax = plt.subplots()
     balmorel_colours['Spilled'] = 'black'
     balmorel_colours['WOOD'] = 'orange'
@@ -965,9 +994,12 @@ def collect_results(ctx, scenario: str):
                                                                                     stacked=True,
                                                                                     color=balmorel_colours)
     print(pro.pivot_table(index=['Model', 'F'], values='Value', aggfunc='sum'))
+    ax.set_facecolor(kwargs.get('facecolor', 'none'))
+    fig.set_facecolor(kwargs.get('facecolor', 'none'))
     ax.set_ylabel('Electricity Generation (TWh)')
     ax.legend(bbox_to_anchor=(1.05, .5), loc='center left')
-    fig.savefig(f'Workflow/OverallResults/{scenario}_elec_gen.png', bbox_inches='tight')
-                
+
+    return fig, ax 
+
 if __name__ == '__main__':
-    collect_results()
+    CLI()
