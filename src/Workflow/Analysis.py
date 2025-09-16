@@ -25,6 +25,10 @@ from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput
 import warnings
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
+### ------------------------------- ###
+###          1. Functions           ###
+### ------------------------------- ###
+
 @click.pass_context
 def get_balmorel_results(ctx,
                          obj: pd.DataFrame,
@@ -843,6 +847,30 @@ def store_and_zip(ctx):
                     print('\nDeleting..')
                     shutil.rmtree(os.path.join(ctx.obj['wk_dir'], 'Antares/output', ant_file))
 
+def plot_annual_electricity_generation(results: dict, **kwargs):
+    pro = results['pro']
+    fig, ax = plt.subplots()
+    balmorel_colours['Spilled'] = 'black'
+    balmorel_colours['WOOD'] = 'orange'
+    balmorel_colours['DUMMY'] = 'orange'
+    balmorel_colours['WOODWASTE'] = 'orange'
+    balmorel_colours['RETORTGAS'] = 'orange'
+    pro.pivot_table(index='Model', columns='F', values='Value', aggfunc='sum').plot(ax=ax, 
+                                                                                    kind='bar', 
+                                                                                    stacked=True,
+                                                                                    color=balmorel_colours)
+    print(pro.pivot_table(index=['Model', 'F'], values='Value', aggfunc='sum'))
+    ax.set_facecolor(kwargs.get('facecolor', 'none'))
+    fig.set_facecolor(kwargs.get('facecolor', 'none'))
+    ax.set_ylabel('Electricity Generation (TWh)')
+    ax.legend(bbox_to_anchor=(1.05, .5), loc='center left')
+
+    return fig, ax 
+
+### ------------------------------- ###
+###           2. Main CLI           ###
+### ------------------------------- ###
+
 @click.group()
 @click.pass_context
 @click.option('--dark', is_flag=True, default=False, help="Dark plots?")
@@ -855,6 +883,9 @@ def CLI(ctx, dark):
     else: 
         ctx.obj['fc'], ctx.obj['plotly_theme'] = set_style('report')
         
+    ## 1.0 Plot design
+    ctx.obj['figsize'] = (10,5)
+
 @CLI.command()
 @click.argument('scenario', type=str)
 @click.pass_context
@@ -911,17 +942,8 @@ def collect_results(ctx, scenario: str):
     # Save to context
     ctx.obj['SC'] = scenario
     
-    ### ------------------------------- ###
-    ###     1. Collect Annual Values    ###
-    ### ------------------------------- ###
-
-    ### 1.0 Plot design
-    figsize = (10,5)
-    # back_color = (32/255, 31/255, 30/255)
-    # xticks = [j for j in np.arange(iters[0], iters[-1]+1)]
-    
-
-    ### 1.1 Placeholders and useful data
+    # 1. Collect Annual Values
+    ## 1.1 Placeholders and useful data
     obj = pd.DataFrame({})
     Antobj = pd.DataFrame({})
     cap = pd.DataFrame({})
@@ -944,8 +966,7 @@ def collect_results(ctx, scenario: str):
         
         Antobj, pro, emi = get_antares_results(years, Antobj, pro, emi)
         
-    # Reset index for plotly plots and store pickle file with all dataframes
-
+    # Store pickle file with all dataframes
     with open('Workflow/OverallResults/%s_results.pkl'%scenario, 'wb') as f:
         pickle.dump({'obj' : obj,
                     'Aobj' : Antobj,
@@ -958,7 +979,6 @@ def collect_results(ctx, scenario: str):
                     'proh2' : proH2,
                     'emi' : emi}, f)
 
-               
 @CLI.command()
 @click.argument('scenario', type=str, required=True)
 @click.option('--overwrite', is_flag=True, default=False, help="Collect results again, even if it exists")
@@ -981,25 +1001,6 @@ def plot(ctx, scenario, overwrite):
 
     # Electricity generating profile per week
 
-def plot_annual_electricity_generation(results: dict, **kwargs):
-    pro = results['pro']
-    fig, ax = plt.subplots()
-    balmorel_colours['Spilled'] = 'black'
-    balmorel_colours['WOOD'] = 'orange'
-    balmorel_colours['DUMMY'] = 'orange'
-    balmorel_colours['WOODWASTE'] = 'orange'
-    balmorel_colours['RETORTGAS'] = 'orange'
-    pro.pivot_table(index='Model', columns='F', values='Value', aggfunc='sum').plot(ax=ax, 
-                                                                                    kind='bar', 
-                                                                                    stacked=True,
-                                                                                    color=balmorel_colours)
-    print(pro.pivot_table(index=['Model', 'F'], values='Value', aggfunc='sum'))
-    ax.set_facecolor(kwargs.get('facecolor', 'none'))
-    fig.set_facecolor(kwargs.get('facecolor', 'none'))
-    ax.set_ylabel('Electricity Generation (TWh)')
-    ax.legend(bbox_to_anchor=(1.05, .5), loc='center left')
-
-    return fig, ax 
 
 if __name__ == '__main__':
     CLI()
