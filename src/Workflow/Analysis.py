@@ -562,43 +562,98 @@ def store_and_zip(ctx):
                     shutil.rmtree(os.path.join(ctx.obj['wk_dir'], 'Antares/output', ant_file))
 
 def plot_annual_electricity_generation(results: dict, **kwargs):
-    pro = results['pro']
+    pro = results["pro"]
     fig, ax = plt.subplots()
-    balmorel_colours['Spilled'] = 'black'
-    balmorel_colours['WOOD'] = 'orange'
-    balmorel_colours['DUMMY'] = 'orange'
-    balmorel_colours['WOODWASTE'] = 'orange'
-    balmorel_colours['RETORTGAS'] = 'orange'
-    pro.pivot_table(index='Model', columns='F', values='Value', aggfunc='sum').plot(ax=ax, 
-                                                                                    kind='bar', 
-                                                                                    stacked=True,
-                                                                                    color=balmorel_colours)
-    print(pro.pivot_table(index=['Model', 'F'], values='Value', aggfunc='sum'))
-    ax.set_facecolor(kwargs.get('facecolor', 'none'))
-    fig.set_facecolor(kwargs.get('facecolor', 'none'))
-    ax.set_ylabel('Electricity Generation (TWh)')
-    ax.legend(bbox_to_anchor=(1.05, .5), loc='center left')
+    pro.pivot_table(index="Model", columns="F", values="Value", aggfunc="sum").plot(
+        ax=ax, kind="bar", stacked=True, color=balmorel_colours
+    )
+    print(pro.pivot_table(index=["Model", "F"], values="Value", aggfunc="sum"))
+    ax.set_facecolor(kwargs.get("facecolor", "none"))
+    fig.set_facecolor(kwargs.get("facecolor", "none"))
+    ax.set_ylabel("Electricity Generation (TWh)")
+    ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left")
 
-    return fig, ax 
+    return fig, ax
+
+
+def plot_antares_hourly_electricity_generation(
+    production_hourly: dict,
+    iteration: int = 0,
+    week: int = 1,
+    year: str = "2050",
+    regions: str | list = "all",
+    **kwargs,
+):
+    antares_production = production_hourly[iteration][year]
+    df = None
+
+    # Aggregate to regional choice
+    if type(regions) is str:
+        if regions.lower() != "all":
+            df = pd.DataFrame(antares_production[regions])
+        else:
+            regions = list(antares_production.keys())
+
+    if type(regions) is list:
+        df = pd.DataFrame(antares_production[regions[0]])
+        for region in regions[1:]:
+            df = df.add(pd.DataFrame(antares_production[region]), fill_value=0)
+
+    if df is None:
+        raise ValueError("Wrong choice of regions")
+
+    # Plot timeseries
+    with open("test.txt", "w") as f:
+        f.write(df.to_string())
+
+    fig, ax = plt.subplots(figsize=kwargs.get("figsize", (10, 5)))
+    df.loc[(week - 1) * 168 : week * 168].plot(
+        ax=ax, stacked=True, kind="area", color=balmorel_colours
+    )
+    ax.set_facecolor(kwargs.get("facecolor", "none"))
+    ax.set_ylabel("Electricity Generation (TWh)")
+    ax.set_xlim((week - 1) * 168, week * 168)
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.05), ncols=4)
+    fig.set_facecolor(kwargs.get("facecolor", "none"))
+
+    return fig, ax
+
+
+def plot_balmorel_hourly_electricity_generation(
+    scenario: str, iteration: int = 0, week: int = 0, year: str = "2050", gams_system_directory: str = None
+):
+    scenario = f"{scenario}_Iter{iteration}"
+    model = Balmorel("Balmorel", gams_system_directory=gams_system_directory)
+    model.collect_results()
+
+    fig, ax = model.results.plot_profile("electricity", int(year), scenario)
+    print(ax.get_xlim())
+
+    ax.set_xlim(f"S{week:02.0f}", f"S{week:02.0f}")
+
+    return fig, ax
+
 
 ### ------------------------------- ###
 ###           2. Main CLI           ###
 ### ------------------------------- ###
 
+
 @click.group()
 @click.pass_context
-@click.option('--dark', is_flag=True, default=False, help="Dark plots?")
+@click.option("--dark", is_flag=True, default=False, help="Dark plots?")
 def CLI(ctx, dark):
     # Context manager
     ctx.ensure_object(dict)
 
     if dark:
-        ctx.obj['fc'], ctx.obj['plotly_theme'] = set_style('ppt')
-    else: 
-        ctx.obj['fc'], ctx.obj['plotly_theme'] = set_style('report')
-        
+        ctx.obj["fc"], ctx.obj["plotly_theme"] = set_style("ppt")
+    else:
+        ctx.obj["fc"], ctx.obj["plotly_theme"] = set_style("report")
+
     ## 1.0 Plot design
-    ctx.obj['figsize'] = (10,5)
+    ctx.obj["figsize"] = (10, 5)
+
 
 @CLI.command()
 @click.argument('scenario', type=str)
@@ -698,27 +753,52 @@ def collect_results(ctx, scenario: str):
                     'emi' : emi}, f)
 
 @CLI.command()
-@click.argument('scenario', type=str, required=True)
-@click.option('--overwrite', is_flag=True, default=False, help="Collect results again, even if it exists")
+@click.argument("scenario", type=str, required=True)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    help="Collect results again, even if it exists",
+)
 @click.pass_context
 def plot(ctx, scenario, overwrite):
-    
     # Collect results if overwrite or if it doesn't exist
-    result_path = Path(f'Workflow/OverallResults/{scenario}_results.pkl')
+    result_path = Path(f"Workflow/OverallResults/{scenario}_results.pkl")
     if not result_path.exists() or overwrite:
-        print(f'Collecting {scenario} results...')
+        print(f"Collecting {scenario} results...")
         ctx.invoke(collect_results, scenario=scenario)
 
     # Load results
-    with open(str(result_path), 'rb') as f:
+    with open(str(result_path), "rb") as f:
         results = pickle.load(f)
 
-    # Annual electricity generation    
-    fig, _ = plot_annual_electricity_generation(results, facecolor=ctx.obj['fc'])
-    fig.savefig(f'Workflow/OverallResults/{scenario}_elec_gen.png', bbox_inches='tight', transparent=True)
+    # Annual electricity generation
+    fig, _ = plot_annual_electricity_generation(results, facecolor=ctx.obj["fc"])
+    fig.savefig(
+        f"Workflow/OverallResults/{scenario}_elec_gen.png",
+        bbox_inches="tight",
+        transparent=True,
+    )
 
     # Electricity generating profile per week
+    fig, _ = plot_antares_hourly_electricity_generation(
+        results["pro_hourly"], regions="ES"
+    )
+    fig.savefig(
+        f"Workflow/OverallResults/{scenario}_antares_elec_gen_hourly.png",
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    fig, _ = plot_balmorel_hourly_electricity_generation(
+        scenario, gams_system_directory=ctx.obj["gams_system_directory"]
+    )
+    fig.savefig(
+        f"Workflow/OverallResults/{scenario}_balmorel_elec_gen_hourly.png",
+        bbox_inches="tight",
+        transparent=True,
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     CLI()
