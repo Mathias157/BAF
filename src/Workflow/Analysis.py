@@ -156,30 +156,29 @@ def get_antares_results(ctx,
             for area in ctx.obj['A2B_regi'].keys(): 
                 print(f'\nProduction in {area}...\n')
                 try:
-                    f = ant_res.load_area_results(area, 'details', 'annual', ctx.obj['mc_choice']).iloc[:, 2:]
+                    f = ant_res.load_area_results(area, 'details', 'hourly', ctx.obj['mc_choice']).iloc[:, 5:]
                     
                     ## Thermal Generation
                     for col in [column for column in f.columns if not('.1' in column or '.2' in column or '.3' in column)]:
-                        print(col)
                         
                         tech = col.split('_')[0].upper()
                         fuel = col.split('_')[1].upper()
                         
                         # Save annual production
                         if not(tech == 'Z'):
-                            pro.loc[year, 'Antares', area, fuel, tech, ctx.obj['i']] = f[col].values[0]/1e6
+                            pro.loc[year, 'Antares', area, fuel, tech, ctx.obj['i']] = f[col].sum()/1e6
                         elif fuel == 'BAT':
-                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'BATTERY', ctx.obj['i']] = f[col].values[0]/1e6
+                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'BATTERY', ctx.obj['i']] = f[col].sum()/1e6
                         elif fuel == 'PSP':
-                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'PSP', ctx.obj['i']] = f[col].values[0]/1e6
-                        print(f'Production of {tech} {fuel} was ', f[col].values[0]/1e6)
+                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'PSP', ctx.obj['i']] = f[col].sum()/1e6
+                        print(f'Production of {tech} {fuel} was ', f[col].sum()/1e6)
 
                         
                 except FileNotFoundError:
                     # print('No thermal generation in area %s'%area)
                     pass
 
-                f = ant_res.load_area_results(area, 'values', 'annual', ctx.obj['mc_choice'])
+                f = ant_res.load_area_results(area, 'values', 'hourly', ctx.obj['mc_choice'])
                 
                 ## CO2
                 emi.loc['Antares', ctx.obj['i'], year, area] = f['CO2 EMIS.'].sum() / 1e3 # kton
@@ -189,19 +188,19 @@ def get_antares_results(ctx,
                                'WIND OFFSHORE' : 'WIND',
                                'SOLAR PV' : 'SUN'}
                 for ren in ['WIND OFFSHORE', 'WIND ONSHORE', 'SOLAR PV']:
-                    pro.loc[year, 'Antares', area, translation[ren], ren, ctx.obj['i']] = f[ren].values[0] / 1e6
-                    print(f'Production of {ren} was ', pro.loc[(year, 'Antares', area, translation[ren], ren, ctx.obj['i']), 'Value'])
+                    pro.loc[year, 'Antares', area, translation[ren], ren, ctx.obj['i']] = f[ren].sum()/ 1e6
+                    print(f'Production of {ren} was ', pro.loc[(year, 'Antares', area, translation[ren], ren, ctx.obj['i']), 'Value'].sum())
 
                 ## Spilled Energy (Mainly curtailment of VRE, but in principle thermal must-runs as well)
-                spilled = f['SPIL. ENRG'].values[0]             
+                spilled = f['SPIL. ENRG'].sum()             
                 pro.loc[year, 'Antares', area, 'Spilled', 'Spilled', ctx.obj['i']] = -spilled / 1e6
                 
                 ## Hydro
                 # In area itself
-                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']] = f.loc[0, 'H. STOR'] / 1e6
-                print('Production of hydro-reservoirs was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']), 'Value'])
-                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']] = f.loc[0, 'H. ROR'] / 1e6
-                print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'])
+                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']] = f.loc[:, 'H. STOR'].sum() / 1e6
+                print('Production of hydro-reservoirs was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']), 'Value'].sum())
+                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']] = f.loc[:, 'H. ROR'].sum() / 1e6
+                print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'].sum())
                 
     return Antobj, pro, emi
 
