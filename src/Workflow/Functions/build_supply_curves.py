@@ -806,6 +806,7 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
             ax_parameter.set_facecolor('none')
             fig_season.savefig('Workflow/OverallResults/supply_curve_%s_%s.png'%(commodity, region),
                                         bbox_inches='tight')
+            plt.close(fig_season)
 
     return resulting_curves
 
