@@ -238,15 +238,9 @@ def bandwidth():
 @CLI.command()
 def virginie():
     antbalm_list = [
-        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250627-1815eco-baf_test_fullyear_clsize1000_nr1_iter0_y-2050"],
-        ["MainResults_baf_test_fullyear_Iter0.gdx", "20250910-1713eco-baf_test_fullyear_iter0_y-2050"],
-        [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0014eco-noh2_fullyear_iter0_y-2050"],
-        [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0829eco-noh2_fullyear_wdisloss_iter0_y-2050"],
-        [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0858eco-noh2_fullyear_wdisloss_wcapex_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx"    , "h2"], "20250914-0029eco-h2_fullyear_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx"    , "h2"], "20250914-0844eco-h2_fullyear_wdisloss_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx"    , "h2"], "20250914-0914eco-h2_fullyear_wdisloss_wcapex_iter0_y-2050"],
-        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250914-1227eco-h2_lss_fullyear_wdisloss_wcapex_iter0_y-2050"],
+        [["MainResults_noh2_eu_operun_Iter0.gdx"  , "noh2"], "20250915-2310eco-noh2_eu_operun_wcapex_cl168_iter0_y-2050"],
+        # [["MainResults_h2_eu_operun_Iter0.gdx"    , "h2"], "20250915-0949eco-h2_eu_operun_cl168_iter0_y-2050"],
+        # [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], ""],
         # ["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"],
     ]
 

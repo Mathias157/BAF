@@ -347,9 +347,9 @@ def get_vre_availability(
 
     # Calculate VRE profiles
     capacities = (
-        result.get_result("G_CAP_YCRAF")
+        result
+        .get_result("G_CAP_YCRAF")
         .query("Scenario == @scenario and Year == @model_year")
-        .query('Technology in ["WIND-ON", "WIND-OFF", "SOLAR-PV"]')
         .pivot_table(
             columns=["Region"],
             index="Technology",
@@ -357,8 +357,10 @@ def get_vre_availability(
             aggfunc="sum",
             fill_value=0,
         )
+        .loc[["WIND-ON", "WIND-OFF", "SOLAR-PV"]]
     )
     regions = capacities.columns
+
     all_data["onshore_wind"] = (
         all_data["onshore_wind"][regions] * capacities.loc["WIND-ON"] * 1e3
     )
@@ -373,11 +375,11 @@ def get_vre_availability(
     )
 
     # Calculate inverse residual load
+    vre_availability = all_data["onshore_wind"].add(all_data["solar_pv"], fill_value=0)
+
     vre_availability = (
-        all_data["onshore_wind"] + all_data["offshore_wind"] + all_data["solar_pv"]
-    )
-    vre_availability = (
-        vre_availability.stack()
+        vre_availability.add(all_data["offshore_wind"], fill_value=0)
+        .stack()
         .reset_index()
         .rename(columns={"country": "Region", 0: "Value"})
     )  # format
@@ -709,7 +711,8 @@ def get_supply_curves(scenario: str,
                       parameters: pd.DataFrame,
                       fuel_consumption: pd.DataFrame, 
                       el_prices: pd.DataFrame,
-                      cluster_size: int = 10,
+                      cluster_size: int,
+                      price_rounding_level: int,
                       plot_overall_curves: bool = False,
                       plot_all_curves: bool = False,
                       style: str = 'report'):
@@ -734,7 +737,7 @@ def get_supply_curves(scenario: str,
     year = str(year)
     commodity2technology = {'HEAT' : 'ELECT-TO-HEAT', 'HYDROGEN' : 'ELECTROLYZER'}
     technology = commodity2technology[commodity]
-    df1_temp = fuel_consumption.query('Year == @year and Technology == @technology')
+    df1_temp = fuel_consumption.query('Year == @year and Technology == @technology and Fuel == "ELECTRIC"')
     df2_temp = el_prices.query('Year == @year')
     
     # Convert EPS to 0
@@ -746,7 +749,7 @@ def get_supply_curves(scenario: str,
     parameter_name = [col for col in parameters.columns if not(col in ['Region', 'Season', 'Time'])][0]
     
     ## Cluster parameters 
-    parameters = parameters.groupby('Region').apply(lambda x: cluster_values(x, cluster_size))
+    parameters = parameters.groupby('Region').apply(lambda x: cluster_values(x, cluster_size)).fillna(0)
     
     resulting_curves = get_curves(
         scenario,
@@ -755,6 +758,7 @@ def get_supply_curves(scenario: str,
         parameter_name,
         df1_temp,
         df2_temp,
+        price_rounding_level,
         plot_all_curves,
         plot_overall_curves,
         regions
@@ -762,7 +766,7 @@ def get_supply_curves(scenario: str,
 
     return resulting_curves
 
-def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_temp, plot_all_curves: bool, plot_overall_curves: bool, regions: list):
+def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_temp, price_rounding_level: int, plot_all_curves: bool, plot_overall_curves: bool, regions: list):
 
     # Get regional parameters and amount of clusters
     resulting_curves = {}
@@ -776,7 +780,8 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
         parameters,
         df1_temp,
         df2_temp,
-        plot_all_curves
+        plot_all_curves,
+        price_rounding_level
     )
     
     log(f'Batching {len(clusters)}x{len(regions)} clusters x regions')
@@ -790,7 +795,7 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
     resulting_curves = {result[0] : {} for result in batch_results} 
     # log(f'Resulting curve: {resulting_curves}')
     for region in resulting_curves.keys():
-        resulting_curves[region] = {result[1] : result[2] for result in batch_results if result[0] == region}
+        resulting_curves[region] = {result[1] : result[2] for result in batch_results if result[0] == region if not np.isnan(result[1])}
         # log(f'Resulting curve for {region}: {resulting_curves[region]}')
 
         # Plot overall curve    
@@ -819,6 +824,7 @@ def process_cluster(
         df1_temp,
         df2_temp,
         plot_all_curves,
+        price_rounding_level,
         cluster: int,
         region: str
     ):
@@ -849,7 +855,12 @@ def process_cluster(
                 continue
             
             # Get electricity prices at hours
-            df2=df2_temp.query('Scenario==@scenario and Region==@region and Season in @seasons and Time in @times').pivot_table(index=['Season', 'Time'], values='Value', aggfunc='mean')
+            df2= (
+                df2_temp
+                .query('Scenario==@scenario and Region==@region and Season in @seasons and Time in @times')
+                .pivot_table(index=['Season', 'Time'], values='Value', aggfunc='mean')
+                .round(price_rounding_level)
+            )
             # print(f'Electricity prices:\n', df2)
 
             # Get combined dataframe with electricity consumption (df1) and price (df2, Value)
@@ -1004,7 +1015,10 @@ def find_closest_indices_with_cut(column, Y):
         labels = list(range(len(Y)))
 
     # Use pd.cut to assign each value to closest Y index
-    closest_indices = pd.cut(column, bins=bins, labels=labels, include_lowest=True)
+    try:
+        closest_indices = pd.cut(column, bins=bins, labels=labels, include_lowest=True)
+    except ValueError:
+        raise ValueError(f"Failed for bins {bins}")
 
     # Group original indices by their closest Y value
     result = {}
@@ -1032,9 +1046,13 @@ def map_closest_parameters(
     weather_years = weather_year_array.columns
     indices = {weather_year: {} for weather_year in weather_years}
     for weather_year in weather_years:
-        indices[weather_year] = find_closest_indices_with_cut(
-            weather_year_array[weather_year], np.array(list(fitted_parameters))
-        )
+
+        try:
+            indices[weather_year] = find_closest_indices_with_cut(
+                weather_year_array[weather_year], np.array(list(fitted_parameters))
+            )
+        except ValueError:
+            raise ValueError(f"Bins must increase monotonicaly. Failed for {region}, weather_year {weather_year} with the parameters {np.array(list(fitted_parameters))}")
 
     return indices
 
@@ -1075,9 +1093,10 @@ def model_supply_curves_in_antares(weather_years: list,
  
     # Map the parameters not captured by Balmorel timeslices to the closest fitted parameter
     fitted_parameters = supply_curves[region].keys()  
-    log(f'Fitting {commodity} for region {region}')  
+
     idx_mapped = map_closest_parameters(all_parameters, fitted_parameters, region)
     
+    log(f'Fitting {commodity} for region {region} with {len(fitted_parameters)} fitted parameters.')  
     for parameter in fitted_parameters:
         
         # Get the supply curve for the specific parameter
@@ -1095,12 +1114,13 @@ def model_supply_curves_in_antares(weather_years: list,
         temp = temp.groupby(['price']).aggregate({'capacity' : 'sum'})
         
         # Get rounded prices
-        prices = np.unique([round(price) for price in temp.index if temp.loc[price, 'capacity'] > 0])
+        prices = np.unique([price for price in temp.index if temp.loc[price, 'capacity'] > 0])
         
         # if len(prices) > 0:
         #     print(prices)
         
         # Create a cluster per price 
+        log(f'{commodity} {region}: Creating {len(prices)} virtual generators for parameter {parameter}...')
         for price in prices:
             
             # Get max capacity and initiate availability timeseries if it doesn't exist yet
@@ -1122,7 +1142,10 @@ def model_supply_curves_in_antares(weather_years: list,
                 
         # Set load
         for i, weather_year in enumerate(weather_years):
-            load[idx_mapped[weather_year][parameter], i] = temp.loc[:, 'capacity'].sum()
+            try:
+                load[idx_mapped[weather_year][parameter], i] = temp.loc[:, 'capacity'].sum()
+            except KeyError:
+                print(f'No results for weather year {weather_year}')
 
     # Save load and availability
     np.savetxt(antares_input.path_load[virtual_area], load, delimiter='\t', fmt='%g')
@@ -1218,7 +1241,7 @@ def CLI(testfunction):
         
         ## Make curves
         for commodity in commodities:  
-            resulting_curves[commodity] = get_supply_curves(scenario, year, commodity, parameters, production, el_prices, -1, plot_overall_curves=True)
+            resulting_curves[commodity] = get_supply_curves(scenario, year, commodity, parameters, production, el_prices, 10, -1, plot_overall_curves=True)
     
     elif testfunction == 'model_supply_curves': 
 
@@ -1279,6 +1302,7 @@ def CLI(testfunction):
             commodity,
             region,
             unserved_energy_cost,
+            -1
         )
 
 

@@ -170,7 +170,7 @@ def antares_thermal_capacities(
     log("Thermal capacities to Antares...")
 
     # Get economic parameters
-    include_capital_costs_in_margcost = True
+    include_capital_costs_in_margcost = False
     if include_capital_costs_in_margcost:
         print('Including CAPEX and FOM in marginal cost by dividing by 8760 h')
 
@@ -1027,7 +1027,7 @@ def create_demand_response_hourly_constraint(
             f.write("\n".join([str(n) for n in hydrogen_RHS]))
             f.write("\n".join(["0" for i in range(49)]))
 
-def create_demand_response(weather_years: list, result: MainResults, scenario: str, year: int, temporal_resolution: dict, cluster_size: int, style: str = 'report'):
+def create_demand_response(weather_years: list, result: MainResults, scenario: str, year: int, temporal_resolution: dict, cluster_size: int, price_rounding_level: int, style: str = 'report'):
     """Create demand response curves for all hours per season
 
     Args:
@@ -1039,7 +1039,7 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
 
     supply_curves = {}
     antares_input = AntaresInput('Antares')
-    commodities = ['HEAT', 'HYDROGEN']
+    commodities = ['HYDROGEN', 'HEAT']
     
     fuel_consumption = result.get_result('F_CONS_YCRAST')
     el_prices = result.get_result('EL_PRICE_YCRST')
@@ -1055,7 +1055,7 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         all_parameters = get_supply_curve_parameters_all(result, scenario, year, commodity) # all, for later
         fit_parameters = get_supply_curve_parameters_fit(result, scenario, year, commodity, temporal_resolution) # for fitting to Balmorel results
         log(f'Getting supply curves for {commodity}')
-        supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, cluster_size, plot_overall_curves=True, style=style)
+        supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, cluster_size, price_rounding_level, plot_overall_curves=True, style=style)
         
         model_func = partial(
             model_supply_curves_in_antares,
@@ -1228,6 +1228,8 @@ def main(ctx, sc_name: str, year: str, cluster_size: int):
 
     # Context Data
     ctx.ensure_object(dict)
+    price_rounding_level = -1
+    ctx.obj["price_rounding_level"] = price_rounding_level
     ctx.obj["balmorel_weather_year"] = Config.getint(
         "PreProcessing", "balmorel_weather_year"
     )
@@ -1295,7 +1297,6 @@ def main(ctx, sc_name: str, year: str, cluster_size: int):
         A2B_regi_h2 = pickle.load(f)
 
     # Load results and data
-
     # All input data (should have been loaded in initialisation)
     m = Balmorel("Balmorel", gams_system_directory=gams_system_directory)
     m.load_incfiles(SC_folder)
@@ -1406,7 +1407,7 @@ def main(ctx, sc_name: str, year: str, cluster_size: int):
     #                                     CCCRRR, cap)
 
     # Demand response 
-    create_demand_response(ctx.obj['weather_years'], res, SC, year, temporal_resolution, cluster_size, style)
+    create_demand_response(ctx.obj['weather_years'], res, SC, year, temporal_resolution, cluster_size, price_rounding_level, style)
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
 
     log("|--------------------------------------------------|")
