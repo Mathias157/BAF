@@ -18,7 +18,7 @@ import pickle
 import configparser
 import plotly.express as px
 import plotly.graph_objects as go
-from pybalmorel import Balmorel
+from pybalmorel import MainResults
 from pybalmorel.utils import symbol_to_df
 from pybalmorel.formatting import balmorel_colours
 from Functions.Formatting import newplot, set_style, stacked_bar
@@ -616,12 +616,19 @@ def plot_antares_hourly_electricity_generation(
     if df is None:
         raise ValueError("Wrong choice of regions")
 
+    # Exclude SPILLED and make into GW
+    df = (
+        df
+        .drop(columns='SPILLED')
+        .div(1e3)
+    )
+
     # Plot timeseries
     with open("test.txt", "w") as f:
         f.write(df.to_string())
 
-    fig, ax = plt.subplots(figsize=kwargs.get("figsize", (10, 5)))
-    df.loc[(week - 1) * 168 : week * 168].div(1e3).plot(
+    fig, ax = plt.subplots(figsize=kwargs.get("figsize", (9, 3)))
+    df.loc[(week - 1) * 168 : week * 168].plot(
         ax=ax, stacked=True, kind="area", color=balmorel_colours
     )
     ax.set_facecolor(kwargs.get("facecolor", "none"))
@@ -634,17 +641,18 @@ def plot_antares_hourly_electricity_generation(
 
 
 def plot_balmorel_hourly_electricity_generation(
-    scenario: str, iteration: int = 0, week: int = 1, year: str = "2050", gams_system_directory: str = '/appl/gams/47.6.0'
+    scenario: str, iteration: int = 0, week: int = 1, year: str = "2050", region='ALL', gams_system_directory: str = '/appl/gams/47.6.0'
 ):
-    scenario = f"{scenario}_Iter{iteration}"
-    model = Balmorel("Balmorel", gams_system_directory=gams_system_directory)
-    model.collect_results()
+    filename = f"MainResults_{scenario}_Iter{iteration}.gdx"
+    paths = [path for path in Path('Balmorel').glob(f'**/model/{filename}')]
 
-    try:
-        fig, ax = model.results.plot_profile("electricity", int(year), scenario)
-    except KeyError:
-        scenario = scenario.split('_')[0]
-        fig, ax = model.results.plot_profile("electricity", int(year), scenario)
+    if len(paths) > 1:
+        raise ValueError(f"Found multiple {filename}!\n{paths}")
+
+    result = MainResults(filename, str(paths[0].parent), scenario,
+                        system_directory=gams_system_directory)
+
+    fig, ax = result.plot_profile("electricity", int(year), scenario, region=region)
 
     ax.set_xlim((week - 1) * 168, week * 168)
 
@@ -796,25 +804,38 @@ def plot(ctx, scenario, overwrite):
         bbox_inches="tight",
         transparent=True,
     )
+    plt.close(fig)
 
-    # Electricity generating profile per week
-    fig, _ = plot_antares_hourly_electricity_generation(
-        results["pro_hourly"], regions="all"
-    )
-    fig.savefig(
-        f"Workflow/OverallResults/{scenario}_antares_elec_gen_hourly.png",
-        bbox_inches="tight",
-        transparent=True,
-    )
+    region = 'ES'
+    for week in range(1, 53):
+        # Electricity generating profile per week
+        fig_ant, ax_ant = plot_antares_hourly_electricity_generation(
+            results["pro_hourly"], regions=region,week=week,
+        )
 
-    fig, _ = plot_balmorel_hourly_electricity_generation(
-        scenario
-    )
-    fig.savefig(
-        f"Workflow/OverallResults/{scenario}_balmorel_elec_gen_hourly.png",
-        bbox_inches="tight",
-        transparent=True,
-    )
+        fig_balm, ax_balm = plot_balmorel_hourly_electricity_generation(
+            scenario, week=week, region=region
+        )
+
+        # Find highest ylim
+        ant_ylims = ax_ant.get_ylim()
+        balm_ylims = ax_balm.get_ylim()
+        max_ylim = np.max([ant_ylims[1], balm_ylims[1]])
+        ax_ant.set_ylim(0, max_ylim)
+        ax_balm.set_ylim(0, max_ylim)
+
+        fig_ant.savefig(
+            f"Workflow/OverallResults/{scenario}_W{week}_{region}_antares_elec_gen_hourly.png",
+            bbox_inches="tight",
+            transparent=True,
+        )
+        fig_balm.savefig(
+            f"Workflow/OverallResults/{scenario}_W{week}_{region}_balmorel_elec_gen_hourly.png",
+            bbox_inches="tight",
+            transparent=True,
+        )
+        plt.close(fig_ant)
+        plt.close(fig_balm)
 
 @CLI.command()
 def plot_virginie_clustering_table():
