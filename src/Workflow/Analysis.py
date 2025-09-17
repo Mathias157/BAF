@@ -12,17 +12,36 @@ OS = platform.platform().split('-')[0]
 import matplotlib.pyplot as plt
 import shutil
 import os
+from pathlib import Path
 import click
 import pickle
 import configparser
 import plotly.express as px
 import plotly.graph_objects as go
+from pybalmorel import Balmorel
 from pybalmorel.utils import symbol_to_df
 from pybalmorel.formatting import balmorel_colours
 from Functions.Formatting import newplot, set_style, stacked_bar
 from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput
 import warnings
-warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+
+warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+
+balmorel_colours["Spilled"] = "black"
+balmorel_colours["WOOD"] = "orange"
+balmorel_colours["DUMMY"] = "orange"
+balmorel_colours["WOODWASTE"] = "orange"
+balmorel_colours["RETORTGAS"] = "orange"
+balmorel_colours["CHP-EXTRACTION-CCS"] = "gray"
+balmorel_colours["CONDENSING-CCS"] = "gray"
+balmorel_colours["WIND OFFSHORE"] = balmorel_colours["WIND-OFF"]
+balmorel_colours["WIND ONSHORE"] = balmorel_colours["WIND-ON"]
+balmorel_colours["SOLAR PV"] = balmorel_colours["SOLAR-PV"]
+balmorel_colours["SPILLED"] = "lightblue"
+
+### ------------------------------- ###
+###          1. Functions           ###
+### ------------------------------- ###
 
 @click.pass_context
 def get_balmorel_results(ctx,
@@ -125,9 +144,13 @@ def get_antares_results(ctx,
                         pro: pd.DataFrame,
                         emi: pd.DataFrame,):
     
+    iteration = ctx.obj['i']
+    pro_hourly = {iteration : {}}
+
     ### 1.3 Load Antares Results
     for year in years:
         
+        pro_hourly[iteration][year] = {}
         if not(year == str(ctx.obj['ref_year']) and ctx.obj['i'] != 0):
             ant_output = ctx.obj['antares_output'][ctx.obj['antares_output'].str.find(('eco-' + ctx.obj['SC'] + '_iter%d_y-%s'%(ctx.obj['i'], year)).lower().replace('+', ' ')) != -1].values[0]
             print('\nReading results from %s..\n'%ant_output)
@@ -150,31 +173,34 @@ def get_antares_results(ctx,
             ## Electricity
             for area in ctx.obj['A2B_regi'].keys(): 
                 print(f'\nProduction in {area}...\n')
+                pro_hourly[iteration][year][area] = {}
+                pro_hourly[iteration][year][area]['INTRASEASONAL-ELECT-STORAGE'] = np.zeros(8736)
                 try:
-                    f = ant_res.load_area_results(area, 'details', 'annual', ctx.obj['mc_choice']).iloc[:, 2:]
+                    f = ant_res.load_area_results(area, 'details', 'hourly', ctx.obj['mc_choice']).iloc[:, 5:]
                     
                     ## Thermal Generation
                     for col in [column for column in f.columns if not('.1' in column or '.2' in column or '.3' in column)]:
-                        print(col)
                         
                         tech = col.split('_')[0].upper()
                         fuel = col.split('_')[1].upper()
                         
                         # Save annual production
                         if not(tech == 'Z'):
-                            pro.loc[year, 'Antares', area, fuel, tech, ctx.obj['i']] = f[col].values[0]/1e6
+                            pro.loc[year, 'Antares', area, fuel, tech, ctx.obj['i']] = f[col].sum()/1e6
+                            pro_hourly[iteration][year][area][tech] = f[col].values
                         elif fuel == 'BAT':
-                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'BATTERY', ctx.obj['i']] = f[col].values[0]/1e6
+                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'BATTERY', ctx.obj['i']] = f[col].sum()/1e6
+                            pro_hourly[iteration][year][area]['INTRASEASONAL-ELECT-STORAGE'] += f[col].values
                         elif fuel == 'PSP':
-                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'PSP', ctx.obj['i']] = f[col].values[0]/1e6
-                        print(f'Production of {tech} {fuel} was ', f[col].values[0]/1e6)
-
+                            pro.loc[year, 'Antares', area, 'ELECTRIC', 'PSP', ctx.obj['i']] = f[col].sum()/1e6
+                            pro_hourly[iteration][year][area]['INTRASEASONAL-ELECT-STORAGE'] += f[col].values
+                        print(f'Production of {tech} {fuel} was ', f[col].sum()/1e6)
                         
                 except FileNotFoundError:
                     # print('No thermal generation in area %s'%area)
                     pass
 
-                f = ant_res.load_area_results(area, 'values', 'annual', ctx.obj['mc_choice'])
+                f = ant_res.load_area_results(area, 'values', 'hourly', ctx.obj['mc_choice'])
                 
                 ## CO2
                 emi.loc['Antares', ctx.obj['i'], year, area] = f['CO2 EMIS.'].sum() / 1e3 # kton
@@ -184,21 +210,25 @@ def get_antares_results(ctx,
                                'WIND OFFSHORE' : 'WIND',
                                'SOLAR PV' : 'SUN'}
                 for ren in ['WIND OFFSHORE', 'WIND ONSHORE', 'SOLAR PV']:
-                    pro.loc[year, 'Antares', area, translation[ren], ren, ctx.obj['i']] = f[ren].values[0] / 1e6
-                    print(f'Production of {ren} was ', pro.loc[(year, 'Antares', area, translation[ren], ren, ctx.obj['i']), 'Value'])
+                    pro.loc[year, 'Antares', area, translation[ren], ren, ctx.obj['i']] = f[ren].sum()/ 1e6
+                    pro_hourly[iteration][year][area][ren] = f[ren].values
+                    print(f'Production of {ren} was ', pro.loc[(year, 'Antares', area, translation[ren], ren, ctx.obj['i']), 'Value'].sum())
 
                 ## Spilled Energy (Mainly curtailment of VRE, but in principle thermal must-runs as well)
-                spilled = f['SPIL. ENRG'].values[0]             
+                spilled = f['SPIL. ENRG'].sum()             
                 pro.loc[year, 'Antares', area, 'Spilled', 'Spilled', ctx.obj['i']] = -spilled / 1e6
+                pro_hourly[iteration][year][area]['SPILLED'] = f['SPIL. ENRG'].values
                 
                 ## Hydro
                 # In area itself
-                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']] = f.loc[0, 'H. STOR'] / 1e6
-                print('Production of hydro-reservoirs was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']), 'Value'])
-                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']] = f.loc[0, 'H. ROR'] / 1e6
-                print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'])
+                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']] = f.loc[:, 'H. STOR'].sum() / 1e6
+                pro_hourly[iteration][year][area]['HYDRO-RESERVOIRS'] = f['H. STOR'].values
+                print('Production of hydro-reservoirs was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']), 'Value'].sum())
+                pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']] = f.loc[:, 'H. ROR'].sum() / 1e6
+                pro_hourly[iteration][year][area]['HYDRO-RUN-OF-RIVER'] = f['H. ROR'].values
+                print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'].sum())
                 
-    return Antobj, pro, emi
+    return Antobj, pro, emi, pro_hourly
 
 @click.pass_context
 def old_plotting(ctx, obj, cap, cap_F, pro, proH2, eltrans, dem, emi):
@@ -407,304 +437,7 @@ def old_plotting(ctx, obj, cap, cap_F, pro, proH2, eltrans, dem, emi):
             fig.savefig('Workflow/OverallResults/PFComparison_%s.png'%year, transparent=True,
                         bbox_inches='tight')
 
-
-    ###------------------------------- ###
-    ###           2. Profiles           ###
-    ### ------------------------------- ###
-
-    ### 2.0 Plot choices and design
-    figsize = (10,5)
-    back_color = (32/255, 31/255, 30/255)
-    iters_to_plot = [0] # Iterations to plot
-    mc_year = 0 # If = 0, it will choose the aggregated results
-    if mc_year == 0:
-        mc_choice = 'mc-all'
-        mc_string = 'All MCY'
-    else:
-        mc_choice = '0000%d'%mc_year
-        mc_choice = mc_choice[len(mc_choice) - 5:] # Adjust so the amount of digits are correct
-        mc_choice = 'mc-ind/' + mc_choice
-        mc_string = 'MCY%d'%mc_year
-    list_of_balances = {}
-    list_of_plots = {}
-
-    ### 2.1 Antares Power Operation
-    elbalance = {}
-    if ctx.obj['plotprofiles'] == 'y':
-        for j in iters_to_plot:
-            elbalance[j] = {}
-            for year in ctx.obj['years']:
-                elbalance[j][year] = {}
-                ### Load Antares Results
-                ant_output = ctx.obj['antares_output'][ctx.obj['antares_output'].str.find(('eco-' + ctx.obj['SC'] + '_iter%d_y-%s'%(j, year)).lower().replace('+', ' ')) != -1].values[0]
-
-                for area in ctx.obj['A2B_regi'].keys(): 
-                    if not(area in ['ITCO']):
-                        balance = pd.DataFrame({})        
-                        fig, ax = newplot(figsize=figsize, fc=ctx.obj['fc']) # Figure for balance profile plot
-                        temp = np.zeros(8736) # Placeholder for positive profiles
-                        
-                        ## Electrolyser consumption
-                        f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                        '/economy/%s/links/%s - x_c3/values-hourly.txt'%(mc_choice, area),
-                                        skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                        
-                        prod = f['FLOW LIN.'].values
-                        ax.fill_between(np.arange(0, 8736, 1), -prod, temp, label='Electrolysis') 
-                        temp += -prod
-                        balance['Electrolyser'] = -prod
-                        ax.plot(-prod, 'r--', linewidth=1, label='Elec Load')
-                        
-                        
-                        ## Battery
-                        f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                        '/economy/%s/links/0_bat_sto - %s/values-hourly.txt'%(mc_choice, area),
-                                        skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                        
-                        prod = f['FLOW LIN.'].values
-                        ax.fill_between(np.arange(0, 8736, 1), temp, temp + prod, label='Battery') 
-                        temp += prod
-                        balance['Bat Charge'] = prod
-                        
-                        f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                '/economy/%s/links/0_bat_sto - %s/values-hourly.txt'%(mc_choice, area),
-                                skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                        
-                        prod = f['FLOW LIN.'].values
-                        ax.fill_between(np.arange(0, 8736, 1), temp, prod) 
-                        temp += prod
-                        balance['Bat Discharge'] = prod
-                        
-                        
-                        ## 'Hydraulic'
-                        hydro_ror = np.zeros(8736)
-                        
-                        # The production in the area itself
-                        f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                        '/economy/%s/areas/%s/values-hourly.txt'%(mc_choice, area),
-                                        skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                        
-                        try:
-                            hydro_ror += f['H. ROR'].values      
-                        except KeyError:
-                            print('No H. ROR in %s'%area)
-                        try:
-                            hydro_ror += f['H. STOR'].values
-                        except KeyError:
-                            print('No H. STOR in %s'%area)
-                        ax.fill_between(np.arange(0, 8736, 1), temp, temp + hydro_ror, label='Hydro ROR')
-                        temp += hydro_ror
-                        balance['Hydro ROR'] = hydro_ror             
-                        
-                        
-                        ## Pumped Storage
-                        hydro_sto = np.zeros(8736)
-                        try:
-                            hydro_sto += f['PSP'].values
-                            balance['Hydro PSP'] = hydro_sto
-                        except KeyError:
-                            print('No Pumped Hydro in %s'%area)
-                        
-                        # The production from pumped storage areas
-                        hydro_sto = np.zeros(8736)
-                        for RG in ['2_*_hydro_open', '1_pump_closed', '1_turb_closed']:
-                            try:
-                                f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                                '/economy/%s/links/%s - %s/values-hourly.txt'%(mc_choice, RG.replace('*', area), area),
-                                                skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-
-                                # Assumed convention
-                                hydro_sto += f['FLOW LIN.'].values
-                            except FileNotFoundError:
-                                print('No hydro connection between:', '\n%s - %s'%(RG.replace('*', area), area))
-                                                        
-                        ax.fill_between(np.arange(0, 8736, 1), temp, temp + hydro_sto, label='Hydro STO')
-                        temp += hydro_sto 
-                        balance['Hydro Nodes'] = hydro_sto
-                        
-                        
-                        ## Import/Export
-                        for area2 in ctx.obj['A2B_regi'].keys():
-                            if area2 != area:
-                                try:
-                                    f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                                    '/economy/%s/links/%s - %s/values-hourly.txt'%(mc_choice, area2, area),
-                                                    skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                                    
-                                    prod = f['FLOW LIN.'].values # Importing = positive convention
-                                    ax.fill_between(np.arange(0, 8736, 1), temp, temp + prod, label=area2) 
-                                    temp += prod
-                                    balance[area2] = prod
-                                    
-                                except FileNotFoundError:
-                                    f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                                    '/economy/%s/links/%s - %s/values-hourly.txt'%(mc_choice, area, area2),
-                                                    skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                                    
-                                    prod = -f['FLOW LIN.'].values # Importing = positive convention
-                                    ax.fill_between(np.arange(0, 8736, 1), temp, temp + prod, label=area2) 
-                                    temp += prod
-                                    balance[area2] = prod
-                        
-                        
-                        ## Thermal Generation
-                        fd = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output + '/economy/%s/areas/%s/details-hourly.txt'%(mc_choice, area.lower()),
-                                            skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2 (BUT 0 IN HPC!!! Should find it with datestring instead)
-                        
-                        # Sort away other results than production  
-                        fd = fd.iloc[:, 5:]      
-                        fd = fd.iloc[:, :int(len(fd.columns)/3)]
-                        
-                        for col in fd.columns:
-                            
-                            # Plot temporal profiles
-                            prod = np.array(fd[col]).astype(float)
-                            ax.fill_between(np.arange(0, 8736, 1), temp, temp + prod, label=col)   
-                            temp += prod
-                            balance[col] = prod
-                    
-                    
-                        ## Renewable Generation
-                        # Iterate through Antares areas
-                        ren_gen = pd.DataFrame({})
-                        
-                        for ren in ['wind', 'solar']:
-                            ren_gen[ren] = np.zeros(8736)
-                            
-                            # The production in the area itself
-                            f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                            '/economy/%s/areas/%s/values-hourly.txt'%(mc_choice, area),
-                                            skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                            
-                            spilled = f['SPIL. ENRG'].values # Total curtailment (also thermal, so beware of double counting)
-                            LOLE = f['UNSP. ENRG'].values
-                            ren_gen[ren] += f[ren.upper()].values
-                        
-                        # The production from SRES areas
-                        for RG in ['5_*_sres', '6_*_sres', '8_*_sres']:
-                            # try:
-                            f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                                            '/economy/%s/links/%s - %s/values-hourly.txt'%(mc_choice, RG.replace('*', area), area),
-                                            skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-
-                            # Assumed convention
-                            ren_gen[ren] += f['FLOW LIN.'].values
-                                
-                            # except FileNotFoundError:
-                            #     f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                            #                     '/economy/%s/links/%s - %s/values-hourly.txt'%(mc_choice, area, RG.replace('*', area)),
-                            #                     skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-
-                            #     # Assumed convention
-                            #     ren_gen[ren] += -f['FLOW LIN.'].values
-                        
-                        # Assuming spill on VRE
-                        ax.fill_between(np.arange(0, 8736, 1), temp, temp + ren_gen.sum(axis=1) - spilled, label='VRE')
-                        temp += ren_gen.sum(axis=1) - spilled 
-                        
-                        balance['VRE'] = ren_gen.sum(axis=1)
-                        balance['Spill'] = -spilled
-                        balance['LOLE'] = LOLE
-
-                        ## Load
-                        fd = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output + '/economy/%s/areas/%s/values-hourly.txt'%(mc_choice, area.lower()),
-                                            skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2 (BUT 0 IN HPC!!! Should find it with datestring instead)
-                        
-                        ax.plot(fd['LOAD'], 'r-', linewidth=1, label='Load')
-            
-
-                        ## DSR
-                        # Find connections
-                        l = pd.Series(os.listdir(ctx.obj['wk_dir'] + '/Antares/output/'+ant_output+'/economy/mc-all/links'))
-                        l = l[l.str.find(area + ' - z_dsr') != -1]
-                        balance['DSR'] = np.zeros(8736)
-                        for link in l:
-                            f = pd.read_table(ctx.obj['wk_dir'] + '/Antares/output/' + ant_output +\
-                            '/economy/%s/links/%s/values-hourly.txt'%(mc_choice, link),
-                            skiprows=[0,1,2,3,5,6]) # At the moment the recent one is -2
-                            balance['DSR'] -= f['FLOW LIN.']
-                        
-                        ### Balance Profile Plot Settings
-                        ax.legend(loc='center', bbox_to_anchor=(.5, 1.15), ncol=5)
-                        ax.set_xlim([0, 8736])
-                        ax.set_title('Iteration %d, %s, %s'%(j, area, mc_string))
-
-                        ## Save yearly balance
-                        elbalance[j][year][area] = balance.sum()
-
-
-        ### 2.2 Antares Power Operation Plot
-        for j in iters_to_plot:
-            for year in ctx.obj['years']:
-                fig, ax = newplot(figsize=figsize, fc=ctx.obj['fc'])
-                total_bal = pd.DataFrame()
-                for area in ctx.obj['A2B_regi'].keys():
-                    for ind in elbalance[j][year][area].index:
-                        # If there's already a column
-                        try:
-                            total_bal.loc[year, ind] += elbalance[j][year][area][ind] / 1e6
-                        # If there isn't
-                        except KeyError:
-                            total_bal.loc[year, ind] = elbalance[j][year][area][ind] / 1e6
-                
-                # Combine Hydro nodes
-                total_bal.loc[year, 'Hydro'] = total_bal.loc[year, 'Hydro ROR'] + total_bal.loc[year, 'Hydro PSP'] + total_bal.loc[year, 'Hydro Nodes']
-                total_bal = total_bal.drop(columns=['Hydro ROR', 'Hydro PSP', 'Hydro Nodes'])
-                
-                # Drop zeros and links
-                total_bal = total_bal[total_bal != 0.0].dropna(axis=1)
-                total_bal = total_bal.drop(columns=ctx.obj['A2B_regi'].keys())
-                
-                # Plot
-                total_bal.plot(kind='bar', stacked=True, ax=ax)
-                ax.set_title('Iteration %d'%j)
-
-        # stacked_bar(temp/2, ['Iter'], ['To'], ax, {'zorder' : 5})
-        # ax.legend(loc='center', bbox_to_anchor=(.5, 1.25), ncol=2)
-        # ax.set_ylabel('H$_2$ Transmission Capacity (GW)')
-        # ax.set_xlabel('Iteration')
-        # ax.set_title(year)
-        # # ax.set_xticks(xticks)
-        # fig.savefig('Workflow/OverallResults/%s_TransmissionCapacitiesH2.png'%ctx.obj['SC'], 
-        #             bbox_inches='tight', transparent=True)
-
-        ## How to use graph objects
-
-        fig_p = go.Figure()
-        for col in balance.columns[1:]:
-            fig_p.add_trace(go.Scatter(
-                            x=np.arange(8736), y=balance[col],
-                            hoverinfo='x+y',
-                            mode='lines',
-                            # line=dict(width=0.5, color='rgb(131, 90, 241)'),
-                            stackgroup='one', # define stack group
-                            name=col))
-        fig_p.add_trace(go.Scatter(
-                            x=np.arange(8736), y=fd['LOAD'],
-                            mode='lines',
-                            name='Exogenous Load'
-                        ))
-        fig_p.add_trace(go.Scatter(
-                            x=np.arange(8736), y=balance['Electrolyser'],
-                            mode='lines',
-                            name='PtH2'
-                        ))
-        fig_p.add_trace(go.Scatter(
-                            x=np.arange(8736), y=fd['LOAD']-balance['Electrolyser'],
-                            mode='lines',
-                            name='Net Load'
-                        ))
-
-        fig_p.update_xaxes(range=[0, 168])
-
-
-    ### ------------------------------- ###
-    ###          3. AntaresViz          ###
-    ### ------------------------------- ###
-
-    # if ctx.obj['plotantaresViz'] == 'y':
-    #     stacked_plot()
-        
+       
 @click.pass_context
 def store_and_zip(ctx):
     ### ------------------------------- ###
@@ -841,14 +574,108 @@ def store_and_zip(ctx):
                 if ctx.obj['del_files']:
                     print('\nDeleting..')
                     shutil.rmtree(os.path.join(ctx.obj['wk_dir'], 'Antares/output', ant_file))
-        
-@click.command()
+
+def plot_annual_electricity_generation(results: dict, **kwargs):
+    pro = results["pro"]
+    fig, ax = plt.subplots()
+    pro.pivot_table(index="Model", columns="F", values="Value", aggfunc="sum").plot(
+        ax=ax, kind="bar", stacked=True, color=balmorel_colours
+    )
+    print(pro.pivot_table(index=["Model", "F"], values="Value", aggfunc="sum"))
+    ax.set_facecolor(kwargs.get("facecolor", "none"))
+    fig.set_facecolor(kwargs.get("facecolor", "none"))
+    ax.set_ylabel("Electricity Generation (TWh)")
+    ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left")
+
+    return fig, ax
+
+
+def plot_antares_hourly_electricity_generation(
+    production_hourly: dict,
+    iteration: int = 0,
+    week: int = 1,
+    year: str = "2050",
+    regions: str | list = "all",
+    **kwargs,
+):
+    antares_production = production_hourly[iteration][year]
+    df = None
+
+    # Aggregate to regional choice
+    if type(regions) is str:
+        if regions.lower() != "all":
+            df = pd.DataFrame(antares_production[regions])
+        else:
+            regions = list(antares_production.keys())
+
+    if type(regions) is list:
+        df = pd.DataFrame(antares_production[regions[0]])
+        for region in regions[1:]:
+            df = df.add(pd.DataFrame(antares_production[region]), fill_value=0)
+
+    if df is None:
+        raise ValueError("Wrong choice of regions")
+
+    # Plot timeseries
+    with open("test.txt", "w") as f:
+        f.write(df.to_string())
+
+    fig, ax = plt.subplots(figsize=kwargs.get("figsize", (10, 5)))
+    df.loc[(week - 1) * 168 : week * 168].div(1e3).plot(
+        ax=ax, stacked=True, kind="area", color=balmorel_colours
+    )
+    ax.set_facecolor(kwargs.get("facecolor", "none"))
+    ax.set_ylabel("Power (GW)")
+    ax.set_xlim((week - 1) * 168, week * 168)
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.05), ncols=4)
+    fig.set_facecolor(kwargs.get("facecolor", "none"))
+
+    return fig, ax
+
+
+def plot_balmorel_hourly_electricity_generation(
+    scenario: str, iteration: int = 0, week: int = 1, year: str = "2050", gams_system_directory: str = '/appl/gams/47.6.0'
+):
+    scenario = f"{scenario}_Iter{iteration}"
+    model = Balmorel("Balmorel", gams_system_directory=gams_system_directory)
+    model.collect_results()
+
+    try:
+        fig, ax = model.results.plot_profile("electricity", int(year), scenario)
+    except KeyError:
+        scenario = scenario.split('_')[0]
+        fig, ax = model.results.plot_profile("electricity", int(year), scenario)
+
+    ax.set_xlim((week - 1) * 168, week * 168)
+
+    return fig, ax
+
+
+### ------------------------------- ###
+###           2. Main CLI           ###
+### ------------------------------- ###
+
+
+@click.group()
+@click.pass_context
+@click.option("--dark", is_flag=True, default=False, help="Dark plots?")
+def CLI(ctx, dark):
+    # Context manager
+    ctx.ensure_object(dict)
+
+    if dark:
+        ctx.obj["fc"], ctx.obj["plotly_theme"] = set_style("ppt")
+    else:
+        ctx.obj["fc"], ctx.obj["plotly_theme"] = set_style("report")
+
+    ## 1.0 Plot design
+    ctx.obj["figsize"] = (10, 5)
+
+
+@CLI.command()
 @click.argument('scenario', type=str)
 @click.pass_context
 def collect_results(ctx, scenario: str):
-    
-    # Context manager
-    ctx.ensure_object(dict)
     
     Config = configparser.ConfigParser()
     Config.read('Workflow/MetaResults/%s_meta.ini'%scenario)
@@ -860,14 +687,9 @@ def collect_results(ctx, scenario: str):
     ctx.obj['plotprofiles'] = 'n' # Choose whether to plot profiles or not
     ctx.obj['plotantaresViz'] = 'n'
     ctx.obj['plotPFcomparison'] = False
-    style = Config.get('Analysis', 'plot_style')
     ctx.obj['plot_all'] = Config.getboolean('Analysis', 'plot_all')
     ctx.obj['zip_files'] = Config.getboolean('Analysis', 'zip_files')
     ctx.obj['del_files'] = Config.getboolean('Analysis', 'del_files')
-
-    ctx.obj['fc'], ctx.obj['plotly_theme'] = set_style(style)
-
-
         
     # Years
     years = np.array(Config.get('RunMetaData', 'Y').split(',')).astype(int)
@@ -906,17 +728,8 @@ def collect_results(ctx, scenario: str):
     # Save to context
     ctx.obj['SC'] = scenario
     
-    ### ------------------------------- ###
-    ###     1. Collect Annual Values    ###
-    ### ------------------------------- ###
-
-    ### 1.0 Plot design
-    figsize = (10,5)
-    # back_color = (32/255, 31/255, 30/255)
-    # xticks = [j for j in np.arange(iters[0], iters[-1]+1)]
-    
-
-    ### 1.1 Placeholders and useful data
+    # 1. Collect Annual Values
+    ## 1.1 Placeholders and useful data
     obj = pd.DataFrame({})
     Antobj = pd.DataFrame({})
     cap = pd.DataFrame({})
@@ -937,10 +750,12 @@ def collect_results(ctx, scenario: str):
         ctx.obj['i'] = j
         obj, cap, cap_F, eltrans, h2trans, dem, curt, pro, proH2, emi = get_balmorel_results(obj, cap, cap_F, eltrans, h2trans, dem, pro, proH2, emi)
         
-        Antobj, pro, emi = get_antares_results(years, Antobj, pro, emi)
+        Antobj, pro, emi, pro_hourly = get_antares_results(years, 
+                                                           Antobj, 
+                                                           pro, 
+                                                           emi)
         
-    # Reset index for plotly plots and store pickle file with all dataframes
-
+    # Store pickle file with all dataframes
     with open('Workflow/OverallResults/%s_results.pkl'%scenario, 'wb') as f:
         pickle.dump({'obj' : obj,
                     'Aobj' : Antobj,
@@ -951,23 +766,91 @@ def collect_results(ctx, scenario: str):
                     'dem' : dem,
                     'pro' : pro,
                     'proh2' : proH2,
+                    'pro_hourly' : pro_hourly,
                     'emi' : emi}, f)
 
-    # A more simple plot
-    fig, ax = plt.subplots()
-    balmorel_colours['Spilled'] = 'black'
-    balmorel_colours['WOOD'] = 'orange'
-    balmorel_colours['DUMMY'] = 'orange'
-    balmorel_colours['WOODWASTE'] = 'orange'
-    balmorel_colours['RETORTGAS'] = 'orange'
-    pro.pivot_table(index='Model', columns='F', values='Value', aggfunc='sum').plot(ax=ax, 
-                                                                                    kind='bar', 
-                                                                                    stacked=True,
-                                                                                    color=balmorel_colours)
-    print(pro.pivot_table(index=['Model', 'F'], values='Value', aggfunc='sum'))
-    ax.set_ylabel('Electricity Generation (TWh)')
-    ax.legend(bbox_to_anchor=(1.05, .5), loc='center left')
-    fig.savefig(f'Workflow/OverallResults/{scenario}_elec_gen.png', bbox_inches='tight')
-                
-if __name__ == '__main__':
-    collect_results()
+@CLI.command()
+@click.argument("scenario", type=str, required=True)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    help="Collect results again, even if it exists",
+)
+@click.pass_context
+def plot(ctx, scenario, overwrite):
+    # Collect results if overwrite or if it doesn't exist
+    result_path = Path(f"Workflow/OverallResults/{scenario}_results.pkl")
+    if not result_path.exists() or overwrite:
+        print(f"Collecting {scenario} results...")
+        ctx.invoke(collect_results, scenario=scenario)
+
+    # Load results
+    with open(str(result_path), "rb") as f:
+        results = pickle.load(f)
+
+    # Annual electricity generation
+    fig, _ = plot_annual_electricity_generation(results, facecolor=ctx.obj["fc"])
+    fig.savefig(
+        f"Workflow/OverallResults/{scenario}_elec_gen.png",
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    # Electricity generating profile per week
+    fig, _ = plot_antares_hourly_electricity_generation(
+        results["pro_hourly"], regions="all"
+    )
+    fig.savefig(
+        f"Workflow/OverallResults/{scenario}_antares_elec_gen_hourly.png",
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    fig, _ = plot_balmorel_hourly_electricity_generation(
+        scenario
+    )
+    fig.savefig(
+        f"Workflow/OverallResults/{scenario}_balmorel_elec_gen_hourly.png",
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+@CLI.command()
+def plot_virginie_clustering_table():
+    
+    f=pd.read_csv('Workflow/OverallResults/PtX_demand_comparison_virginie_clustering.csv')
+    print(f.columns)
+
+    # Get clustering amounts and scenario names
+    f['Clusters'] = f.AntaresFile.str.extract('cl(\d+)').astype(int)
+    f['Scenario'] = f.AntaresFile.str.extract('eco-(.+)_fullyear')
+
+    # Make table
+    df_antares=(
+        f.query('Model=="Antares"')
+        .pivot_table(index=['Scenario', 'Category'],
+                     columns=['Clusters', 'Region'],
+                     values='Value',
+                     aggfunc='sum')
+    )
+    df_balmorel=(
+        f.query('Model=="Balmorel"')
+        .pivot_table(index=['Scenario', 'Category'],
+                     columns=['Clusters', 'Region'],
+                     values='Value',
+                     aggfunc='sum')
+    )
+    df_diff = ((df_antares - df_balmorel) / df_balmorel * 100).abs()
+    print(df_diff.loc[['noh2',
+                           'h2',
+                            'h2_lss']].round())
+
+    # Aggregate to mean difference per region
+    df_diff_mean = df_diff.groupby(level=0, axis=1).mean()
+    print(df_diff_mean.loc[['noh2',
+                           'h2',
+                            'h2_lss']].round())
+
+if __name__ == "__main__":
+    CLI()
