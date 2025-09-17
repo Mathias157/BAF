@@ -18,6 +18,7 @@ import pickle
 import configparser
 import plotly.express as px
 import plotly.graph_objects as go
+from pybalmorel import Balmorel
 from pybalmorel.utils import symbol_to_df
 from pybalmorel.formatting import balmorel_colours
 from Functions.Formatting import newplot, set_style, stacked_bar
@@ -620,11 +621,11 @@ def plot_antares_hourly_electricity_generation(
         f.write(df.to_string())
 
     fig, ax = plt.subplots(figsize=kwargs.get("figsize", (10, 5)))
-    df.loc[(week - 1) * 168 : week * 168].plot(
+    df.loc[(week - 1) * 168 : week * 168].div(1e3).plot(
         ax=ax, stacked=True, kind="area", color=balmorel_colours
     )
     ax.set_facecolor(kwargs.get("facecolor", "none"))
-    ax.set_ylabel("Electricity Generation (TWh)")
+    ax.set_ylabel("Power (GW)")
     ax.set_xlim((week - 1) * 168, week * 168)
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.05), ncols=4)
     fig.set_facecolor(kwargs.get("facecolor", "none"))
@@ -633,16 +634,19 @@ def plot_antares_hourly_electricity_generation(
 
 
 def plot_balmorel_hourly_electricity_generation(
-    scenario: str, iteration: int = 0, week: int = 0, year: str = "2050", gams_system_directory: str = None
+    scenario: str, iteration: int = 0, week: int = 1, year: str = "2050", gams_system_directory: str = '/appl/gams/47.6.0'
 ):
     scenario = f"{scenario}_Iter{iteration}"
     model = Balmorel("Balmorel", gams_system_directory=gams_system_directory)
     model.collect_results()
 
-    fig, ax = model.results.plot_profile("electricity", int(year), scenario)
-    print(ax.get_xlim())
+    try:
+        fig, ax = model.results.plot_profile("electricity", int(year), scenario)
+    except KeyError:
+        scenario = scenario.split('_')[0]
+        fig, ax = model.results.plot_profile("electricity", int(year), scenario)
 
-    ax.set_xlim(f"S{week:02.0f}", f"S{week:02.0f}")
+    ax.set_xlim((week - 1) * 168, week * 168)
 
     return fig, ax
 
@@ -795,7 +799,7 @@ def plot(ctx, scenario, overwrite):
 
     # Electricity generating profile per week
     fig, _ = plot_antares_hourly_electricity_generation(
-        results["pro_hourly"], regions="ES"
+        results["pro_hourly"], regions="all"
     )
     fig.savefig(
         f"Workflow/OverallResults/{scenario}_antares_elec_gen_hourly.png",
@@ -804,7 +808,7 @@ def plot(ctx, scenario, overwrite):
     )
 
     fig, _ = plot_balmorel_hourly_electricity_generation(
-        scenario, gams_system_directory=ctx.obj["gams_system_directory"]
+        scenario
     )
     fig.savefig(
         f"Workflow/OverallResults/{scenario}_balmorel_elec_gen_hourly.png",
