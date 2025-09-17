@@ -816,6 +816,41 @@ def plot(ctx, scenario, overwrite):
         transparent=True,
     )
 
+@CLI.command()
+def plot_virginie_clustering_table():
+    
+    f=pd.read_csv('Workflow/OverallResults/PtX_demand_comparison_virginie_clustering.csv')
+    print(f.columns)
+
+    # Get clustering amounts and scenario names
+    f['Clusters'] = f.AntaresFile.str.extract('cl(\d+)').astype(int)
+    f['Scenario'] = f.AntaresFile.str.extract('eco-(.+)_fullyear')
+
+    # Make table
+    df_antares=(
+        f.query('Model=="Antares"')
+        .pivot_table(index=['Scenario', 'Category'],
+                     columns=['Clusters', 'Region'],
+                     values='Value',
+                     aggfunc='sum')
+    )
+    df_balmorel=(
+        f.query('Model=="Balmorel"')
+        .pivot_table(index=['Scenario', 'Category'],
+                     columns=['Clusters', 'Region'],
+                     values='Value',
+                     aggfunc='sum')
+    )
+    df_diff = ((df_antares - df_balmorel) / df_balmorel * 100).abs()
+    print(df_diff.loc[['noh2',
+                           'h2',
+                            'h2_lss']].round())
+
+    # Aggregate to mean difference per region
+    df_diff_mean = df_diff.groupby(level=0, axis=1).mean()
+    print(df_diff_mean.loc[['noh2',
+                           'h2',
+                            'h2_lss']].round())
 
 if __name__ == "__main__":
     CLI()
