@@ -763,7 +763,7 @@ $setglobal ADDTRANSDEV yes
 *!option yes
 
 *Import heat transmission development from previous runs
-$setglobal ADDHEATTRANSDEV 
+$setglobal ADDHEATTRANSDEV yes
 *!option yes
 
 *Import H2 transmission development from previous runs
@@ -799,7 +799,7 @@ $setglobal ADDTERMTRANSPORTDEMAND
 *!option yes
 
 *Import seasonal demand from the transport sector
-$setglobal ADDSEASONALTRANSPORTDEMAND
+$setglobal ADDSEASONALTRANSPORTDEMAND yes
 *!option yes
 
 *Import peak demand from the transport sector
