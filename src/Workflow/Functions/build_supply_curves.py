@@ -144,14 +144,13 @@ def get_inverse_residual_load(
         all_data[data].index.name = "time_id"
 
         if not (to_create_antares_input):
-            all_data[data] = all_data[data].loc[hour_index]
-            all_data[data].index = balmorel_index
+            all_data[data] = collect_balmorel_input_data(data).loc[balmorel_index]
 
     # Calculate VRE profiles
     capacities = (
-        result.get_result("G_CAP_YCRAF")
+        result
+        .get_result("G_CAP_YCRAF")
         .query("Scenario == @scenario and Year == @model_year")
-        .query('Technology in ["WIND-ON", "WIND-OFF", "SOLAR-PV"]')
         .pivot_table(
             columns=["Region"],
             index="Technology",
@@ -159,17 +158,27 @@ def get_inverse_residual_load(
             aggfunc="sum",
             fill_value=0,
         )
+        .loc[["WIND-ON", "WIND-OFF", "SOLAR-PV"]]
     )
     regions = capacities.columns
+
     all_data["onshore_wind"] = (
         all_data["onshore_wind"][regions] * capacities.loc["WIND-ON"] * 1e3
     )
+
+    offshore_regions = set(all_data["offshore_wind"].keys())
     all_data["offshore_wind"] = (
-        all_data["offshore_wind"][regions] * capacities.loc["WIND-OFF"] * 1e3
+        all_data["offshore_wind"][list(set(regions) & offshore_regions)]
+        * capacities.loc["WIND-OFF"]
+        * 1e3
     )
+
     all_data["solar_pv"] = (
         all_data["solar_pv"][regions] * capacities.loc["SOLAR-PV"] * 1e3
     )
+
+    inverse_residual_load = all_data["onshore_wind"].add(all_data["solar_pv"], fill_value=0)
+    inverse_residual_load = inverse_residual_load.add(all_data["offshore_wind"], fill_value=0)
 
     # Calculate exogenous demand profiles
     el_demand = (
@@ -202,14 +211,10 @@ def get_inverse_residual_load(
 
     # Calculate inverse residual load
     inverse_residual_load = (
-        all_data["onshore_wind"]
-        + all_data["offshore_wind"]
-        + all_data["solar_pv"]
-        - all_data["load"]
-        - all_data["heat"]
-    )
-    inverse_residual_load = (
-        inverse_residual_load.stack()
+        inverse_residual_load
+        .sub(all_data["load"], fill_value=0)
+        .sub(all_data["heat"], fill_value=0)
+        .stack()
         .reset_index()
         .rename(columns={"country": "Region", 0: "Value"})
     )  # format
