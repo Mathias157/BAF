@@ -170,7 +170,7 @@ def antares_thermal_capacities(
     log("Thermal capacities to Antares...")
 
     # Get economic parameters
-    include_capital_costs_in_margcost = False
+    include_capital_costs_in_margcost = True
     if include_capital_costs_in_margcost:
         print('Including CAPEX and FOM in marginal cost by dividing by 8760 h')
 
