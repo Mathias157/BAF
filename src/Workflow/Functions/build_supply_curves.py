@@ -222,6 +222,7 @@ def get_inverse_residual_load(
     return inverse_residual_load
 
 
+
 @click.pass_context
 def get_exo_demand(
     ctx,
@@ -456,21 +457,21 @@ def get_supply_curve_parameters_fit(
     result: MainResults,
     scenario: str,
     year: int,
-    commodity: str,
+    choice: str,
     temporal_resolution: dict,
 ):
-    """Get parameters for supply curve fitting depending on the commodity
+    """Get parameters for supply curve fitting depending on the choice
 
     Args:
         ctx (_type_): click CLI context
         result (MainResults): The result file
         scenario (str): The scenario name
         year (int): The model year
-        commodity (str): Either 'HEAT' or 'HYDROGEN'
+        choice (str): Either 'exogenous_demand', 'inverse_residual_load' or 'vre_availability'
         temporal_resolution (dict): Temporal resolution of Balmorel
 
     Raises:
-        ValueError: If choice is not 'HEAT' or 'HYDROGEN'
+        ValueError: If choice is not 'exogenous_demand', 'inverse_residual_load' or 'vre_availability'
 
     Returns:
         parameters (tuple[pd.DataFrame]): The parameters to fit with columns [parameter_name, 'Region', 'Season', 'Time']
@@ -478,8 +479,7 @@ def get_supply_curve_parameters_fit(
 
     balmorel_weather_year = ctx.obj["balmorel_weather_year"]
 
-    if commodity.upper() == "HEAT":
-        # NOTE: SHOULD ADD SOME LINES TO MAKE THESE DEPENDENT ON THE Config/PeriProcessing/kernel_smooth_parameter_xy PARAMETERS
+    if choice.lower() == "exogenous_demand":
         exo_demand = get_exo_demand(
             result,
             scenario,
@@ -489,8 +489,17 @@ def get_supply_curve_parameters_fit(
             temporal_resolution["balmorel_index"],
         )
         return exo_demand
-    elif commodity.upper() == "HYDROGEN":
-        # NOTE: SHOULD ADD SOME LINES TO MAKE THESE DEPENDENT ON THE Config/PeriProcessing/kernel_smooth_parameter_xy PARAMETERS
+    elif choice.lower() == "inverse_residual_load":
+        inverse_residual_load = get_inverse_residual_load(
+            result,
+            scenario,
+            year,
+            balmorel_weather_year,
+            temporal_resolution["hour_index"],
+            temporal_resolution["balmorel_index"],
+        )
+        return inverse_residual_load
+    elif choice.lower() == "vre_availability":
         vre_availability = get_vre_availability(
             result,
             scenario,
@@ -502,7 +511,7 @@ def get_supply_curve_parameters_fit(
         return vre_availability
     else:
         raise ValueError(
-            f"Commodity '{commodity}' is not yet a part of this framework. Please choose 'HEAT' or 'HYDROGEN'"
+            f"Choice '{choice}' is not an option. Please choose 'exogenous_demand', 'vre_availability' or 'inverse_residual_load'"
         )
 
 def cluster_values(group: pd.DataFrame, cluster_size: int):
@@ -513,20 +522,20 @@ def cluster_values(group: pd.DataFrame, cluster_size: int):
 
 @click.pass_context
 def get_supply_curve_parameters_all(
-    ctx, result: MainResults, scenario: str, year: int, commodity: str
+    ctx, result: MainResults, scenario: str, year: int, choice: str
 ):
-    """Get parameters for supply curve fitting depending on the commodity
+    """Get parameters for supply curve fitting depending on the choice
 
     Args:
         ctx (_type_): click CLI context
         result (MainResults): The result file
         scenario (str): The scenario name
         year (int): The model year
-        commodity (str): Either 'HEAT' or 'HYDROGEN'
+        choice (str): Either 'exogenous_demand', 'inverse_residual_load' or 'vre_availability'
         temporal_resolution (dict): Temporal resolution of Balmorel
 
     Raises:
-        ValueError: If choice is not 'HEAT' or 'HYDROGEN'
+        ValueError: If choice is not 'exogenous_demand', 'inverse_residual_load' or 'vre_availability'
 
     Returns:
         parameters (pd.DataFrame): All parameters, for all weather years ['time_id', 'Region', parameter_name, 'Weather Year']
@@ -536,21 +545,35 @@ def get_supply_curve_parameters_all(
     parameters = pd.DataFrame({})
 
     for weather_year in weather_years:
-        if commodity.upper() == "HEAT":
-            # NOTE: SHOULD ADD SOME LINES TO MAKE THESE DEPENDENT ON THE Config/PeriProcessing/kernel_smooth_parameter_xy PARAMETERS
+
+        if choice.lower() == "exogenous_demand":
             temp = get_exo_demand(
-                result, scenario, year, weather_year, to_create_antares_input=True
+                result,
+                scenario,
+                year,
+                weather_year,
+                to_create_antares_input=True
             )
-        elif commodity.upper() == "HYDROGEN":
-            # NOTE: SHOULD ADD SOME LINES TO MAKE THESE DEPENDENT ON THE Config/PeriProcessing/kernel_smooth_parameter_xy PARAMETERS
+        elif choice.lower() == "inverse_residual_load":
+            temp = get_inverse_residual_load(
+                result,
+                scenario,
+                year,
+                weather_year,
+                to_create_antares_input=True
+            )
+        elif choice.lower() == "vre_availability":
             temp = get_vre_availability(
-                result, scenario, year, weather_year, to_create_antares_input=True
+                result,
+                scenario,
+                year,
+                weather_year,
+                to_create_antares_input=True
             )
         else:
             raise ValueError(
-                f"Commodity '{commodity}' is not yet a part of this framework. Please choose 'HEAT' or 'HYDROGEN'"
+                f"Choice '{choice}' is not an option. Please choose 'exogenous_demand', 'vre_availability' or 'inverse_residual_load'"
             )
-
         # Concatenate
         temp["Weather Year"] = weather_year
         parameters = pd.concat((parameters, temp))
