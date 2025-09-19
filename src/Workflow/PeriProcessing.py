@@ -170,7 +170,7 @@ def antares_thermal_capacities(
     log("Thermal capacities to Antares...")
 
     # Get economic parameters
-    include_capital_costs_in_margcost = True
+    include_capital_costs_in_margcost = False
     if include_capital_costs_in_margcost:
         print('Including CAPEX and FOM in marginal cost by dividing by 8760 h')
 
@@ -1228,7 +1228,7 @@ def main(ctx, sc_name: str, year: str, cluster_size: int):
 
     # Context Data
     ctx.ensure_object(dict)
-    price_rounding_level = -1
+    price_rounding_level = 0
     ctx.obj["price_rounding_level"] = price_rounding_level
     ctx.obj["balmorel_weather_year"] = Config.getint(
         "PreProcessing", "balmorel_weather_year"
