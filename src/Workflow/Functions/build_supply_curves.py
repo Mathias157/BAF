@@ -480,6 +480,7 @@ def get_supply_curve_parameters_fit(
     balmorel_weather_year = ctx.obj["balmorel_weather_year"]
 
     if choice.lower() == "exogenous_demand":
+        log('Getting exogenous demand...')
         exo_demand = get_exo_demand(
             result,
             scenario,
@@ -490,6 +491,7 @@ def get_supply_curve_parameters_fit(
         )
         return exo_demand
     elif choice.lower() == "inverse_residual_load":
+        log('Getting inverse residual load...')
         inverse_residual_load = get_inverse_residual_load(
             result,
             scenario,
@@ -500,6 +502,7 @@ def get_supply_curve_parameters_fit(
         )
         return inverse_residual_load
     elif choice.lower() == "vre_availability":
+        log('Getting VRE availability...')
         vre_availability = get_vre_availability(
             result,
             scenario,
@@ -811,6 +814,10 @@ def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_te
         plot_all_curves,
         price_rounding_level
     )
+
+    if df1_temp.Value.sum() < 1e-5:
+        log(f"No power-to-{commodity} demand")
+        return {}
     
     log(f'Batching {len(clusters)}x{len(regions)} clusters x regions')
     with Pool() as pool:

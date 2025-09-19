@@ -6,16 +6,14 @@
 #BSUB -J new_runs_for_simex
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 10
-### -- specify that we need a certain architecture --
-#BSUB -R "select[model == XeonGold6226R]"
 ### -- specify that the cores must be on the same host --
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need X GB of memory per core/slot --
-#BSUB -R "rusage[mem=5GB]"
+#BSUB -R "rusage[mem=4GB]"
 ### -- specify that we want the job to get killed if it exceeds X GB per core/slot --
-#BSUB -M 5.1GB
+#BSUB -M 4.1GB
 ### -- set walltime limit: hh:mm --
-#BSUB -W 16:00
+#BSUB -W 168:00
 ### -- set the email address --
 #BSUB -u mberos@dtu.dk
 ### -- send notification at start --

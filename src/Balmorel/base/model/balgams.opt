@@ -149,7 +149,7 @@ option intVarUp = 0
 * In the following a few option file possibilities are mentioned for use with Cplex,
 * their use assumes that appropriate files exist in the model folder.
 
-$Setglobal USEOPTIONFILE 4
+$Setglobal USEOPTIONFILE 2
 *!option 0   No option file is used. Note that not setting anything will generate an error.
 *!option 1   Use option file SolverName.opt.
 *!option 2   Predefined, don't change. Used with CPLEX it opens cplex.op2 and sets 'LPmethod 4' to run barrior method. Also does not set any Threads option to allow running on HPC.
