@@ -15,7 +15,7 @@
 ### -- specify that we want the job to get killed if it exceeds X GB per core/slot --
 #BSUB -M 5.1GB
 ### -- set walltime limit: hh:mm --
-#BSUB -W 72:00
+#BSUB -W 2:00
 ### -- set the email address --
 #BSUB -u mberos@dtu.dk
 ### -- send notification at start --
@@ -36,6 +36,8 @@ export PATH=/zhome/c0/2/105719/Desktop/Antares-8.7.0/bin:$PATH
 export PATH=/appl/gams/47.6.0:$PATH
 export PATH=~/.pixi/bin:$PATH
 
+sleep 360
+
 for name in h2_fullyear; do
   # Rename Config_SCX.ini to Config.ini (make active)
   # mv Config_${name}.ini "Config.ini"
@@ -44,16 +46,16 @@ for name in h2_fullyear; do
   # ~/.pixi/bin/pixi run python Master.py
 
   # Running Balmorel
-  cd Balmorel/h2/model
-  gams Balmorel --scenario_name $name --threads $LSB_DJOB_NUMPROC
+  # cd Balmorel/h2/model
+  # gams Balmorel --scenario_name "${name}_Iter0" threads $LSB_DJOB_NUMPROC
 
-  # for year in 2050; do
-  #   # Running Peri-Processing
-  #   pixi run periprocess $name $year
-  #
-  #   # Running Antares
-  #   antares-8.7-solver Antares -n "${name}_Iter0_Y-${year}" --parallel
-  # done
+  for year in 2050; do
+    # Running Peri-Processing
+    pixi run periprocess $name $year
+
+    # Running Antares
+    antares-8.7-solver Antares -n "${name}_Iter0_Y-${year}" --parallel
+  done
 
   # Running ConvergenceCriterion
   # python3 -m runpy "Workflow.ConvergenceCriterion" $name

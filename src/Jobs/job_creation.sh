@@ -3,7 +3,7 @@
 ### -- specify queue --
 #BSUB -q man
 ### -- set the job Name --
-#BSUB -J h2_noh2_antares_runs
+#BSUB -J new_runs_for_simex
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 10
 ### -- specify that we need a certain architecture --
@@ -15,7 +15,7 @@
 ### -- specify that we want the job to get killed if it exceeds X GB per core/slot --
 #BSUB -M 5.1GB
 ### -- set walltime limit: hh:mm --
-#BSUB -W 10:00
+#BSUB -W 16:00
 ### -- set the email address --
 #BSUB -u mberos@dtu.dk
 ### -- send notification at start --
@@ -24,8 +24,8 @@
 #BSUB -N
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
-#BSUB -o ./Logs/h2_noh2_antares_runs_%J.out
-#BSUB -e ./Logs/h2_noh2_antares_runs_%J.err
+#BSUB -o ./Logs/new_runs_for_simex_%J.out
+#BSUB -e ./Logs/new_runs_for_simex_%J.err
 # here follow the commands you want to execute with input.in as the input file
 
 ### Load modules and find binaries
@@ -36,7 +36,7 @@ export PATH=/zhome/c0/2/105719/Desktop/Antares-8.7.0/bin:$PATH
 export PATH=/appl/gams/47.6.0:$PATH
 export PATH=~/.pixi/bin:$PATH
 
-for name in noh2_fullyear h2_fullyear h2_lss_fullyear; do
+for name in noh noh2 h2; do
   # Rename Config_SCX.ini to Config.ini (make active)
   # mv Config_${name}.ini "Config.ini"
 
@@ -44,18 +44,26 @@ for name in noh2_fullyear h2_fullyear h2_lss_fullyear; do
   # ~/.pixi/bin/pixi run python Master.py
 
   # Running Balmorel
-  # cd Balmorel/h2_lss/model
-  # gams Balmorel --scenario_name "${name}_Iter0" --threads $LSB_DJOB_NUMPROC
+  cd "Balmorel/${name}/model"
+  gams Balmorel --scenario_name "${name}_fullyear2_Iter0" threads $LSB_DJOB_NUMPROC
+  cd ../../
 
-  for cluster_size in 4 8 52 168 672 1344; do
-    for year in 2050; do
-      # Running Peri-Processing
-      pixi run periprocess $name $year $cluster_size
+  cp -r simex "simex_${name}"
+  cd ../
 
-      # Running Antares
-      antares-8.7-solver Antares -n "${name}_cl${cluster_size}_Iter0_Y-${year}" --parallel
-    done
-  done
+  # for cluster_size in 168; do
+  #   for year in 2050; do
+  #     # Running Peri-Processing
+  #     pixi run periprocess $name $year $cluster_size
+  #
+  #     if [ $? -ne 0 ]; then
+  #       exit 1
+  #     fi
+  #
+  #     # Running Antares
+  #     antares-8.7-solver Antares -n "${name}_h2surhheat_Iter0_Y-${year}" --parallel
+  #   done
+  # done
 
   # Running ConvergenceCriterion
   # python3 -m runpy "Workflow.ConvergenceCriterion" $name

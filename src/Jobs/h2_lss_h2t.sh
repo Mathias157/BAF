@@ -5,17 +5,15 @@
 ### -- set the job Name --
 #BSUB -J h2_lss_h2t_fullyear
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 10
-### -- specify that we need a certain architecture --
-#BSUB -R "select[model == XeonGold6226R]"
+#BSUB -n 5
 ### -- specify that the cores must be on the same host --
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need X GB of memory per core/slot --
-#BSUB -R "rusage[mem=5GB]"
+#BSUB -R "rusage[mem=10GB]"
 ### -- specify that we want the job to get killed if it exceeds X GB per core/slot --
-#BSUB -M 5.1GB
+#BSUB -M 10.1GB
 ### -- set walltime limit: hh:mm --
-#BSUB -W 72:00
+#BSUB -W 168:00
 ### -- set the email address --
 #BSUB -u mberos@dtu.dk
 ### -- send notification at start --
@@ -45,7 +43,7 @@ for name in h2_lss_h2t_fullyear; do
 
   # Running Balmorel
   cd Balmorel/h2_lss_h2t/model
-  gams Balmorel --scenario_name $name --threads $LSB_DJOB_NUMPROC
+  gams Balmorel --scenario_name "${name}_Iter0" threads $LSB_DJOB_NUMPROC
 
   # for year in 2050; do
   #   # Running Peri-Processing
