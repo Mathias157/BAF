@@ -894,7 +894,6 @@ def process_cluster(
                 df2_temp
                 .query('Scenario==@scenario and Region==@region and Season in @seasons and Time in @times')
                 .pivot_table(index=['Season', 'Time'], values='Value', aggfunc='mean')
-                .round(price_rounding_level)
             )
             # print(f'Electricity prices:\n', df2)
 
@@ -1096,6 +1095,7 @@ def model_supply_curves_in_antares(weather_years: list,
                                    supply_curves: dict,
                                    antares_input: AntaresInput,
                                    commodity: str,
+                                   price_rounding_level: int,
                                    unserved_energy_cost: configparser.ConfigParser,
                                    region: str
                                    ):
@@ -1149,7 +1149,7 @@ def model_supply_curves_in_antares(weather_years: list,
         temp = temp.groupby(['price']).aggregate({'capacity' : 'sum'})
         
         # Get rounded prices
-        prices = np.unique([price for price in temp.index if temp.loc[price, 'capacity'] > 0])
+        prices = np.unique([round(price, price_rounding_level) for price in temp.index if temp.loc[price, 'capacity'] > 0])
         
         # if len(prices) > 0:
         #     print(prices)
@@ -1335,6 +1335,7 @@ def CLI(testfunction):
             test_data["supply_curves"][commodity],
             antares_input,
             commodity,
+            price_rounding_level,
             region,
             unserved_energy_cost,
             -1
