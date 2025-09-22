@@ -282,22 +282,28 @@ def get_exo_demand(
         * 1e6
     )
 
-    heat_demand = (
-        result.get_result("H_DEMAND_YCRA")
-        .query("Scenario == @scenario and Year == @model_year")
-        .query('Category == "EXOGENOUS"')
-        .pivot_table(columns=["Region"], values="Value", aggfunc="sum")
-        .reindex(columns=regions, fill_value=0)
-    )
-    all_data["heat"] = (
-        all_data["heat"][regions]
-        / all_data["heat"][regions].sum()
-        * heat_demand.values
-        * 1e6
-    )
+    try:
+        heat_demand = (
+            result.get_result("H_DEMAND_YCRA")
+            .query("Scenario == @scenario and Year == @model_year")
+            .query('Category == "EXOGENOUS"')
+            .pivot_table(columns=["Region"], values="Value", aggfunc="sum")
+            .reindex(columns=regions, fill_value=0)
+        )
+        all_data["heat"] = (
+            all_data["heat"][regions]
+            / all_data["heat"][regions].sum()
+            * heat_demand.values
+            * 1e6
+        )
+
+        exo_demand = all_data["load"] + all_data["heat"]
+    
+    except pd.errors.UndefinedVariableError:
+        # If no heat demand
+        exo_demand = all_data["load"]
 
     # Calculate total exogenous load
-    exo_demand = all_data["load"] + all_data["heat"]
     exo_demand = (
         exo_demand.stack()
         .reset_index()
