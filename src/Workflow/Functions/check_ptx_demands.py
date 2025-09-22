@@ -8,7 +8,7 @@ import click
 
 console = Console()
 def get_ptx_results(
-    antares_result: str, balmorel_result: str, gams_system_directory: str, scenario_folder: str = 'base'
+    antares_result: str, balmorel_result: str, gams_system_directory: str, scenario_folder: str = 'base', mc_year: str = 'mc-all'
 ):
     # Load Results
     scenario_name = (
@@ -34,7 +34,7 @@ def get_ptx_results(
     data = []
     for area, commodity in product(areas, commodities):
         res = antout.load_link_results(
-            [area, "_".join([area, commodity])], temporal="annual"
+            [area, "_".join([area, commodity])], temporal="annual", mc_year=mc_year
         )["FLOW LIN."]
 
         data.append(
@@ -70,17 +70,26 @@ def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str):
     concated = pd.DataFrame()
     for balmorel_result, antares_result in antbalm_result_list:
 
+        # If Balmorel result is list, second argument is scenario folder
         if type(balmorel_result) is list:
             scenario_folder = balmorel_result[1]
             balmorel_result = balmorel_result[0]
         else:
             scenario_folder = 'base'
 
+        # If Antares result is list, second argument is mc year
+        if type(antares_result) is list:
+            mc_year = antares_result[1]
+            antares_result = antares_result[0]
+        else:
+            mc_year = 'mc-all'
+
         balmorel_ptx, antares_ptx = get_ptx_results(
-                antares_result,
+                    antares_result,
                     balmorel_result,
                     gams_system_directory,
-                    scenario_folder
+                    scenario_folder,
+                    mc_year
                 )
 
         temp_concatenated = pd.concat((balmorel_ptx, antares_ptx), ignore_index=True)
@@ -239,7 +248,12 @@ def bandwidth():
 @CLI.command()
 def virginie_clustering():
     antbalm_list = [
-        # [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0014eco-noh2_fullyear_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx"  , "noh"], "20250919-1524eco-noh_fullyear_fullyear_cl4_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx"  , "noh"], "20250919-1528eco-noh_fullyear_fullyear_cl8_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx"  , "noh"], "20250919-1532eco-noh_fullyear_fullyear_cl52_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx"  , "noh"], "20250919-1536eco-noh_fullyear_fullyear_cl168_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx"  , "noh"], "20250921-2028eco-noh_fullyear_h2vrehexo_cl672_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx"  , "noh"], "20250921-2034eco-noh_fullyear_h2vrehexo_cl1344_iter0_y-2050"],
         # [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0829eco-noh2_fullyear_wdisloss_iter0_y-2050"],
         # [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-0858eco-noh2_fullyear_wdisloss_wcapex_iter0_y-2050"],
         # [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250914-1516eco-noh2_fullyear_cl4_iter0_y-2050"],
@@ -287,9 +301,14 @@ def virginie_clustering():
         [["MainResults_h2_lss_fullyear_Iter0.gdx"  , "h2_lss"], "20250915-1616eco-h2_lss_fullyear_cl168_fixedfuelprice_iter0_y-2050"],
         [["MainResults_h2_lss_fullyear_Iter0.gdx"  , "h2_lss"], "20250915-1626eco-h2_lss_fullyear_cl672_fixedfuelprice_iter0_y-2050"],
         [["MainResults_h2_lss_fullyear_Iter0.gdx"  , "h2_lss"], "20250915-1639eco-h2_lss_fullyear_cl1344_fixedfuelprice_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1236eco-h2_lss_h2t_fullyear_h2vrehexo_cl4_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1240eco-h2_lss_h2t_fullyear_h2vrehexo_cl8_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1246eco-h2_lss_h2t_fullyear_h2vrehexo_cl52_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1253eco-h2_lss_h2t_fullyear_h2vrehexo_cl168_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1304eco-h2_lss_h2t_fullyear_h2vrehexo_cl672_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1319eco-h2_lss_h2t_fullyear_h2vrehexo_cl1344_iter0_y-2050"],
         # [["MainResults_h2_lss_fullyear_Iter0.gdx"  , "h2_lss"], ""],
         # ["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"],
-
     ]
 
     collect_ptx_results(antbalm_list, 'virginie_clustering')
@@ -297,21 +316,45 @@ def virginie_clustering():
 @CLI.command()
 def virginie_data():
     antbalm_list = [
-        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250918-1739eco-noh2_fullyear_h2vrehsur_iter0_y-2050"],
-        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250918-1903eco-noh2_fullyear_h2surhsur_iter0_y-2050"],
-        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250918-2055eco-noh2_fullyear_h2surhheat_iter0_y-2050"],
-        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250915-1445eco-noh2_fullyear_cl168_fixedfuelprice_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250918-1745eco-h2_fullyear_h2vrehsur_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250918-1909eco-h2_fullyear_h2surhsur_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250918-2101eco-h2_fullyear_h2surhheat_iter0_y-2050"],
-        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250915-1529eco-h2_fullyear_cl168_fixedfuelprice_iter0_y-2050"],
-        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250918-1751eco-h2_lss_fullyear_h2vrehsur_iter0_y-2050"],
-        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250918-1915eco-h2_lss_fullyear_h2surhsur_iter0_y-2050"],
-        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250918-2107eco-h2_lss_fullyear_h2surhheat_iter0_y-2050"],
-        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250915-1616eco-h2_lss_fullyear_cl168_fixedfuelprice_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx", "noh"], "20250919-1558eco-noh_fullyear_h2surhsur_oldrounding_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx", "noh"], "20250919-1554eco-noh_fullyear_h2vrehsur_oldrounding_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx", "noh"], "20250919-1549eco-noh_fullyear_h2surhexo_oldrounding_iter0_y-2050"],
+        [["MainResults_noh_fullyear_Iter0.gdx", "noh"], "20250919-1545eco-noh_fullyear_h2vrehexo_oldrounding_iter0_y-2050"],
+        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250919-1804eco-noh2_fullyear_h2surhsur_oldrounding_iter0_y-2050"],
+        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250919-1756eco-noh2_fullyear_h2vrehsur_oldrounding_iter0_y-2050"],
+        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250919-1750eco-noh2_fullyear_h2surhexo_oldrounding_iter0_y-2050"],
+        [["MainResults_noh2_fullyear_Iter0.gdx", "noh2"], "20250919-1743eco-noh2_fullyear_h2vrehexo_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250919-1843eco-h2_lss_fullyear_h2vrehexo_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250919-1850eco-h2_lss_fullyear_h2surhexo_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250919-1857eco-h2_lss_fullyear_h2vrehsur_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_lss_fullyear_Iter0.gdx", "h2_lss"], "20250919-1904eco-h2_lss_fullyear_h2surhsur_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250919-1812eco-h2_fullyear_h2vrehexo_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250919-1820eco-h2_fullyear_h2surhexo_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250919-1828eco-h2_fullyear_h2vrehsur_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_fullyear_Iter0.gdx", "h2"], "20250919-1837eco-h2_fullyear_h2surhsur_oldrounding_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1253eco-h2_lss_h2t_fullyear_h2vrehexo_cl168_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1327eco-h2_lss_h2t_fullyear_h2surhexo_cl168_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1334eco-h2_lss_h2t_fullyear_h2vrehsur_cl168_iter0_y-2050"],
+        [["MainResults_h2_lss_h2t_fullyear_Iter0.gdx", "h2_lss_h2t"], "20250921-1342eco-h2_lss_h2t_fullyear_h2surhsur_cl168_iter0_y-2050"],
+        # [["MainResults_noh2_fullyear_Iter0.gdx"  , "noh2"], "20250915-1445eco-noh2_fullyear_cl168_fixedfuelprice_iter0_y-2050"],
+        # [["MainResults_h2_fullyear_Iter0.gdx"  , "h2"], "20250915-1529eco-h2_fullyear_cl168_fixedfuelprice_iter0_y-2050"],
+        # [["MainResults_h2_lss_fullyear_Iter0.gdx"  , "h2_lss"], "20250915-1616eco-h2_lss_fullyear_cl168_fixedfuelprice_iter0_y-2050"],
     ]
 
     collect_ptx_results(antbalm_list, 'virginie_data')
+
+@CLI.command()
+def multiweather():
+    antbalm_list = [
+        [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"],   ["20250922-1308eco-noh_wy1982_cl1344_iter0_y-2050", "00001"]],
+        [["MainResults_noh_dispatch_WY1983_Iter0.gdx", "noh"],   ["20250922-1308eco-noh_wy1982_cl1344_iter0_y-2050", "00002"]],
+        [["MainResults_noh2_dispatch_WY1982_Iter0.gdx", "noh2"], ["20250922-1317eco-noh2_wy1982_cl1344_iter0_y-2050", "00001"]],
+        [["MainResults_h2_dispatch_WY1982_Iter0.gdx", "h2"],     ["20250922-1330eco-h2_wy1982_cl1344_iter0_y-2050", "00001"]],
+        # [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"], ["", ""]],
+        # [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"], ["", ""]],
+    ]
+
+    collect_ptx_results(antbalm_list, 'multiweather')
 
 @CLI.command()
 @click.pass_context
