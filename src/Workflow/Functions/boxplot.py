@@ -102,6 +102,53 @@ def collect_and_concat_dataframes():
     return collected_df
 
 
+def plot_boxplot(df: pd.DataFrame):
+    """
+    Plot boxplot of values where TestYear != TrainYear, grouped by Region.
+    
+    Parameters:
+    df: DataFrame with columns Value, Region, TestYear, TrainYear
+    """
+    # Filter for rows where TestYear != TrainYear
+    filtered_df = df[df['TestYear'] != df['TrainYear']].copy()
+    
+    # Get unique regions for x-axis
+    regions = sorted(pd.Series(filtered_df['Region']).unique().tolist())
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Prepare data for boxplot - one box per region
+    data_for_plot = []
+    for region in regions:
+        region_data = np.array(filtered_df[filtered_df['Region'] == region]['Value'].tolist())
+        data_for_plot.append(region_data)
+    
+    # Create boxplot
+    bp = ax.boxplot(data_for_plot, patch_artist=True)
+    
+    # Set x-axis labels
+    ax.set_xticklabels(regions)
+    
+    # Style the boxplot
+    for patch in bp['boxes']:
+        patch.set_facecolor('lightblue')
+        patch.set_alpha(0.7)
+    
+    # Add labels and title
+    ax.set_xlabel('Region', fontsize=12)
+    ax.set_ylabel('Relative Difference (%)', fontsize=12)
+    ax.set_title('PtX Demand Deviations (Test Year ≠ Train Year)', fontsize=14)
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    # Rotate x-axis labels if many regions
+    if len(regions) > 10:
+        plt.xticks(rotation=45, ha='right')
+    
+    plt.tight_layout()
+    
+    return fig, ax
+
 
 # ------------------------------- #
 #            2. Main              #
@@ -112,6 +159,9 @@ def collect_and_concat_dataframes():
 def main():
     df = collect_and_concat_dataframes()
     
+    # Plot the boxplot for values where TestYear != TrainYear
+    fig, ax = plot_boxplot(df)
+    plt.show()
 
 
 if __name__ == "__main__":
