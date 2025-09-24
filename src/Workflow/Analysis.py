@@ -658,6 +658,41 @@ def plot_balmorel_hourly_electricity_generation(
 
     return fig, ax
 
+def get_difference_table(filename: str,
+                         column_name: str,
+                         column_regex: str,
+                         column_elements_type: type,
+                         scenario_regex: str = 'eco-(.+)_fullyear',
+                         column_to_extract_columns_from: str = 'AntaresFile',
+                         column_to_extract_scenario_from: str = 'AntaresFile'):
+    f=pd.read_csv(filename)
+
+    # Get clustering amounts and scenario names
+    f[column_name] = f[column_to_extract_columns_from].str.extract(column_regex).astype(column_elements_type)
+    f['Scenario'] = f[column_to_extract_scenario_from].str.extract(scenario_regex)
+
+    # Make table
+    df_antares=(
+        f.query('Model=="Antares"')
+        .pivot_table(index=['Scenario', 'Category'],
+                     columns=[column_name, 'Region'],
+                     values='Value',
+                     aggfunc='sum')
+    )
+    df_balmorel=(
+        f.query('Model=="Balmorel"')
+        .pivot_table(index=['Scenario', 'Category'],
+                     columns=[column_name, 'Region'],
+                     values='Value',
+                     aggfunc='sum')
+    )
+    df_diff = ((df_antares - df_balmorel) / df_balmorel * 100).abs()
+
+    # Aggregate to mean difference per region
+    df_diff_mean = df_diff.groupby(level=0, axis=1).mean()
+
+    return df_diff, df_diff_mean
+
 
 ### ------------------------------- ###
 ###           2. Main CLI           ###
@@ -864,38 +899,17 @@ def plot_virginie_data_table():
 @click.argument('weather_year', type=int)
 def plot_multiweather_table(weather_year: int):
     filename = f'Workflow/OverallResults/PtX_demand_comparison_multiweather_{weather_year}trained.csv'
-    df_diff, df_diff_mean = get_difference_table(filename, 'Data', r'\_wy(.+)\_cl1344', int, r'eco-(.+)\_wy')
+    df_diff, df_diff_mean = get_difference_table(filename, 
+                                                 'Data',
+                                                 r'\_dispatch\_WY(.+)\_Iter0',
+                                                 int,
+                                                 r'eco-(.+)\_wy',
+                                                 'BalmorelFile')
 
-    print(df_diff_mean.round().to_string())
-
-def get_difference_table(filename: str, column_name: str, column_regex: str, column_elements_type: type, scenario_regex: str = 'eco-(.+)_fullyear'):
-    f=pd.read_csv(filename)
-
-    # Get clustering amounts and scenario names
-    f[column_name] = f.AntaresFile.str.extract(column_regex).astype(column_elements_type)
-    f['Scenario'] = f.AntaresFile.str.extract(scenario_regex)
-
-    # Make table
-    df_antares=(
-        f.query('Model=="Antares"')
-        .pivot_table(index=['Scenario', 'Category'],
-                     columns=[column_name, 'Region'],
-                     values='Value',
-                     aggfunc='sum')
-    )
-    df_balmorel=(
-        f.query('Model=="Balmorel"')
-        .pivot_table(index=['Scenario', 'Category'],
-                     columns=[column_name, 'Region'],
-                     values='Value',
-                     aggfunc='sum')
-    )
-    df_diff = ((df_antares - df_balmorel) / df_balmorel * 100).abs()
-
-    # Aggregate to mean difference per region
-    df_diff_mean = df_diff.groupby(level=0, axis=1).mean()
-
-    return df_diff, df_diff_mean
+    print(f'Trained on weather year {weather_year}')
+    print(df_diff_mean.mean().round().to_string())
+    print(f'Average deviation for trained weather year: {df_diff_mean.loc[:, weather_year].mean().round(2)}')
+    print(f'Average deviation for other weather years:  {df_diff_mean.loc[:, df_diff_mean.columns.drop(weather_year)].mean().mean().round(2)}')
 
 if __name__ == "__main__":
     CLI()
