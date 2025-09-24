@@ -610,25 +610,29 @@ def get_supply_curve(x: np.array, y: np.array):
     # The 'fitted' values
     fit_x, fit_y = [], []
 
-    for i, row in df.iterrows():
-        if i == 0:
-            # Fill the first values
-            if small_number_to_zero(row["y"]) != 0:
+    if len(df) > 0:
+        for i, row in df.iterrows():
+            if i == 0:
+                # Fill the first values
+                if small_number_to_zero(row["y"]) != 0:
+                    fit_x.append(small_number_to_zero(row["x"]) + 1e-3)
+                    fit_y.append(0)
+                fit_x.append(small_number_to_zero(row["x"]))
+                fit_y.append(small_number_to_zero(row["y"]))
+            elif row["y"] > fit_y[-1]:
+                # Add higher y at lower x as a stepwise linear function
                 fit_x.append(small_number_to_zero(row["x"]) + 1e-3)
-                fit_y.append(0)
-            fit_x.append(small_number_to_zero(row["x"]))
-            fit_y.append(small_number_to_zero(row["y"]))
-        elif row["y"] > fit_y[-1]:
-            # Add higher y at lower x as a stepwise linear function
-            fit_x.append(small_number_to_zero(row["x"]) + 1e-3)
-            fit_y.append(fit_y[-1])
-            fit_x.append(small_number_to_zero(row["x"]))
-            fit_y.append(small_number_to_zero(row["y"]))
+                fit_y.append(fit_y[-1])
+                fit_x.append(small_number_to_zero(row["x"]))
+                fit_y.append(small_number_to_zero(row["y"]))
 
-    # Last point
-    if fit_x[-1] != 0:
+        # Last point
+        if fit_x[-1] != 0:
+            fit_x.append(0)
+            fit_y.append(fit_y[-1])
+    else:
         fit_x.append(0)
-        fit_y.append(fit_y[-1])
+        fit_y.append(0)
 
     return fit_x, fit_y
 

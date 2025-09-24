@@ -170,7 +170,7 @@ def antares_thermal_capacities(
     log("Thermal capacities to Antares...")
 
     # Get economic parameters
-    include_capital_costs_in_margcost = True
+    include_capital_costs_in_margcost = False
     if include_capital_costs_in_margcost:
         print('Including CAPEX and FOM in marginal cost by dividing by 8760 h')
 
@@ -1063,7 +1063,8 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
             all_parameters, 
             supply_curves[commodity], 
             antares_input, 
-            commodity, 
+            commodity,
+            price_rounding_level,
             unserved_energy_cost
         )
 
@@ -1189,9 +1190,9 @@ def main(ctx, sc_name: str, year: str, cluster_size: int, heat_parameter_choice:
         sc_name (str): Scenario name
         year (str): Model year
     """
-    log("|--------------------------------------------------|")
-    log("              PERI-PROCESSING")
-    log("|--------------------------------------------------|")
+    print("|--------------------------------------------------|")
+    print("              PERI-PROCESSING")
+    print("|--------------------------------------------------|")
 
     # Metadata
     if sc_name == None:
@@ -1414,9 +1415,9 @@ def main(ctx, sc_name: str, year: str, cluster_size: int, heat_parameter_choice:
     create_demand_response(ctx.obj['weather_years'], res, SC, year, temporal_resolution, cluster_size, price_rounding_level, choices, style)
     # create_demand_response_hourly_constraint(m, SC, year, gams_system_directory)
 
-    log("|--------------------------------------------------|")
-    log("              END OF PERI-PROCESSING")
-    log("|--------------------------------------------------|")
+    print("|--------------------------------------------------|")
+    print("              END OF PERI-PROCESSING")
+    print("|--------------------------------------------------|")
 
     # Set periprocessing_finished to true (will be set to true after peri-processing finishes)
     with open("Workflow/MetaResults/periprocessing_finished.txt", "w") as f:

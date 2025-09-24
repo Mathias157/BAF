@@ -5,6 +5,7 @@ from itertools import product
 from configparser import ConfigParser
 from rich.console import Console 
 import click
+from pathlib import Path
 
 console = Console()
 def get_ptx_results(
@@ -345,16 +346,56 @@ def virginie_data():
 
 @CLI.command()
 def multiweather():
-    antbalm_list = [
-        [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"],   ["20250922-1308eco-noh_wy1982_cl1344_iter0_y-2050", "00001"]],
-        [["MainResults_noh_dispatch_WY1983_Iter0.gdx", "noh"],   ["20250922-1308eco-noh_wy1982_cl1344_iter0_y-2050", "00002"]],
-        [["MainResults_noh2_dispatch_WY1982_Iter0.gdx", "noh2"], ["20250922-1317eco-noh2_wy1982_cl1344_iter0_y-2050", "00001"]],
-        [["MainResults_h2_dispatch_WY1982_Iter0.gdx", "h2"],     ["20250922-1330eco-h2_wy1982_cl1344_iter0_y-2050", "00001"]],
-        # [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"], ["", ""]],
-        # [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"], ["", ""]],
-    ]
 
-    collect_ptx_results(antbalm_list, 'multiweather')
+    weather_years = [
+        1982,
+        1983,
+        1984,
+        1985,
+        1986,
+        1987,
+        1988,
+        1989,
+        1990,
+        1991,
+        1992,
+        1993,
+        1994,
+        1995,
+        1996,
+        1997,
+        1998,
+        1999,
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+    ]
+    for training_year in weather_years:
+        collection_list = []
+        antares_outputs = Path('Antares/output').glob(f'*wy{training_year}_cl1344*')
+        for antares_output in antares_outputs:
+            scenario = antares_output.name.split('eco-')[1].split('_wy')[0]
+            for test_year in weather_years:
+                collection_list.append(
+                    [[f"MainResults_{scenario}_dispatch_WY{test_year}_Iter0.gdx", scenario],
+                    [antares_output.name, f"{test_year-1982+1:05.0f}"]]
+                )
+
+        collect_ptx_results(collection_list, f'multiweather_{training_year}trained')
 
 @CLI.command()
 @click.pass_context

@@ -806,7 +806,7 @@ def plot(ctx, scenario, overwrite):
     )
     plt.close(fig)
 
-    region = 'ES'
+    region = 'all'
     for week in range(1, 53):
         # Electricity generating profile per week
         fig_ant, ax_ant = plot_antares_hourly_electricity_generation(
@@ -841,24 +841,39 @@ def plot(ctx, scenario, overwrite):
 def plot_virginie_clustering_table():
     filename = 'Workflow/OverallResults/PtX_demand_comparison_virginie_clustering.csv'
     df_diff, df_diff_mean = get_difference_table(filename, '# Demand Curves', r'cl(\d+)', int)
+    print(df_diff_mean.to_string())
+    df_diff_mean.loc['noh', [4, 8, 52, 168]] = df_diff_mean.loc['noh_fullyear', [4, 8, 52, 168]].values
     
     # print(df_diff.loc[['noh2', 'h2', 'h2_lss']].round())
-    print(df_diff_mean.loc[['noh2', 'h2', 'h2_lss']].round())
+    print(df_diff_mean.loc[['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']].round().to_string())
 
 @CLI.command()
 def plot_virginie_data_table():
     filename = 'Workflow/OverallResults/PtX_demand_comparison_virginie_data.csv'
     df_diff, df_diff_mean = get_difference_table(filename, 'Data', r'fullyear_(.+)\_iter0', str)
-    df_diff_mean = df_diff_mean.rename(columns={'cl168_fixedfuelprice' : 'h2vrehheat'}).rename(columns={'hheat':'hexo'})
-    # print(df_diff.loc[['noh2', 'h2', 'h2_lss']].round())
-    print(df_diff_mean.loc[['noh2', 'h2', 'h2_lss']].round())
 
-def get_difference_table(filename: str, column_name: str, column_regex: str, column_elements_type: type):
+    df_diff_mean.loc[:, 'h2surhsur'] = df_diff_mean.loc[:, ['h2surhsur_oldrounding', 'h2surhsur_cl168']].sum(axis=1)
+    df_diff_mean.loc[:, 'h2vrehsur'] = df_diff_mean.loc[:, ['h2vrehsur_oldrounding', 'h2vrehsur_cl168']].sum(axis=1)
+    df_diff_mean.loc[:, 'h2surhexo'] = df_diff_mean.loc[:, ['h2surhexo_oldrounding', 'h2surhexo_cl168']].sum(axis=1)
+    df_diff_mean.loc[:, 'h2vrehexo'] = df_diff_mean.loc[:, ['h2vrehexo_oldrounding', 'h2vrehexo_cl168']].sum(axis=1)
+    
+    # print(df_diff.loc[['noh', 'noh2', 'h2', 'h2_lss']].round())
+    print(df_diff_mean.loc[['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t'], ['h2vrehexo', 'h2vrehsur', 'h2surhexo', 'h2surhsur']].round().to_string())
+
+@CLI.command()
+@click.argument('weather_year', type=int)
+def plot_multiweather_table(weather_year: int):
+    filename = f'Workflow/OverallResults/PtX_demand_comparison_multiweather_{weather_year}trained.csv'
+    df_diff, df_diff_mean = get_difference_table(filename, 'Data', r'\_wy(.+)\_cl1344', int, r'eco-(.+)\_wy')
+
+    print(df_diff_mean.round().to_string())
+
+def get_difference_table(filename: str, column_name: str, column_regex: str, column_elements_type: type, scenario_regex: str = 'eco-(.+)_fullyear'):
     f=pd.read_csv(filename)
 
     # Get clustering amounts and scenario names
     f[column_name] = f.AntaresFile.str.extract(column_regex).astype(column_elements_type)
-    f['Scenario'] = f.AntaresFile.str.extract('eco-(.+)_fullyear')
+    f['Scenario'] = f.AntaresFile.str.extract(scenario_regex)
 
     # Make table
     df_antares=(
