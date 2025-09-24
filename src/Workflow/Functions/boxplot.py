@@ -73,6 +73,8 @@ def get_difference_table(
 
 
 def collect_and_concat_dataframes():
+
+    collected_df = pd.DataFrame()
     for weather_year in [1982 + i for i in range(35)]:
         filename = f"Workflow/OverallResults/PtX_demand_comparison_multiweather_{weather_year}trained.csv"
         df, _ = get_difference_table(
@@ -84,7 +86,21 @@ def collect_and_concat_dataframes():
             "BalmorelFile",
         )
 
-        print(df)
+        formatted_df = (
+            df
+            .stack()
+            .stack()
+            .reset_index(name="Value")
+            .rename(columns={'Data' : 'TestYear'})
+        ) 
+
+        formatted_df['TrainYear'] = weather_year
+        collected_df = pd.concat((collected_df, 
+                                  formatted_df),
+                                  ignore_index=True)
+
+    return collected_df
+
 
 
 # ------------------------------- #
@@ -94,7 +110,8 @@ def collect_and_concat_dataframes():
 
 @click.command()
 def main():
-    collect_and_concat_dataframes()
+    df = collect_and_concat_dataframes()
+    
 
 
 if __name__ == "__main__":
