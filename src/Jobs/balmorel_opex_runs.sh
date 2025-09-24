@@ -3,19 +3,17 @@
 ### -- specify queue --
 #BSUB -q man
 ### -- set the job Name --
-#BSUB -J cluster_sensitivity
+#BSUB -J balmorel_operuns_and_sensitivities
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 3
-### -- specify that we need a certain architecture --
-#BSUB -R "select[model == XeonGold6226R]"
+#BSUB -n 10
 ### -- specify that the cores must be on the same host --
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need X GB of memory per core/slot --
-#BSUB -R "rusage[mem=1GB]"
+#BSUB -R "rusage[mem=2GB]"
 ### -- specify that we want the job to get killed if it exceeds X GB per core/slot --
-#BSUB -M 1.1GB
+#BSUB -M 2.1GB
 ### -- set walltime limit: hh:mm --
-#BSUB -W 16:00
+#BSUB -W 24:00
 ### -- set the email address --
 #BSUB -u mberos@dtu.dk
 ### -- send notification at start --
@@ -24,8 +22,8 @@
 #BSUB -N
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
-#BSUB -o ./Logs/cluster_sensitivity_%J.out
-#BSUB -e ./Logs/cluster_sensitivity_%J.err
+#BSUB -o ./Logs/balmorel_operuns_and_sensitivities_%J.out
+#BSUB -e ./Logs/balmorel_operuns_and_sensitivities_%J.err
 # here follow the commands you want to execute with input.in as the input file
 
 ### Load modules and find binaries
@@ -37,15 +35,15 @@ export PATH=/appl/gams/47.6.0:$PATH
 export PATH=~/.pixi/bin:$PATH
 
 for weather_year in 1982 1983 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002 2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016; do
-  for name in noh noh2 h2 h2_lss; do
+  # Change weather year
+  sed -i "s/^balmorel_weather_year:.*$/balmorel_weather_year: $weather_year/" Config.ini
+
+  # Run preprocessing
+  pixi run preprocessing -F --rerun-incomplete
+
+  for name in noh noh2 h2 h2_lss h2_lss_h2t; do
     # Rename Config_SCX.ini to Config.ini (make active)
     # mv Config_${name}.ini ""
-
-    # Change weather year
-    sed -i "s/^balmorel_weather_year:.*$/balmorel_weather_year: $weather_year/" Config.ini
-
-    # Run preprocessing
-    pixi run preprocessing
 
     # Running Master
     # ~/.pixi/bin/pixi run python Master.py

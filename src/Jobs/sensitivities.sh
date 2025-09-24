@@ -5,9 +5,7 @@
 ### -- set the job Name --
 #BSUB -J cluster_parameter_sensitivity
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 3
-### -- specify that we need a certain architecture --
-#BSUB -R "select[model == XeonGold6226R]"
+#BSUB -n 10
 ### -- specify that the cores must be on the same host --
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need X GB of memory per core/slot --
@@ -36,7 +34,7 @@ export PATH=/zhome/c0/2/105719/Desktop/Antares-8.7.0/bin:$PATH
 export PATH=/appl/gams/47.6.0:$PATH
 export PATH=~/.pixi/bin:$PATH
 
-for name in noh_fullyear; do
+for name in noh_fullyear noh2_fullyear h2_fullyear h2_lss_fullyear h2_lss_h2t_fullyear; do
   # Rename Config_SCX.ini to Config.ini (make active)
   # mv Config_${name}.ini ""
 
@@ -51,9 +49,9 @@ for name in noh_fullyear; do
   # cp -r simex "simex_${name}"
   # cd ../
 
-  for cluster_size in 168; do
-    for year in 2050; do
-      # Running Peri-Processing
+  for year in 2050; do
+    # Running Peri-Processing
+    for cluster_size in 4 8 52 168 672 1344; do
       pixi run periprocess $name $year $cluster_size --heat-parameter-choice exogenous_demand --hydrogen-parameter-choice vre_availability
 
       if [ $? -ne 0 ]; then
@@ -61,38 +59,39 @@ for name in noh_fullyear; do
       fi
 
       # Running Antares
-      antares-8.7-solver Antares -n "${name}_h2vrehexo_Iter0_Y-${year}" --parallel
-
-      # Running Peri-Processing
-      pixi run periprocess $name $year $cluster_size --heat-parameter-choice exogenous_demand --hydrogen-parameter-choice inverse_residual_load
-
-      if [ $? -ne 0 ]; then
-        exit 1
-      fi
-
-      # Running Antares
-      antares-8.7-solver Antares -n "${name}_h2surhexo_Iter0_Y-${year}" --parallel
-
-      # Running Peri-Processing
-      pixi run periprocess $name $year $cluster_size --heat-parameter-choice inverse_residual_load --hydrogen-parameter-choice vre_availability
-
-      if [ $? -ne 0 ]; then
-        exit 1
-      fi
-
-      # Running Antares
-      antares-8.7-solver Antares -n "${name}_h2vrehsur_Iter0_Y-${year}" --parallel
-
-      # Running Peri-Processing
-      pixi run periprocess $name $year $cluster_size --heat-parameter-choice inverse_residual_load --hydrogen-parameter-choice inverse_residual_load
-
-      if [ $? -ne 0 ]; then
-        exit 1
-      fi
-
-      # Running Antares
-      antares-8.7-solver Antares -n "${name}_h2surhsur_Iter0_Y-${year}" --parallel
+      antares-8.7-solver Antares -n "${name}_h2vrehexo_cl${cluster_size}_Iter0_Y-${year}" --parallel
     done
+    cluster_size=168
+
+    # Running Peri-Processing
+    pixi run periprocess $name $year $cluster_size --heat-parameter-choice exogenous_demand --hydrogen-parameter-choice inverse_residual_load
+
+    if [ $? -ne 0 ]; then
+      exit 1
+    fi
+
+    # Running Antares
+    antares-8.7-solver Antares -n "${name}_h2surhexo_cl${cluster_size}_Iter0_Y-${year}" --parallel
+
+    # Running Peri-Processing
+    pixi run periprocess $name $year $cluster_size --heat-parameter-choice inverse_residual_load --hydrogen-parameter-choice vre_availability
+
+    if [ $? -ne 0 ]; then
+      exit 1
+    fi
+
+    # Running Antares
+    antares-8.7-solver Antares -n "${name}_h2vrehsur_cl${cluster_size}_Iter0_Y-${year}" --parallel
+
+    # Running Peri-Processing
+    pixi run periprocess $name $year $cluster_size --heat-parameter-choice inverse_residual_load --hydrogen-parameter-choice inverse_residual_load
+
+    if [ $? -ne 0 ]; then
+      exit 1
+    fi
+
+    # Running Antares
+    antares-8.7-solver Antares -n "${name}_h2surhsur_cl${cluster_size}_Iter0_Y-${year}" --parallel
   done
 
   # Running ConvergenceCriterion
