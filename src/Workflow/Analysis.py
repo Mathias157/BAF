@@ -23,6 +23,7 @@ from pybalmorel.utils import symbol_to_df
 from pybalmorel.formatting import balmorel_colours
 from Functions.Formatting import newplot, set_style, stacked_bar
 from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput
+from Functions.boxplot import get_difference_table
 import warnings
 
 warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
@@ -657,42 +658,6 @@ def plot_balmorel_hourly_electricity_generation(
     ax.set_xlim((week - 1) * 168, week * 168)
 
     return fig, ax
-
-def get_difference_table(filename: str,
-                         column_name: str,
-                         column_regex: str,
-                         column_elements_type: type,
-                         scenario_regex: str = 'eco-(.+)_fullyear',
-                         column_to_extract_columns_from: str = 'AntaresFile',
-                         column_to_extract_scenario_from: str = 'AntaresFile'):
-    f=pd.read_csv(filename)
-
-    # Get clustering amounts and scenario names
-    f[column_name] = f[column_to_extract_columns_from].str.extract(column_regex).astype(column_elements_type)
-    f['Scenario'] = f[column_to_extract_scenario_from].str.extract(scenario_regex)
-
-    # Make table
-    df_antares=(
-        f.query('Model=="Antares"')
-        .pivot_table(index=['Scenario', 'Category'],
-                     columns=[column_name, 'Region'],
-                     values='Value',
-                     aggfunc='sum')
-    )
-    df_balmorel=(
-        f.query('Model=="Balmorel"')
-        .pivot_table(index=['Scenario', 'Category'],
-                     columns=[column_name, 'Region'],
-                     values='Value',
-                     aggfunc='sum')
-    )
-    df_diff = ((df_antares - df_balmorel) / df_balmorel * 100).abs()
-
-    # Aggregate to mean difference per region
-    df_diff_mean = df_diff.groupby(level=0, axis=1).mean()
-
-    return df_diff, df_diff_mean
-
 
 ### ------------------------------- ###
 ###           2. Main CLI           ###
