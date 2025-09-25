@@ -789,7 +789,7 @@ def get_supply_curves(scenario: str,
     regions = df1_temp.Region.sort_values().unique()
     parameter_name = [col for col in parameters.columns if not(col in ['Region', 'Season', 'Time'])][0]
     
-    ## Cluster parameters 
+    ## Cluster parameters (works independently within each region)
     parameters = parameters.groupby('Region').apply(lambda x: cluster_values(x, cluster_size)).fillna(0)
     
     resulting_curves = get_curves(
