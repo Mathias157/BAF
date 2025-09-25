@@ -110,8 +110,8 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     df: DataFrame with columns Value, Region, TestYear, TrainYear
     """
     # Mark train and test years
-    df.loc[:, 'Category'] = 'Test Years'
-    df.loc[df.eval('TestYear == TrainYear'), 'Category'] = 'Train Years'
+    df.loc[:, 'YearType'] = 'Test Years'
+    df.loc[df.eval('TestYear == TrainYear'), 'YearType'] = 'Train Years'
     
     # Get unique scenarios for x-axis
     scenarios = ['NoH', 'NoH2', 'H2', 'H2LSS', 'H2LSSH2T']
@@ -132,11 +132,11 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     
     for scenario in scenarios:
         # Test years data
-        test_scenario_data = df.query('Scenario == @scenario and Category == "Test Years"').Value.tolist()
+        test_scenario_data = df.query('Scenario == @scenario and YearType == "Test Years"').Value.tolist()
         test_data.append(test_scenario_data)
         
         # Train years data  
-        train_scenario_data = df.query('Scenario == @scenario and Category == "Train Years"').Value.tolist()
+        train_scenario_data = df.query('Scenario == @scenario and YearType == "Train Years"').Value.tolist()
         train_data.append(train_scenario_data)
     
     # Calculate positions for the boxplots (side by side)
@@ -145,9 +145,9 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     
     # Create boxplots
     bp1 = ax.boxplot(test_data, positions=positions_test, widths=0.35, 
-                     patch_artist=True, whis=(0.0, 100.0))
+                     patch_artist=True) 
     bp2 = ax.boxplot(train_data, positions=positions_train, widths=0.35, 
-                     patch_artist=True, whis=(0.0, 100.0))
+                     patch_artist=True)
     
     # Style the boxplots with different colors
     for patch in bp1['boxes']:
@@ -193,8 +193,8 @@ def main():
     fig.savefig('Workflow/OverallResults/boxplot_endodemand_comparison.png')
 
     # Print mean
-    print('Mean of difference through all test years:  ', df.query('Category=="Test Years"').Value.mean().round(2))
-    print('Mean of difference through train years only:', df.query('Category=="Train Years"').Value.mean().round(2))
+    print('Mean of difference through all test years:    \n', df.query('YearType=="Test Years"').pivot_table(index='Scenario', columns='Category', values='Value', aggfunc='mean').round(2))
+    print('Mean of difference through train years only:  \n', df.query('YearType=="Train Years"').pivot_table(index='Scenario', columns='Category', values='Value', aggfunc='mean').round(2))
 
 
 if __name__ == "__main__":
