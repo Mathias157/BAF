@@ -114,10 +114,17 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     df.loc[df.eval('TestYear == TrainYear'), 'Category'] = 'Train Years'
     
     # Get unique scenarios for x-axis
-    scenarios = ['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']
+    scenarios = ['NoH', 'NoH2', 'H2', 'H2LSS', 'H2LSSH2T']
+    df = df.replace({
+        'noh' : 'NoH',
+        'noh2' : 'NoH2',
+        'h2' : 'H2',
+        'h2_lss' : 'H2LSS',
+        'h2_lss_h2t' : 'H2LSSH2T',
+    })
     
     # Create figure and axis
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(9, 6))
     
     # Prepare data for boxplot - separate data for test years and train years
     test_data = []
@@ -162,7 +169,7 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     ax.legend(handles=legend_elements, loc='upper right')
     
     # Add labels and title
-    ax.set_xlabel('Region', fontsize=12)
+    ax.set_xlabel('Scenario', fontsize=12)
     ax.set_ylabel('Relative Difference (%)', fontsize=12)
     ax.set_title(title, fontsize=14)
     ax.set_ylim(-100, 100)
@@ -170,7 +177,7 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     
     plt.tight_layout()
 
-    return fig, ax
+    return df, fig, ax
 
 # ------------------------------- #
 #            2. Main              #
@@ -182,9 +189,12 @@ def main():
     df = collect_and_concat_dataframes()
     
     # Plot the boxplot for values where TestYear != TrainYear
-    fig, ax = plot_boxplot(df, 'Endogenous electricity demands')
-    fig.savefig('Workflow/OverallResults/boxplot_testyears.png', )
+    df, fig, ax = plot_boxplot(df, 'Endogenous electricity demands')
+    fig.savefig('Workflow/OverallResults/boxplot_endodemand_comparison.png')
 
+    # Print mean
+    print('Mean of difference through all test years:  ', df.query('Category=="Test Years"').Value.mean().round(2))
+    print('Mean of difference through train years only:', df.query('Category=="Train Years"').Value.mean().round(2))
 
 
 if __name__ == "__main__":
