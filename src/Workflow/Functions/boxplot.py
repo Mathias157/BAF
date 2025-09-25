@@ -35,7 +35,7 @@ def get_difference_table(
     scenario_regex: str = "eco-(.+)_fullyear",
     column_to_extract_columns_from: str = "AntaresFile",
     column_to_extract_scenario_from: str = "AntaresFile",
-    abslute_difference: bool = True,
+    absolute_difference: bool = True,
 ):
     f = pd.read_csv(filename)
 
@@ -61,7 +61,7 @@ def get_difference_table(
         aggfunc="sum",
     )
 
-    if abslute_difference:
+    if absolute_difference:
         df_diff = ((df_antares - df_balmorel) / df_balmorel * 100).abs()
     else:
         df_diff = (df_antares - df_balmorel) / df_balmorel * 100
@@ -84,6 +84,7 @@ def collect_and_concat_dataframes():
             int,
             r"eco-(.+)\_wy",
             "BalmorelFile",
+            absolute_difference=False
         )
 
         formatted_df = (
@@ -101,54 +102,75 @@ def collect_and_concat_dataframes():
 
     return collected_df
 
-
-def plot_boxplot(df: pd.DataFrame):
+def plot_boxplot(df: pd.DataFrame, title: str):
     """
-    Plot boxplot of values where TestYear != TrainYear, grouped by Region.
+    Plot boxplot of values with separate boxes for test years and train years
     
     Parameters:
     df: DataFrame with columns Value, Region, TestYear, TrainYear
     """
-    # Filter for rows where TestYear != TrainYear
-    filtered_df = df[df['TestYear'] != df['TrainYear']].copy()
+    # Mark train and test years
+    df.loc[:, 'Category'] = 'Test Years'
+    df.loc[df.eval('TestYear == TrainYear'), 'Category'] = 'Train Years'
     
-    # Get unique regions for x-axis
-    regions = sorted(pd.Series(filtered_df['Region']).unique().tolist())
+    # Get unique scenarios for x-axis
+    scenarios = ['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']
     
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(12, 6))
     
-    # Prepare data for boxplot - one box per region
-    data_for_plot = []
-    for region in regions:
-        region_data = np.array(filtered_df[filtered_df['Region'] == region]['Value'].tolist())
-        data_for_plot.append(region_data)
+    # Prepare data for boxplot - separate data for test years and train years
+    test_data = []
+    train_data = []
     
-    # Create boxplot
-    bp = ax.boxplot(data_for_plot, patch_artist=True)
+    for scenario in scenarios:
+        # Test years data
+        test_scenario_data = df.query('Scenario == @scenario and Category == "Test Years"').Value.tolist()
+        test_data.append(test_scenario_data)
+        
+        # Train years data  
+        train_scenario_data = df.query('Scenario == @scenario and Category == "Train Years"').Value.tolist()
+        train_data.append(train_scenario_data)
     
-    # Set x-axis labels
-    ax.set_xticklabels(regions)
+    # Calculate positions for the boxplots (side by side)
+    positions_test = [i - 0.2 for i in range(1, len(scenarios) + 1)]
+    positions_train = [i + 0.2 for i in range(1, len(scenarios) + 1)]
     
-    # Style the boxplot
-    for patch in bp['boxes']:
+    # Create boxplots
+    bp1 = ax.boxplot(test_data, positions=positions_test, widths=0.35, 
+                     patch_artist=True, whis=(0.0, 100.0))
+    bp2 = ax.boxplot(train_data, positions=positions_train, widths=0.35, 
+                     patch_artist=True, whis=(0.0, 100.0))
+    
+    # Style the boxplots with different colors
+    for patch in bp1['boxes']:
+        patch.set_facecolor('lightcoral')
+        patch.set_alpha(0.7)
+    
+    for patch in bp2['boxes']:
         patch.set_facecolor('lightblue')
         patch.set_alpha(0.7)
+    
+    # Set x-axis labels at the center positions
+    ax.set_xticks(range(1, len(scenarios) + 1))
+    ax.set_xticklabels(scenarios)
+    
+    # Create legend
+    from matplotlib.patches import Patch
+    legend_elements = [Patch(facecolor='lightcoral', alpha=0.7, label='Test Years'),
+                      Patch(facecolor='lightblue', alpha=0.7, label='Train Years')]
+    ax.legend(handles=legend_elements, loc='upper right')
     
     # Add labels and title
     ax.set_xlabel('Region', fontsize=12)
     ax.set_ylabel('Relative Difference (%)', fontsize=12)
-    ax.set_title('PtX Demand Deviations (Test Year ≠ Train Year)', fontsize=14)
+    ax.set_title(title, fontsize=14)
+    ax.set_ylim(-100, 100)
     ax.grid(True, alpha=0.3, axis='y')
     
-    # Rotate x-axis labels if many regions
-    if len(regions) > 10:
-        plt.xticks(rotation=45, ha='right')
-    
     plt.tight_layout()
-    
-    return fig, ax
 
+    return fig, ax
 
 # ------------------------------- #
 #            2. Main              #
@@ -160,8 +182,9 @@ def main():
     df = collect_and_concat_dataframes()
     
     # Plot the boxplot for values where TestYear != TrainYear
-    fig, ax = plot_boxplot(df)
-    plt.show()
+    fig, ax = plot_boxplot(df, 'Endogenous electricity demands')
+    fig.savefig('Workflow/OverallResults/boxplot_testyears.png', )
+
 
 
 if __name__ == "__main__":
