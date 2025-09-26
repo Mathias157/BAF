@@ -192,14 +192,14 @@ def main(scenario_folder: str):
                     2012, 2013, 2014, 2015, 2016]
     
     for weather_year in weather_years:
-        
+
         # Change weather year before preprocessing
         config.set('PreProcessing', 'balmorel_weather_year', str(weather_year))
         store_config(config)
-        
+
         # Preprocess data
         os.system('pixi run preprocessing -F --rerun-incomplete')
-                
+
         # Get parameters
         export_to_generative_model(scenario_folder, weather_year, 'Pre-Processing/Output/genmodel_data_WY%d.csv', gams_system_directory=gams_system_directory)
 

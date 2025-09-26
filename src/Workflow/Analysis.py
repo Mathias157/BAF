@@ -153,7 +153,7 @@ def get_antares_results(ctx,
         
         pro_hourly[iteration][year] = {}
         if not(year == str(ctx.obj['ref_year']) and ctx.obj['i'] != 0):
-            ant_output = ctx.obj['antares_output'][ctx.obj['antares_output'].str.find(('eco-' + ctx.obj['SC'] + '_iter%d_y-%s'%(ctx.obj['i'], year)).lower().replace('+', ' ')) != -1].values[0]
+            ant_output = ctx.obj['antares_output'][ctx.obj['antares_output'].str.find('_iter%d_y-%s'%(ctx.obj['i'], year)) != -1].values[0]
             print('\nReading results from %s..\n'%ant_output)
             
             # Load class
@@ -578,6 +578,11 @@ def store_and_zip(ctx):
 
 def plot_annual_electricity_generation(results: dict, **kwargs):
     pro = results["pro"]
+
+    if kwargs.get('region') != 'all':
+        region = kwargs.get('region')
+        pro = pro.query(f'R == "{region}"')
+
     fig, ax = plt.subplots()
     pro.pivot_table(index="Model", columns="F", values="Value", aggfunc="sum").plot(
         ax=ax, kind="bar", stacked=True, color=balmorel_colours
@@ -682,8 +687,9 @@ def CLI(ctx, dark):
 
 @CLI.command()
 @click.argument('scenario', type=str)
+@click.option('--mc-year', type=str, default='mc-all', help="MC year to collect Antares results from, e.g. mc-all (default) or 00001, 00002, ...")
 @click.pass_context
-def collect_results(ctx, scenario: str):
+def collect_results(ctx, scenario: str, mc_year: str):
     
     Config = configparser.ConfigParser()
     Config.read('Workflow/MetaResults/%s_meta.ini'%scenario)
@@ -723,13 +729,15 @@ def collect_results(ctx, scenario: str):
 
     ### 0.4 Which results to import?
     ant_out = pd.Series(os.listdir(ctx.obj['wk_dir'] + '/Antares/output'))
-    ant_out = ant_out[ant_out.str.find(('eco-' + scenario + '_iter').lower().replace('+',' ')) != -1].sort_values(ascending=False)
+    ant_out = ant_out[ant_out.str.find(('eco-' + scenario.replace('dispatch_', '').lower() + '_cl1344_iter').lower().replace('+',' ')) != -1].sort_values(ascending=False)
+    # ant_out = pd.Series(['20250923-0522eco-noh_wy2000_cl1344_iter0_y-2050']) # Uncomment to select specific run instead of trying to match
     ctx.obj['antares_output'] = ant_out
 
     # Find iterations
-    iters = list(ant_out.str.split('_iter', expand=True).iloc[:,1].str.split('_y-',expand=True).iloc[:,0].astype(int)) 
-    iters = pd.Series(iters).unique()
-    iters.sort()
+    # iters = list(ant_out.str.split('_iter', expand=True).iloc[:,1].str.split('_y-',expand=True).iloc[:,0].astype(int)) 
+    # iters = pd.Series(iters).unique()
+    # iters.sort()
+    iters = [0]
     ctx.obj['iters'] = iters
     print('\nIterations as read from Antares output: %d'%len(iters))
 
@@ -753,7 +761,7 @@ def collect_results(ctx, scenario: str):
     #        'hydrogen', 'lightoil', 'lignite', 'muniwaste', 'natgas',
     #        'nuclear', 'straw', 'sun', 'wasteheat', 'water', 'wind',
     #        'woodchips', 'woodpellets', 'woodwaste'], dtype=object)
-    ctx.obj['mc_choice'] = 'mc-all' # MC year in Antares for generation results
+    ctx.obj['mc_choice'] = mc_year # MC year in Antares for generation results
     for j in iters:
         ctx.obj['i'] = j
         obj, cap, cap_F, eltrans, h2trans, dem, curt, pro, proH2, emi = get_balmorel_results(obj, cap, cap_F, eltrans, h2trans, dem, pro, proH2, emi)
@@ -764,6 +772,8 @@ def collect_results(ctx, scenario: str):
                                                            emi)
         
     # Store pickle file with all dataframes
+    if mc_year != 'mc-all':
+        scenario = scenario + '_' + mc_year
     with open('Workflow/OverallResults/%s_results.pkl'%scenario, 'wb') as f:
         pickle.dump({'obj' : obj,
                     'Aobj' : Antobj,
@@ -785,57 +795,70 @@ def collect_results(ctx, scenario: str):
     default=False,
     help="Collect results again, even if it exists",
 )
+@click.option("--region", type=str, default='all', help="Regional scope")
+@click.option('--mc-year', type=str, default='mc-all', help="MC year to collect Antares results from, e.g. mc-all (default) or 00001, 00002, ...")
 @click.pass_context
-def plot(ctx, scenario, overwrite):
+def plot_all(ctx, scenario, overwrite, region, mc_year):
     # Collect results if overwrite or if it doesn't exist
-    result_path = Path(f"Workflow/OverallResults/{scenario}_results.pkl")
+    if mc_year == 'mc-all':
+        result_path = Path(f"Workflow/OverallResults/{scenario}_results.pkl")
+        plot_name = f'{scenario}'
+    else:
+        result_path = Path(f"Workflow/OverallResults/{scenario}_{mc_year}_results.pkl")
+        plot_name = f'{scenario}_{mc_year}'
+
     if not result_path.exists() or overwrite:
         print(f"Collecting {scenario} results...")
-        ctx.invoke(collect_results, scenario=scenario)
+        ctx.invoke(collect_results, scenario=scenario, mc_year=mc_year)
+
+    # Include region in plot_name if specified
+    if region != 'all':
+        plot_name += f'_{region}'
 
     # Load results
     with open(str(result_path), "rb") as f:
         results = pickle.load(f)
 
     # Annual electricity generation
-    fig, _ = plot_annual_electricity_generation(results, facecolor=ctx.obj["fc"])
+    fig, _ = plot_annual_electricity_generation(results, facecolor=ctx.obj["fc"],
+                                                region=region)
     fig.savefig(
-        f"Workflow/OverallResults/{scenario}_elec_gen.png",
+        f"Workflow/OverallResults/{plot_name}_elec_gen.png",
         bbox_inches="tight",
         transparent=True,
     )
     plt.close(fig)
 
-    region = 'all'
-    for week in range(1, 53):
-        # Electricity generating profile per week
-        fig_ant, ax_ant = plot_antares_hourly_electricity_generation(
-            results["pro_hourly"], regions=region,week=week,
-        )
-
-        fig_balm, ax_balm = plot_balmorel_hourly_electricity_generation(
-            scenario, week=week, region=region
-        )
-
-        # Find highest ylim
-        ant_ylims = ax_ant.get_ylim()
-        balm_ylims = ax_balm.get_ylim()
-        max_ylim = np.max([ant_ylims[1], balm_ylims[1]])
-        ax_ant.set_ylim(0, max_ylim)
-        ax_balm.set_ylim(0, max_ylim)
-
-        fig_ant.savefig(
-            f"Workflow/OverallResults/{scenario}_W{week}_{region}_antares_elec_gen_hourly.png",
-            bbox_inches="tight",
-            transparent=True,
-        )
-        fig_balm.savefig(
-            f"Workflow/OverallResults/{scenario}_W{week}_{region}_balmorel_elec_gen_hourly.png",
-            bbox_inches="tight",
-            transparent=True,
-        )
-        plt.close(fig_ant)
-        plt.close(fig_balm)
+    # region = 'all'
+    # for week in range(1, 53):
+    #     # Electricity generating profile per week
+    #     fig_ant, ax_ant = plot_antares_hourly_electricity_generation(
+    #         results["pro_hourly"], regions=region,week=week,
+    #     )
+    #
+    #     fig_balm, ax_balm = plot_balmorel_hourly_electricity_generation(
+    #         scenario, week=week, region=region
+    #     )
+    #
+    #     # Find highest ylim
+    #     ant_ylims = ax_ant.get_ylim()
+    #     balm_ylims = ax_balm.get_ylim()
+    #     max_ylim = np.max([ant_ylims[1], balm_ylims[1]])
+    #     ax_ant.set_ylim(0, max_ylim)
+    #     ax_balm.set_ylim(0, max_ylim)
+    #
+    #     fig_ant.savefig(
+    #         f"Workflow/OverallResults/{scenario}_W{week}_{region}_antares_elec_gen_hourly.png",
+    #         bbox_inches="tight",
+    #         transparent=True,
+    #     )
+    #     fig_balm.savefig(
+    #         f"Workflow/OverallResults/{scenario}_W{week}_{region}_balmorel_elec_gen_hourly.png",
+    #         bbox_inches="tight",
+    #         transparent=True,
+    #     )
+    #     plt.close(fig_ant)
+    #     plt.close(fig_balm)
 
 @CLI.command()
 def plot_virginie_clustering_table():
