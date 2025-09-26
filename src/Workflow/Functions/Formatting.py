@@ -52,16 +52,32 @@ def stacked_bar(df, axis, legend, ax='None', args='None'):
     # df.groupby([r for r in axis + legend]).aggregate(np.sum).unstack().plot(y='Value', x=axis, kind='bar', stacked=True, **args)
     df.pivot_table(columns=legend, index=axis).plot(kind='bar', stacked=True, **args)
 
+def cmcrameri_style(colourmap: str = 'batlowKS', 
+                    steps: list | range = range(256), 
+                    dark: bool = False):
+    """Style matplotlib plots with colour-deficiency friendly colours"""
+
+    import cmcrameri.cm as cmc
+
+    if dark:
+        color_list = [getattr(cmc, colourmap)(i) for i in steps[::-1]]
+    else:
+        color_list = [getattr(cmc, colourmap)(i) for i in steps]
+
+    plt.rcParams['axes.prop_cycle'] = plt.cycler(color=color_list)
+    plt.rcParams['image.cmap'] = f'cmc.{colourmap}' 
 
 def set_style(style):
     if style == 'report':
         plt.style.use('default')
         fc = 'white'
         plotly_theme = 'plotly'
+        dark = False
     elif style == 'ppt':
         plt.style.use('dark_background')
         fc = 'none'
         plotly_theme = 'plotly_dark'
+        dark = True
 
     # 0.1 Custom colormap  
     # Importing a custom colormap, adequate for communicating to people with colour-vision deficiency or colour-blindness
@@ -74,17 +90,7 @@ def set_style(style):
     # to install:
     # pip install cmcrameri
     try: 
-        import cmcrameri.cm as cmc
-        print('Using colormap adequate for color-deficient and -blind communication')
-        
-        if style == 'report':
-            # color_list = [cmc.batlow(i) for i in [0, 126, 256, 189, 80, 150]] # Custom discrete colours
-            color_list = [cmc.batlowWS(i) for i in range(1, 256)] # batlowS is a categorical
-        elif style == 'ppt':
-            color_list = [cmc.batlowKS(i) for i in range(1, 256)] # batlowS is a categorical
-            
-        plt.rcParams['axes.prop_cycle'] = plt.cycler(color=color_list)
-        plt.rcParams['image.cmap'] = 'cmc.batlow'
+        cmcrameri_style(dark=dark)
     except ModuleNotFoundError:
         print('Using default colormap')
         

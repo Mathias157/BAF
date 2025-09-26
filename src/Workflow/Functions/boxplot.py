@@ -18,6 +18,7 @@ Created on 24.09.2025
 # ------------------------------- #
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import pandas as pd
 import numpy as np
 import click
@@ -102,7 +103,7 @@ def collect_and_concat_dataframes():
 
     return collected_df
 
-def plot_boxplot(df: pd.DataFrame, title: str):
+def plot_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
     """
     Plot boxplot of values with separate boxes for test years and train years
     
@@ -112,6 +113,14 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     # Mark train and test years
     df.loc[:, 'YearType'] = 'Test Years'
     df.loc[df.eval('TestYear == TrainYear'), 'YearType'] = 'Train Years'
+    
+    if average_regions:
+        # Do average across regions 
+        df = df.pivot_table(
+            index=list(df.columns.drop(['Region', 'Value'])),
+            values='Value',
+            aggfunc=lambda x: np.mean(np.abs(x))
+        ).reset_index()
     
     # Get unique scenarios for x-axis
     scenarios = ['NoH', 'NoH2', 'H2', 'H2LSS', 'H2LSSH2T']
@@ -163,16 +172,18 @@ def plot_boxplot(df: pd.DataFrame, title: str):
     ax.set_xticklabels(scenarios)
     
     # Create legend
-    from matplotlib.patches import Patch
     legend_elements = [Patch(facecolor='lightcoral', alpha=0.7, label='Test Years'),
                       Patch(facecolor='lightblue', alpha=0.7, label='Train Years')]
     ax.legend(handles=legend_elements, loc='upper right')
     
     # Add labels and title
-    ax.set_xlabel('Scenario', fontsize=12)
-    ax.set_ylabel('Relative Difference (%)', fontsize=12)
     ax.set_title(title, fontsize=14)
-    ax.set_ylim(-100, 100)
+    if not(average_regions):
+        ax.set_ylabel('Relative Difference (%)', fontsize=12)
+        ax.set_ylim(-100, 100)
+    else:
+        ax.set_ylabel('Absolute Relative Difference (%)', fontsize=12)
+        ax.set_ylim(0, 100)
     ax.grid(True, alpha=0.3, axis='y')
     
     plt.tight_layout()
@@ -188,9 +199,13 @@ def plot_boxplot(df: pd.DataFrame, title: str):
 def main():
     df = collect_and_concat_dataframes()
     
-    # Plot the boxplot for values where TestYear != TrainYear
-    df, fig, ax = plot_boxplot(df, 'Endogenous electricity demands')
+    # Plot the boxplot for all data
+    df, fig, ax = plot_boxplot(df, 'Endogenous electricity demands - average error for all regions and WY')
     fig.savefig('Workflow/OverallResults/boxplot_endodemand_comparison.png')
+
+    # Plot the boxplot for system (aggregated absolute error across regions)
+    df, fig, ax = plot_boxplot(df, 'Endogenous electricity demands - average absolute error for system for all WY', True)
+    fig.savefig('Workflow/OverallResults/boxplot_endodemand_comparison_averageregions.png')
 
     # Print mean
     print('Mean of difference through all test years:    \n', df.query('YearType=="Test Years"').pivot_table(index='Scenario', columns='Category', values='Value', aggfunc='mean').round(2))
