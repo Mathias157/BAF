@@ -1027,7 +1027,7 @@ def plot_multiweather_table(weather_year: int):
 @click.argument('balmorel_scenario', type=str, default='h2_dispatch_WY1983')
 @click.argument('balmorel_scfolder', type=str, default='h2')
 @click.argument('antares_scenario', type=str, default='20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050')
-@click.argument('mc-year', type=str, default='00035')
+@click.argument('mc-year', type=str, default='00002')
 @click.option('--temporal', type=str, default='weekly', help="The choice of temporal aggregation for the result")
 @click.option('--plot', is_flag=True, default=False, help="Plot the series or not")
 @click.option('--overwrite', is_flag=True, default=False, help="Overwrite collected results")
@@ -1091,26 +1091,61 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
     # Calculate average production for each technology in each region
     technologies = set(balmorel_production.index.get_level_values(3)) | set(antares_production.index.get_level_values(2))
     regions = set(balmorel_production.index.get_level_values(2))
+    data = []
     for commodity in ['HEAT', 'HYDROGEN']:
         for region in regions:
             for technology in technologies:
+                total_ptx_el_supply_balm = ptx_balm.loc[:,:,region,commodity].Value.sum()
                 try:
-                    total_ptx_el_supply = ptx_balm.loc[:,:,region,commodity].Value.sum()
                     average_production_balmorel = balmorel_production.loc[:, :, region, technology].Value.mean()
-                    weighted_average_production_balmorel = balmorel_production.loc[:,:,region, technology].mul(ptx_balm.loc[:,:,region,commodity]/total_ptx_el_supply, fill_value=0).Value.sum()
-                    print(f'{np.round(average_production_balmorel/1e3, 2)} GWh mean {technology} prod. in {region} for Balmorel')
-                    print(f'{np.round(weighted_average_production_balmorel/1e3, 2)} GWh mean {technology} prod. at {commodity} electricity demand in {region} for Balmorel')
+                    weighted_average_production_balmorel = balmorel_production.loc[:,:,region, technology].mul(ptx_balm.loc[:,:,region,commodity]/total_ptx_el_supply_balm, fill_value=0).Value.sum()
+                    # print(f'{np.round(average_production_balmorel/1e3, 2)} GWh mean {technology} prod. in {region} for Balmorel')
+                    # print(f'{np.round(weighted_average_production_balmorel/1e3, 2)} GWh mean {technology} prod. at {commodity} electricity demand in {region} for Balmorel')
                 except KeyError:
+                    average_production_balmorel = 0
+                    weighted_average_production_balmorel = 0
                     print(f'No {technology} in {region} for Balmorel')
 
+                total_ptx_el_supply_ant = ptx_ant.loc[:,region,commodity].Value.sum()
                 try:
-                    total_ptx_el_supply = ptx_ant.loc[:,region,commodity].Value.sum()
                     average_production_antares = antares_production.loc[:, region, technology].Value.mean()
-                    weighted_average_production_antares = antares_production.loc[:,region, technology].mul(ptx_ant.loc[:,region,commodity]/total_ptx_el_supply, fill_value=0).Value.sum()
-                    print(f'{np.round(average_production_antares/1e3, 2)} GWh mean {technology} prod. in {region} for Antares')
-                    print(f'{np.round(weighted_average_production_antares/1e3, 2)} GWh mean {technology} prod. at {commodity} electricity demand in {region} for Antares')
+                    weighted_average_production_antares = antares_production.loc[:,region, technology].mul(ptx_ant.loc[:,region,commodity]/total_ptx_el_supply_ant, fill_value=0).Value.sum()
+                    # print(f'{np.round(average_production_antares/1e3, 2)} GWh mean {technology} prod. in {region} for Antares')
+                    # print(f'{np.round(weighted_average_production_antares/1e3, 2)} GWh mean {technology} prod. at {commodity} electricity demand in {region} for Antares')
                 except KeyError:
+                    average_production_antares = 0
+                    weighted_average_production_antares = 0
                     print(f'No {technology} in {region} for Antares')
+
+                data.append([commodity, region, technology,
+                             total_ptx_el_supply_ant, average_production_antares, weighted_average_production_antares,
+                             total_ptx_el_supply_balm, average_production_balmorel, weighted_average_production_balmorel])
+
+    df = pd.DataFrame(data, columns=['Commodity', 'Region', 'Technology',
+                                     'PtX El Demand Antares','Mean Production Antares','Weighted Mean Production Antares',
+                                     'PtX El Demand Balmorel','Mean Production Balmorel','Weighted Mean Production Balmorel'])
+
+    fig, ax = plt.subplots()
+    df.pivot_table(index=['Commodity', 'Region'],
+                   columns='Technology',
+                   values='Weighted Mean Production Balmorel').plot(ax=ax,
+                                                                    kind='bar',
+                                                                    stacked=True,
+                                                                    position=0,
+                                                                   width=0.4,
+                                                                   label='Balmorel')
+    df.pivot_table(index=['Commodity', 'Region'],
+                   columns='Technology',
+                   values='Weighted Mean Production Antares').plot(ax=ax,
+                                                                    kind='bar',
+                                                                    stacked=True,
+                                                                    position=1.1,
+                                                                   width=0.4,
+                                                                   label='Antares')
+    ax.legend(loc='center left', bbox_to_anchor=(1.01, .5))
+    _, max_val = ax.get_ylim()
+    ax.annotate('Left: Balmorel, Right: Antares', (0, max_val*.95))
+    plt.show()
 
 if __name__ == "__main__":
     CLI()
