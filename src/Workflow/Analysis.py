@@ -904,7 +904,10 @@ def plot_multiweather_table(weather_year: int):
 @click.argument('balmorel_scfolder', type=str, default='h2')
 @click.argument('antares_scenario', type=str, default='20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050')
 @click.argument('mc-year', type=str, default='00035')
-def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year):
+@click.option('--temporal', type=str, default='weekly', help="The choice of temporal aggregation for the result")
+@click.option('--plot', is_flag=True, default=False, help="Plot the series or not")
+def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year, 
+                 temporal, plot):
 
     # Get files
     balmorel_output = MainResults(f'MainResults_{balmorel_scenario}_Iter0.gdx', 
@@ -925,7 +928,7 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
     df_balm = (
         df_balm
         .pivot_table(
-            index=['Season', 'Region', 'Technology'],
+            index=['Season', 'Region', 'Technology'] if temporal == 'weekly' else ['Season', 'Time', 'Region', 'Technology'],
             values='Value',
             aggfunc='sum'
         )
@@ -937,12 +940,12 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
         for commodity in commodities:
             temp = antares_output.load_link_results(
                 [region, f'{region}_{commodity}'],
-                temporal='weekly',
+                temporal=temporal,
                 mc_year=mc_year
             )
             temp['Region'] = region
             temp['Commodity'] = commodity
-            df_ant = pd.concat((df_ant, temp[['weekly', 'Region', 'Commodity', 'FLOW LIN.']]),
+            df_ant = pd.concat((df_ant, temp[[temporal, 'Region', 'Commodity', 'FLOW LIN.']]),
                                ignore_index=True)
 
     df_ant = (
@@ -954,18 +957,19 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
         )
     )
 
-    for commodity in commodities:
-        fig, axes = plt.subplots(3)
-        
-        for i, region in enumerate(regions):
-            df_balm.loc[:, region, commodity].plot(ax=axes[i], label='Balmorel')
-            df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
-            axes[i].set_ylabel(region)
-            axes[i].legend(('Balmorel', 'Antares'))
+    if plot:
+        for commodity in commodities:
+            fig, axes = plt.subplots(3)
+            
+            for i, region in enumerate(regions):
+                df_balm.loc[:, region, commodity].plot(ax=axes[i], label='Balmorel')
+                df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
+                axes[i].set_ylabel(region)
+                axes[i].legend(('Balmorel', 'Antares'))
 
-        axes[0].set_title(commodity)
+            axes[0].set_title(commodity)
 
-        plt.show()
+            plt.show()
 
 
 if __name__ == "__main__":
