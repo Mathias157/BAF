@@ -899,5 +899,74 @@ def plot_multiweather_table(weather_year: int):
     print(f'Average deviation for trained weather year: {df_diff_mean.loc[:, weather_year].mean().round(2)}')
     print(f'Average deviation for other weather years:  {df_diff_mean.loc[:, df_diff_mean.columns.drop(weather_year)].mean().mean().round(2)}')
 
+@CLI.command()
+@click.argument('balmorel_scenario', type=str, default='h2_dispatch_WY1983')
+@click.argument('balmorel_scfolder', type=str, default='h2')
+@click.argument('antares_scenario', type=str, default='20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050')
+@click.argument('mc-year', type=str, default='00035')
+def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year):
+
+    # Get files
+    balmorel_output = MainResults(f'MainResults_{balmorel_scenario}_Iter0.gdx', 
+                                  f'Balmorel/{balmorel_scfolder}/model',
+                                  system_directory='/opt/gams/50.4/')
+    antares_output  = AntaresOutput(antares_scenario)
+    
+    # Get Balmorel series 
+    df_balm = (
+        balmorel_output
+        .get_result('F_CONS_YCRAST')
+        .query('Fuel == "ELECTRIC"')
+        .query('Technology in ["ELECT-TO-HEAT", "ELECTROLYZER"]')
+        .replace({'Technology' : 'ELECT-TO-HEAT'}, 'HEAT')
+        .replace({'Technology' : 'ELECTROLYZER'}, 'HYDROGEN')
+    )
+    df_balm.Season = df_balm.Season.str.replace('S', '').astype(int)
+    df_balm = (
+        df_balm
+        .pivot_table(
+            index=['Season', 'Region', 'Technology'],
+            values='Value',
+            aggfunc='sum'
+        )
+    )
+    regions = ['ES', 'FR', 'DE']
+    commodities = ['HEAT', 'HYDROGEN']
+    df_ant = pd.DataFrame()
+    for region in regions:
+        for commodity in commodities:
+            temp = antares_output.load_link_results(
+                [region, f'{region}_{commodity}'],
+                temporal='weekly',
+                mc_year=mc_year
+            )
+            temp['Region'] = region
+            temp['Commodity'] = commodity
+            df_ant = pd.concat((df_ant, temp[['weekly', 'Region', 'Commodity', 'FLOW LIN.']]),
+                               ignore_index=True)
+
+    df_ant = (
+        df_ant
+        .pivot_table(
+            index=['weekly', 'Region', 'Commodity'],
+            values='FLOW LIN.',
+            aggfunc='sum'
+        )
+    )
+
+    for commodity in commodities:
+        fig, axes = plt.subplots(3)
+        
+        for i, region in enumerate(regions):
+            df_balm.loc[:, region, commodity].plot(ax=axes[i], label='Balmorel')
+            df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
+            axes[i].set_ylabel(region)
+            axes[i].legend(('Balmorel', 'Antares'))
+
+        axes[0].set_title(commodity)
+
+        plt.show()
+
+
 if __name__ == "__main__":
     CLI()
