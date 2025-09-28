@@ -58,9 +58,10 @@ def get_balmorel_results(ctx,
                          ):
     
     ### 1.2 Load Balmorel Results
-    print('Reading results from Balmorel/%s/model/MainResults_%s_Iter%d.gdx..'%(ctx.obj['SC_folder'], ctx.obj['SC'], ctx.obj['i']))
+    balmorel_result = 'Balmorel/%s/model/MainResults_%s_Iter%d.gdx'%(ctx.obj['SC_folder'], ctx.obj['SC'], ctx.obj['i'])
+    print(f'Reading results from {balmorel_result}...')
     ws = gams.GamsWorkspace(system_directory=ctx.obj['gams_system_directory'])  
-    db = ws.add_database_from_gdx(ctx.obj['wk_dir'] + "/Balmorel/%s/model/MainResults_%s_Iter%d.gdx"%(ctx.obj['SC_folder'], ctx.obj['SC'], ctx.obj['i']))
+    db = ws.add_database_from_gdx(ctx.obj['wk_dir'] + "/%s"%(balmorel_result))
 
     ## Get objective function
     temp = symbol_to_df(db, 'OBJ_YCR', ['Y', 'C', 'R', 'Var', 'Unit', 'Value'])
@@ -136,7 +137,7 @@ def get_balmorel_results(ctx,
     temp = temp.groupby(['Model', 'Iter', 'Y', 'R']).aggregate({'Value' : 'sum'})
     emi = pd.concat((emi, temp))
     
-    return obj, cap, cap_F, eltrans, h2trans, dem, curt, pro, proH2, emi
+    return obj, cap, cap_F, eltrans, h2trans, dem, curt, pro, proH2, emi, balmorel_result
 
 @click.pass_context
 def get_antares_results(ctx,
@@ -153,7 +154,7 @@ def get_antares_results(ctx,
         
         pro_hourly[iteration][year] = {}
         if not(year == str(ctx.obj['ref_year']) and ctx.obj['i'] != 0):
-            ant_output = ctx.obj['antares_output'][ctx.obj['antares_output'].str.find('_iter%d_y-%s'%(ctx.obj['i'], year)) != -1].values[0]
+            ant_output = ctx.obj['antares_output']
             print('\nReading mc-year %s results from %s..\n'%(ctx.obj['mc_choice'], ant_output))
             
             # Load class
@@ -230,6 +231,96 @@ def get_antares_results(ctx,
                 # print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'].sum())
                 
     return Antobj, pro, emi, pro_hourly
+
+@click.pass_context
+def get_ptx_demand_timeseries(ctx, balmorel_scenario: str, antares_scenario: str, 
+                              balmorel_scfolder: str, temporal: str = 'weekly',
+                              mc_year: str = 'mc-all', plot: bool = False,
+                              return_output_classes: bool = False):
+    """
+    Get electricity demands for power-to-heat and power-to-hydrogen across models
+
+    Args:
+       balmorel_scenario (str): The concrete Balmorel scenario to load.
+       antares_scenario (str): The concrete Antares scenario to load.
+       balmorel_scfolder (str): The scenario folder, where the Balmorel MainResults resides.
+       temporal (str): The temporal granularity of the timeseries, weekly or hourly.
+       mc_year (str): The monte-carlo year to read from Antares result.
+       plot (bool): Plot the series or not
+
+    Returns:
+       (pd.DataFrame, pd.DataFrame) | (pd.DataFrame, pd.DataFrame, MainResults, AntaresOutput): Dataframes with Balmorel and Antares PtX electricity demands.
+       possibly including Balmorel and Antares output classes.
+    """
+    
+
+    # Get files
+    balmorel_output = MainResults(f'MainResults_{balmorel_scenario}_Iter0.gdx', 
+                                  f'Balmorel/{balmorel_scfolder}/model',
+                                  system_directory=ctx.obj['gams_system_directory'])
+    antares_output  = AntaresOutput(antares_scenario)
+
+    # Get Balmorel series 
+    df_balm = (
+        balmorel_output
+        .get_result('F_CONS_YCRAST')
+        .query('Fuel == "ELECTRIC"')
+        .query('Technology in ["ELECT-TO-HEAT", "ELECTROLYZER"]')
+        .replace({'Technology' : 'ELECT-TO-HEAT'}, 'HEAT')
+        .replace({'Technology' : 'ELECTROLYZER'}, 'HYDROGEN')
+    )
+    df_balm.Season = df_balm.Season.str.replace('S', '').astype(int)
+    df_balm = (
+        df_balm
+        .pivot_table(
+            index=['Season', 'Region', 'Technology'] if temporal == 'weekly' else ['Season', 'Time', 'Region', 'Technology'],
+            values='Value',
+            aggfunc='sum'
+        )
+    )
+    regions = ['ES', 'FR', 'DE']
+    commodities = ['HEAT', 'HYDROGEN']
+    df_ant = pd.DataFrame()
+    for region in regions:
+        for commodity in commodities:
+            temp = antares_output.load_link_results(
+                [region, f'{region}_{commodity}'],
+                temporal=temporal,
+                mc_year=mc_year
+            )
+            temp['Region'] = region
+            temp['Commodity'] = commodity
+            df_ant = pd.concat((df_ant, temp[[temporal, 'Region', 'Commodity', 'FLOW LIN.']]),
+                               ignore_index=True)
+
+    df_ant = (
+        df_ant
+        .pivot_table(
+            index=[temporal, 'Region', 'Commodity'],
+            values='FLOW LIN.',
+            aggfunc='sum'
+        )
+    )
+
+    if plot:
+        for commodity in commodities:
+            fig, axes = plt.subplots(3)
+            
+            for i, region in enumerate(regions):
+                df_balm.loc[:, region, commodity].plot(ax=axes[i], label='Balmorel')
+                df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
+                axes[i].set_ylabel(region)
+                axes[i].legend(('Balmorel', 'Antares'))
+
+            axes[0].set_title(commodity)
+
+            plt.show()
+
+    if not return_output_classes:
+        return df_balm, df_ant
+    else:
+        return df_balm, df_ant, balmorel_output, antares_output
+
 
 @click.pass_context
 def old_plotting(ctx, obj, cap, cap_F, pro, proH2, eltrans, dem, emi):
@@ -596,6 +687,39 @@ def plot_annual_electricity_generation(results: dict, **kwargs):
     return fig, ax
 
 
+def aggregate_antares_production(pro_hourly: dict, regions: str | list = 'all',
+                                 just_convert_to_df: bool = False):
+
+    if not just_convert_to_df:
+        df = None
+
+        # Aggregate to regional choice
+        if type(regions) is str:
+            if regions.lower() != "all":
+                df = pd.DataFrame(pro_hourly[regions])
+            else:
+                regions = list(pro_hourly.keys())
+
+        if type(regions) is list:
+            df = pd.DataFrame(pro_hourly[regions[0]])
+            for region in regions[1:]:
+                df = df.add(pd.DataFrame(pro_hourly[region]), fill_value=0)
+
+        if df is None:
+            raise ValueError("Wrong choice of regions")
+
+    else:
+        df = pd.DataFrame()
+
+        for region in list(pro_hourly.keys()):
+            temp = pd.DataFrame(pro_hourly[region]).stack().reset_index()
+            temp['Region'] = region
+            df = pd.concat((df, temp))
+
+        df.columns = ['hourly', 'Technology', 'Value', 'Region']
+
+    return df
+
 def plot_antares_hourly_electricity_generation(
     production_hourly: dict,
     iteration: int = 0,
@@ -604,23 +728,9 @@ def plot_antares_hourly_electricity_generation(
     regions: str | list = "all",
     **kwargs,
 ):
+
     antares_production = production_hourly[iteration][year]
-    df = None
-
-    # Aggregate to regional choice
-    if type(regions) is str:
-        if regions.lower() != "all":
-            df = pd.DataFrame(antares_production[regions])
-        else:
-            regions = list(antares_production.keys())
-
-    if type(regions) is list:
-        df = pd.DataFrame(antares_production[regions[0]])
-        for region in regions[1:]:
-            df = df.add(pd.DataFrame(antares_production[region]), fill_value=0)
-
-    if df is None:
-        raise ValueError("Wrong choice of regions")
+    df = aggregate_antares_production(antares_production)
 
     # Exclude SPILLED and make into GW
     df = (
@@ -630,9 +740,6 @@ def plot_antares_hourly_electricity_generation(
     )
 
     # Plot timeseries
-    with open("test.txt", "w") as f:
-        f.write(df.to_string())
-
     fig, ax = plt.subplots(figsize=kwargs.get("figsize", (9, 3)))
     df.loc[(week - 1) * 168 : week * 168].plot(
         ax=ax, stacked=True, kind="area", color=balmorel_colours
@@ -689,7 +796,7 @@ def CLI(ctx, dark):
 @click.argument('scenario', type=str)
 @click.option('--mc-year', type=str, default='mc-all', help="MC year to collect Antares results from, e.g. mc-all (default) or 00001, 00002, ...")
 @click.pass_context
-def collect_results(ctx, scenario: str, mc_year: str):
+def collect_results(ctx, scenario: str, mc_year: str, specific_antares_result: str | bool = False):
     
     Config = configparser.ConfigParser()
     Config.read('Workflow/MetaResults/%s_meta.ini'%scenario)
@@ -711,7 +818,6 @@ def collect_results(ctx, scenario: str, mc_year: str):
     years = years.astype(str)
     ctx.obj['years'] = years
     ctx.obj['ref_year'] = Config.getint('RunMetaData', 'ref_year')
-    ctx.obj['gams_system_directory'] = Config.get('RunMetaData', 'gams_system_directory')
 
     ### 0.1 Working Directory
     ctx.obj['wk_dir'] = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -728,9 +834,11 @@ def collect_results(ctx, scenario: str, mc_year: str):
         ctx.obj['ANTREGLIST'] = pickle.load(f)
 
     ### 0.4 Which results to import?
-    ant_out = pd.Series(os.listdir(ctx.obj['wk_dir'] + '/Antares/output'))
-    ant_out = ant_out[ant_out.str.find(('eco-' + scenario.replace('dispatch_', '').lower() + '_cl1344_iter').lower().replace('+',' ')) != -1].sort_values(ascending=False)
-    # ant_out = pd.Series(['20250923-0522eco-noh_wy2000_cl1344_iter0_y-2050']) # Uncomment to select specific run instead of trying to match
+    if not(specific_antares_result):
+        ant_out = pd.Series(os.listdir(ctx.obj['wk_dir'] + '/Antares/output'))
+        ant_out = ant_out[ant_out.str.find(('eco-' + scenario.replace('dispatch_', '').lower() + '_cl1344_iter').lower().replace('+',' ')) != -1].sort_values(ascending=False).values[0]
+    else:
+        ant_out = specific_antares_result
     ctx.obj['antares_output'] = ant_out
 
     # Find iterations
@@ -764,7 +872,7 @@ def collect_results(ctx, scenario: str, mc_year: str):
     ctx.obj['mc_choice'] = mc_year # MC year in Antares for generation results
     for j in iters:
         ctx.obj['i'] = j
-        obj, cap, cap_F, eltrans, h2trans, dem, curt, pro, proH2, emi = get_balmorel_results(obj, cap, cap_F, eltrans, h2trans, dem, pro, proH2, emi)
+        obj, cap, cap_F, eltrans, h2trans, dem, curt, pro, proH2, emi, balmorel_result = get_balmorel_results(obj, cap, cap_F, eltrans, h2trans, dem, pro, proH2, emi)
         
         Antobj, pro, emi, pro_hourly = get_antares_results(years, 
                                                            Antobj, 
@@ -785,11 +893,15 @@ def collect_results(ctx, scenario: str, mc_year: str):
                     'pro' : pro,
                     'proh2' : proH2,
                     'pro_hourly' : pro_hourly,
-                    'emi' : emi}, f)
+                    'emi' : emi,
+                    'antares_result' : ant_out,
+                    'balmorel_result' : balmorel_result}, 
+                    f)
 
 @click.pass_context
 def collect_or_load_results(ctx, scenario: str, region: str = 'all', 
-                            mc_year: str = 'mc-all', overwrite: bool = False):
+                            mc_year: str = 'mc-all', overwrite: bool = False,
+                            specific_antares_result: str | bool = False):
     # Collect results if overwrite or if it doesn't exist
     if mc_year == 'mc-all':
         result_path = Path(f"Workflow/OverallResults/{scenario}_results.pkl")
@@ -800,13 +912,15 @@ def collect_or_load_results(ctx, scenario: str, region: str = 'all',
 
     if not result_path.exists() or overwrite:
         print(f"Collecting {scenario} results...")
-        ctx.invoke(collect_results, scenario=scenario, mc_year=mc_year)
+        ctx.invoke(collect_results, scenario=scenario, mc_year=mc_year, 
+                   specific_antares_result=specific_antares_result)
 
     # Include region in plot_name if specified
     if region != 'all':
         plot_name += f'_{region}'
 
     # Load results
+    print(f'Loading {result_path}')
     with open(str(result_path), "rb") as f:
         results = pickle.load(f)
 
@@ -916,73 +1030,87 @@ def plot_multiweather_table(weather_year: int):
 @click.argument('mc-year', type=str, default='00035')
 @click.option('--temporal', type=str, default='weekly', help="The choice of temporal aggregation for the result")
 @click.option('--plot', is_flag=True, default=False, help="Plot the series or not")
+@click.option('--overwrite', is_flag=True, default=False, help="Overwrite collected results")
 def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year, 
-                 temporal, plot):
+                 temporal, plot, overwrite, iteration: int = 0, year: int = 2050):
 
-    # Get files
-    balmorel_output = MainResults(f'MainResults_{balmorel_scenario}_Iter0.gdx', 
-                                  f'Balmorel/{balmorel_scfolder}/model',
-                                  system_directory='/opt/gams/50.4/')
-    antares_output  = AntaresOutput(antares_scenario)
-    
-    # Get Balmorel series 
-    df_balm = (
-        balmorel_output
-        .get_result('F_CONS_YCRAST')
-        .query('Fuel == "ELECTRIC"')
-        .query('Technology in ["ELECT-TO-HEAT", "ELECTROLYZER"]')
-        .replace({'Technology' : 'ELECT-TO-HEAT'}, 'HEAT')
-        .replace({'Technology' : 'ELECTROLYZER'}, 'HYDROGEN')
-    )
-    df_balm.Season = df_balm.Season.str.replace('S', '').astype(int)
-    df_balm = (
-        df_balm
+    ptx_balm, ptx_ant, balmorel_output, antares_output = get_ptx_demand_timeseries(balmorel_scenario, antares_scenario, balmorel_scfolder,
+                                                                                   temporal='hourly', mc_year=mc_year, plot=plot, 
+                                                                                   return_output_classes=True)
+    ptx_ant = ptx_ant.rename(columns={'FLOW LIN.' : 'Value'})
+
+    results, plot_name = collect_or_load_results(balmorel_scenario, mc_year=mc_year, 
+                                                 specific_antares_result=antares_scenario, overwrite=overwrite)
+
+    # Get Antares production
+    antares_production = results['pro_hourly'][iteration][str(year)]
+    antares_production = (
+        aggregate_antares_production(antares_production, just_convert_to_df=True)
+        .replace({'WIND OFFSHORE' : 'WIND-OFF',
+                  'WIND ONSHORE' : 'WIND-ON',
+                  'SOLAR PV' : 'SOLAR-PV'})
         .pivot_table(
-            index=['Season', 'Region', 'Technology'] if temporal == 'weekly' else ['Season', 'Time', 'Region', 'Technology'],
+            index=['hourly', 'Region', 'Technology'],
             values='Value',
             aggfunc='sum'
         )
     )
-    regions = ['ES', 'FR', 'DE']
-    commodities = ['HEAT', 'HYDROGEN']
-    df_ant = pd.DataFrame()
-    for region in regions:
-        for commodity in commodities:
-            temp = antares_output.load_link_results(
-                [region, f'{region}_{commodity}'],
-                temporal=temporal,
-                mc_year=mc_year
-            )
-            temp['Region'] = region
-            temp['Commodity'] = commodity
-            df_ant = pd.concat((df_ant, temp[[temporal, 'Region', 'Commodity', 'FLOW LIN.']]),
-                               ignore_index=True)
 
-    df_ant = (
-        df_ant
+    # Get Balmorel Production
+    balmorel_curtailment = (
+        balmorel_output
+        .get_result('CURT_YCRAGFST')
+    )
+    balmorel_curtailment.SSS = balmorel_curtailment.SSS.str.replace('S', '').astype(int)
+    balmorel_curtailment = (
+        balmorel_curtailment
         .pivot_table(
-            index=['weekly', 'Region', 'Commodity'],
-            values='FLOW LIN.',
+            index=['SSS', 'TTT', 'RRR', 'TECH_TYPE'],
+            values='Value',
             aggfunc='sum'
         )
+    ) 
+    balmorel_curtailment.index.names = ['Season', 'Time', 'Region', 'Technology']
+
+    balmorel_production = (
+        balmorel_output
+        .get_result('PRO_YCRAGFST')
+        .query('Commodity == "ELECTRICITY"')
     )
+    balmorel_production.Season = balmorel_production.Season.str.replace('S', '').astype(int)
+    balmorel_production = (
+        balmorel_production
+        .pivot_table(
+            index=['Season', 'Time', 'Region', 'Technology'],
+            values='Value',
+            aggfunc='sum'
+        )
+        .sub(balmorel_curtailment, fill_value=0)
+    ) 
 
-    if plot:
-        for commodity in commodities:
-            fig, axes = plt.subplots(3)
-            
-            for i, region in enumerate(regions):
-                df_balm.loc[:, region, commodity].plot(ax=axes[i], label='Balmorel')
-                df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
-                axes[i].set_ylabel(region)
-                axes[i].legend(('Balmorel', 'Antares'))
+    # Calculate average production for each technology in each region
+    technologies = set(balmorel_production.index.get_level_values(3)) | set(antares_production.index.get_level_values(2))
+    regions = set(balmorel_production.index.get_level_values(2))
+    for commodity in ['HEAT', 'HYDROGEN']:
+        for region in regions:
+            for technology in technologies:
+                try:
+                    total_ptx_el_supply = ptx_balm.loc[:,:,region,commodity].Value.sum()
+                    average_production_balmorel = balmorel_production.loc[:, :, region, technology].Value.mean()
+                    weighted_average_production_balmorel = balmorel_production.loc[:,:,region, technology].mul(ptx_balm.loc[:,:,region,commodity]/total_ptx_el_supply, fill_value=0).Value.sum()
+                    print(f'{np.round(average_production_balmorel/1e3, 2)} GWh mean {technology} prod. in {region} for Balmorel')
+                    print(f'{np.round(weighted_average_production_balmorel/1e3, 2)} GWh mean {technology} prod. at {commodity} electricity demand in {region} for Balmorel')
+                except KeyError:
+                    print(f'No {technology} in {region} for Balmorel')
 
-            axes[0].set_title(commodity)
-
-            plt.show()
-
-    else:
-        return df_balm, df_ant
+                try:
+                    total_ptx_el_supply = ptx_ant.loc[:,region,commodity].Value.sum()
+                    average_production_antares = antares_production.loc[:, region, technology].Value.mean()
+                    weighted_average_production_antares = antares_production.loc[:,region, technology].mul(ptx_ant.loc[:,region,commodity]/total_ptx_el_supply, fill_value=0).Value.sum()
+                    print(f'{np.round(average_production_antares/1e3, 2)} GWh mean {technology} prod. in {region} for Antares')
+                    print(f'{np.round(weighted_average_production_antares/1e3, 2)} GWh mean {technology} prod. at {commodity} electricity demand in {region} for Antares')
+                except KeyError:
+                    print(f'No {technology} in {region} for Antares')
 
 if __name__ == "__main__":
     CLI()
