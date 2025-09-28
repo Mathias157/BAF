@@ -154,7 +154,7 @@ def get_antares_results(ctx,
         pro_hourly[iteration][year] = {}
         if not(year == str(ctx.obj['ref_year']) and ctx.obj['i'] != 0):
             ant_output = ctx.obj['antares_output'][ctx.obj['antares_output'].str.find('_iter%d_y-%s'%(ctx.obj['i'], year)) != -1].values[0]
-            print('\nReading results from %s..\n'%ant_output)
+            print('\nReading mc-year %s results from %s..\n'%(ctx.obj['mc_choice'], ant_output))
             
             # Load class
             ant_res = AntaresOutput(ant_output)
@@ -173,7 +173,7 @@ def get_antares_results(ctx,
                 
             ## Electricity
             for area in ctx.obj['A2B_regi'].keys(): 
-                print(f'\nProduction in {area}...\n')
+                # print(f'\nProduction in {area}...\n')
                 pro_hourly[iteration][year][area] = {}
                 pro_hourly[iteration][year][area]['INTRASEASONAL-ELECT-STORAGE'] = np.zeros(8736)
                 try:
@@ -195,7 +195,7 @@ def get_antares_results(ctx,
                         elif fuel == 'PSP':
                             pro.loc[year, 'Antares', area, 'ELECTRIC', 'PSP', ctx.obj['i']] = f[col].sum()/1e6
                             pro_hourly[iteration][year][area]['INTRASEASONAL-ELECT-STORAGE'] += f[col].values
-                        print(f'Production of {tech} {fuel} was ', f[col].sum()/1e6)
+                        # print(f'Production of {tech} {fuel} was ', f[col].sum()/1e6)
                         
                 except FileNotFoundError:
                     # print('No thermal generation in area %s'%area)
@@ -213,7 +213,7 @@ def get_antares_results(ctx,
                 for ren in ['WIND OFFSHORE', 'WIND ONSHORE', 'SOLAR PV']:
                     pro.loc[year, 'Antares', area, translation[ren], ren, ctx.obj['i']] = f[ren].sum()/ 1e6
                     pro_hourly[iteration][year][area][ren] = f[ren].values
-                    print(f'Production of {ren} was ', pro.loc[(year, 'Antares', area, translation[ren], ren, ctx.obj['i']), 'Value'].sum())
+                    # print(f'Production of {ren} was ', pro.loc[(year, 'Antares', area, translation[ren], ren, ctx.obj['i']), 'Value'].sum())
 
                 ## Spilled Energy (Mainly curtailment of VRE, but in principle thermal must-runs as well)
                 spilled = f['SPIL. ENRG'].sum()             
@@ -224,10 +224,10 @@ def get_antares_results(ctx,
                 # In area itself
                 pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']] = f.loc[:, 'H. STOR'].sum() / 1e6
                 pro_hourly[iteration][year][area]['HYDRO-RESERVOIRS'] = f['H. STOR'].values
-                print('Production of hydro-reservoirs was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']), 'Value'].sum())
+                # print('Production of hydro-reservoirs was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RESERVOIRS', ctx.obj['i']), 'Value'].sum())
                 pro.loc[year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']] = f.loc[:, 'H. ROR'].sum() / 1e6
                 pro_hourly[iteration][year][area]['HYDRO-RUN-OF-RIVER'] = f['H. ROR'].values
-                print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'].sum())
+                # print('Production of hydro-run-of-river was ', pro.loc[(year, 'Antares', area, 'WATER', 'HYDRO-RUN-OF-RIVER', ctx.obj['i']), 'Value'].sum())
                 
     return Antobj, pro, emi, pro_hourly
 
@@ -587,7 +587,7 @@ def plot_annual_electricity_generation(results: dict, **kwargs):
     pro.pivot_table(index="Model", columns="F", values="Value", aggfunc="sum").plot(
         ax=ax, kind="bar", stacked=True, color=balmorel_colours
     )
-    print(pro.pivot_table(index=["Model", "F"], values="Value", aggfunc="sum"))
+    # print(pro.pivot_table(index=["Model", "F"], values="Value", aggfunc="sum"))
     ax.set_facecolor(kwargs.get("facecolor", "none"))
     fig.set_facecolor(kwargs.get("facecolor", "none"))
     ax.set_ylabel("Electricity Generation (TWh)")
@@ -787,18 +787,9 @@ def collect_results(ctx, scenario: str, mc_year: str):
                     'pro_hourly' : pro_hourly,
                     'emi' : emi}, f)
 
-@CLI.command()
-@click.argument("scenario", type=str, required=True)
-@click.option(
-    "--overwrite",
-    is_flag=True,
-    default=False,
-    help="Collect results again, even if it exists",
-)
-@click.option("--region", type=str, default='all', help="Regional scope")
-@click.option('--mc-year', type=str, default='mc-all', help="MC year to collect Antares results from, e.g. mc-all (default) or 00001, 00002, ...")
 @click.pass_context
-def plot_all(ctx, scenario, overwrite, region, mc_year):
+def collect_or_load_results(ctx, scenario: str, region: str = 'all', 
+                            mc_year: str = 'mc-all', overwrite: bool = False):
     # Collect results if overwrite or if it doesn't exist
     if mc_year == 'mc-all':
         result_path = Path(f"Workflow/OverallResults/{scenario}_results.pkl")
@@ -818,6 +809,25 @@ def plot_all(ctx, scenario, overwrite, region, mc_year):
     # Load results
     with open(str(result_path), "rb") as f:
         results = pickle.load(f)
+
+    return results, plot_name
+
+@CLI.command()
+@click.argument("scenario", type=str, required=True)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    help="Collect results again, even if it exists",
+)
+@click.option("--region", type=str, default='all', help="Regional scope")
+@click.option('--mc-year', type=str, default='mc-all', help="MC year to collect Antares results from, e.g. mc-all (default) or 00001, 00002, ...")
+@click.pass_context
+def plot_all(ctx, scenario, overwrite, region, mc_year):
+
+    # Load results and plot name 
+    results, plot_name = collect_or_load_results(scenario, region, 
+                                                 mc_year, overwrite)
 
     # Annual electricity generation
     fig, _ = plot_annual_electricity_generation(results, facecolor=ctx.obj["fc"],
@@ -971,6 +981,8 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
 
             plt.show()
 
+    else:
+        return df_balm, df_ant
 
 if __name__ == "__main__":
     CLI()
