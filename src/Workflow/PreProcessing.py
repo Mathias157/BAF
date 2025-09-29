@@ -223,6 +223,7 @@ def generate_mappings(ctx):
     # Balmorel Technologies (rough combustion CO2 estimates hardcoded for now)
     kgGJ2tonMWh = 3.6 / 1e3 # Conversion from kg/GJ to ton/MWh
     BalmTechs = {'CHP-BACK-PRESSURE' : {'NATGAS' : {'CO2' : 56.1 * kgGJ2tonMWh}, 
+                                        'DUMMY' : {'CO2' : 56.1 * kgGJ2tonMWh}, 
                                         'WOODCHIPS' : {'CO2' : 0},  
                                         'WOODPELLETS' : {'CO2' : 0},  
                                         'STRAW' : {'CO2' : 0}, 
@@ -233,6 +234,7 @@ def generate_mappings(ctx):
                                         'LIGHTOIL' : {'CO2' : 74*kgGJ2tonMWh},
                                         'LIGNITE' : {'CO2' : 111.1*kgGJ2tonMWh}},
                 'CHP-EXTRACTION' : {'NATGAS' : {'CO2' : 56.1 * kgGJ2tonMWh}, 
+                                    'DUMMY' : {'CO2' : 56.1 * kgGJ2tonMWh}, 
                                     'WOODCHIPS' : {'CO2' : 0},  
                                     'WOODPELLETS' : {'CO2' : 0}, 
                                     'BIOGAS' : {'CO2' : 0}, 
@@ -244,6 +246,7 @@ def generate_mappings(ctx):
                                     'PEAT' : {'CO2' : 0},
                                     'STRAW' : {'CO2' : 0}},
                 'CONDENSING' : {'BIOGAS' : {'CO2' : 0}, 
+                                'DUMMY' : {'CO2' : 56.1 * kgGJ2tonMWh}, 
                                 'COAL' : {'CO2' : 94.6*kgGJ2tonMWh},
                                 'FUELOIL' : {'CO2' : 74*kgGJ2tonMWh},
                                 'LIGHTOIL' : {'CO2' : 74*kgGJ2tonMWh},
