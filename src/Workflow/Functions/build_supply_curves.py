@@ -1145,7 +1145,7 @@ def model_supply_curves_in_antares(weather_years: list,
     for parameter in fitted_parameters:
         
         # Get the supply curve for the specific parameter
-        temp = pd.DataFrame({'price' : supply_curves[region][parameter]['price'],
+        temp = pd.DataFrame({'price' : np.round(supply_curves[region][parameter]['price'], price_rounding_level),
                             'capacity' : supply_curves[region][parameter]['capacity']},
                             index=np.arange(len(supply_curves[region][parameter]['price'])))
         

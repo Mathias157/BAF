@@ -1304,7 +1304,7 @@ def main(ctx, sc_name: str, year: str, cluster_size: int, heat_parameter_choice:
     # Load results and data
     # All input data (should have been loaded in initialisation)
     m = Balmorel("Balmorel", gams_system_directory=gams_system_directory)
-    m.load_incfiles(SC_folder)
+    m.load_incfiles(SC_folder, overwrite=True)
     electricity_demand = symbol_to_df(m.input_data[SC_folder], "DE")
     electricity_profiles = symbol_to_df(m.input_data[SC_folder], "DE_VAR_T")
     ctx.obj['input_data'] = m.input_data[SC_folder]
