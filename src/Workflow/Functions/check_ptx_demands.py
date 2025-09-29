@@ -374,6 +374,18 @@ def h2exotest():
     collect_ptx_results(result_list, 'multiweather_h2exotest')
 
 @CLI.command()
+def flowbased():
+    
+    antbalm_list = [
+        [["MainResults_noh_dispatch_WY1982_flowbased_Iter0.gdx", "noh"], 
+        ["20250927-1133eco-noh_wy1982_flowbased_cl1344_iter0_y-2050", "00001"]],
+        [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"],
+         ["20250922-1308eco-noh_wy1982_cl1344_iter0_y-2050", "00001"]]
+    ]
+
+    collect_ptx_results(antbalm_list, 'flowbasedtest')
+
+@CLI.command()
 @click.pass_context
 @click.argument('balmorel_scenario', required=True)
 @click.argument('scenario_folder', required=False, default='base')
