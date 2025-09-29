@@ -307,7 +307,8 @@ def get_ptx_demand_timeseries(ctx, balmorel_scenario: str, antares_scenario: str
             fig, axes = plt.subplots(3)
             
             for i, region in enumerate(regions):
-                df_balm.loc[:, region, commodity].plot(ax=axes[i], label='Balmorel')
+                slices = (slice(None), slice(None), region, commodity) if temporal == 'hourly' else (slice(None), region, commodity)
+                df_balm.loc[slices].plot(ax=axes[i], label='Balmorel')
                 df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
                 axes[i].set_ylabel(region)
                 axes[i].legend(('Balmorel', 'Antares'))
@@ -1026,12 +1027,13 @@ def plot_multiweather_table(weather_year: int):
 @CLI.command()
 @click.argument('balmorel_scenario', type=str, default='h2_dispatch_WY1983')
 @click.argument('balmorel_scfolder', type=str, default='h2')
-@click.argument('antares_scenario', type=str, default='20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050')
+# @click.argument('antares_scenario', type=str, default='20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050')
+@click.argument('antares_scenario', type=str, default='20250929-1425eco-h2_wy1983_cl1344_h2exohexo_iter0_y-2050')
 @click.argument('mc-year', type=str, default='00002')
 @click.option('--temporal', type=str, default='weekly', help="The choice of temporal aggregation for the result")
 @click.option('--plot', is_flag=True, default=False, help="Plot the series or not")
 @click.option('--overwrite', is_flag=True, default=False, help="Overwrite collected results")
-def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year, 
+def ptx_elmix(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year, 
                  temporal, plot, overwrite, iteration: int = 0, year: int = 2050):
 
     ptx_balm, ptx_ant, balmorel_output, antares_output = get_ptx_demand_timeseries(balmorel_scenario, antares_scenario, balmorel_scfolder,
@@ -1048,7 +1050,10 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
         aggregate_antares_production(antares_production, just_convert_to_df=True)
         .replace({'WIND OFFSHORE' : 'WIND-OFF',
                   'WIND ONSHORE' : 'WIND-ON',
-                  'SOLAR PV' : 'SOLAR-PV'})
+                  'SOLAR PV' : 'SOLAR-PV',
+                  'CONDENSING-CCS' : 'CONDENSING',
+                  'CHP-EXTRACTION-CCS' : 'CHP-EXTRACTION'})
+        .query('Technology != "SPILLED"')
         .pivot_table(
             index=['hourly', 'Region', 'Technology'],
             values='Value',
@@ -1077,6 +1082,7 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
         .get_result('PRO_YCRAGFST')
         .query('Commodity == "ELECTRICITY"')
     )
+    print('Balmorel production before adding curtailment:', balmorel_production.Value.sum())
     balmorel_production.Season = balmorel_production.Season.str.replace('S', '').astype(int)
     balmorel_production = (
         balmorel_production
@@ -1085,8 +1091,9 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
             values='Value',
             aggfunc='sum'
         )
-        .sub(balmorel_curtailment, fill_value=0)
+        .add(balmorel_curtailment, fill_value=0)
     ) 
+    print('Balmorel production after adding curtailment:', balmorel_production.Value.sum())
 
     # Calculate average production for each technology in each region
     technologies = set(balmorel_production.index.get_level_values(3)) | set(antares_production.index.get_level_values(2))
@@ -1125,27 +1132,34 @@ def seasonal_ptx(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year
                                      'PtX El Demand Antares','Mean Production Antares','Weighted Mean Production Antares',
                                      'PtX El Demand Balmorel','Mean Production Balmorel','Weighted Mean Production Balmorel'])
 
-    fig, ax = plt.subplots()
-    df.pivot_table(index=['Commodity', 'Region'],
-                   columns='Technology',
-                   values='Weighted Mean Production Balmorel').plot(ax=ax,
-                                                                    kind='bar',
-                                                                    stacked=True,
-                                                                    position=0,
-                                                                   width=0.4,
-                                                                   label='Balmorel')
-    df.pivot_table(index=['Commodity', 'Region'],
-                   columns='Technology',
-                   values='Weighted Mean Production Antares').plot(ax=ax,
-                                                                    kind='bar',
-                                                                    stacked=True,
-                                                                    position=1.1,
-                                                                   width=0.4,
-                                                                   label='Antares')
-    ax.legend(loc='center left', bbox_to_anchor=(1.01, .5))
-    _, max_val = ax.get_ylim()
-    ax.annotate('Left: Balmorel, Right: Antares', (0, max_val*.95))
-    plt.show()
+    for value in ['Weighted Mean', 'Mean']:
+        fig, ax = plt.subplots()
+        df.pivot_table(index=['Commodity', 'Region'],
+                    columns='Technology',
+                    values=f'{value} Production Balmorel').plot(ax=ax,
+                                                                        kind='bar',
+                                                                        stacked=True,
+                                                                        position=0,
+                                                                    width=0.4,
+                                                                    color=balmorel_colours,
+                                                                        legend=False)
+        df.pivot_table(index=['Commodity', 'Region'],
+                    columns='Technology',
+                    values=f'{value} Production Antares').plot(ax=ax,
+                                                                        kind='bar',
+                                                                        stacked=True,
+                                                                        position=1.1,
+                                                                    width=0.4,
+                                                                    color=balmorel_colours,
+                                                                    legend=False)
+        ax.legend(loc='center left', bbox_to_anchor=(1.01, .5))
+
+        _, max_val = ax.get_ylim()
+        ax.annotate('Left: Balmorel, Right: Antares', (-.5, max_val*.95))
+        _, max_val = ax.get_xlim()
+        ax.set_xlim(-0.6, max_val*1.1)
+        fig.savefig(f'Workflow/OverallResults/elmix_at_ptx_{value}.png', bbox_inches='tight')
+        # plt.show()
 
 if __name__ == "__main__":
     CLI()

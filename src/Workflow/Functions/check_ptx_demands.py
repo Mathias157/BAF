@@ -362,6 +362,18 @@ def multiweather():
         collect_ptx_results(collection_list, f'multiweather_{training_year}trained')
 
 @CLI.command()
+def h2exotest():
+    
+    result_list = [
+        [["MainResults_h2_dispatch_WY1983_Iter0.gdx", "h2"], ["20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050", "00002"]],
+        [["MainResults_h2_dispatch_WY2016_Iter0.gdx", "h2"], ["20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050", "00035"]],
+        [["MainResults_h2_dispatch_WY1983_Iter0.gdx", "h2"], ["20250929-1425eco-h2_wy1983_cl1344_h2exohexo_iter0_y-2050", "00002"]],
+        [["MainResults_h2_dispatch_WY2016_Iter0.gdx", "h2"], ["20250929-1425eco-h2_wy1983_cl1344_h2exohexo_iter0_y-2050", "00035"]],
+    ]
+
+    collect_ptx_results(result_list, 'multiweather_h2exotest')
+
+@CLI.command()
 @click.pass_context
 @click.argument('balmorel_scenario', required=True)
 @click.argument('scenario_folder', required=False, default='base')
