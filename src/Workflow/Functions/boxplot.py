@@ -72,6 +72,33 @@ def get_difference_table(
 
     return df_diff, df_diff_mean
 
+def collect_and_concat_dataframes(balmorel_train_year: int = 2000):
+    """
+    Collect dataframes of PtX el. demands
+
+    Args:
+       balmorel_train_year (int): The investment year for Balmorel runs.
+
+
+    Returns:
+       pd.DataFrame: Collected dataframe.
+    """
+    
+
+    collected_df = pd.DataFrame()
+    for weather_year in [1982 + i for i in range(35)]:
+        filename = f"Workflow/OverallResults/PtX_demand_comparison_multiweather_{weather_year}trained.csv"
+
+        temp = pd.read_csv(filename)
+        temp["Scenario"] = temp['AntaresFile'].str.extract(r"eco-(.+)\_wy")
+        temp["AntaresTrainYear"] = str(weather_year)
+        temp["AntaresTestYear"] = temp['BalmorelFile'].str.extract(r'dispatch\_WY(.+)\_Iter0')
+        temp["BalmorelTrainYear"] = str(balmorel_train_year)
+        temp["BalmorelTestYear"] = temp['BalmorelFile'].str.extract(r'dispatch\_WY(.+)\_Iter0')
+        collected_df = pd.concat((collected_df, temp), 
+                                 ignore_index=True)
+    
+    return collected_df
 
 def collect_and_concat_diff_dataframes():
     collected_df = pd.DataFrame()
@@ -98,6 +125,81 @@ def collect_and_concat_diff_dataframes():
         collected_df = pd.concat((collected_df, formatted_df), ignore_index=True)
 
     return collected_df
+
+
+def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
+    """
+    Plot boxplot of values with separate boxes for test years and train years
+
+    Parameters:
+    df: DataFrame with columns Value, Region, TestYear, TrainYear
+    """
+
+    if average_regions:
+        # Do average across regions
+        df = df.pivot_table(
+            index=list(df.columns.drop(["Region", "Value"])),
+            values="Value",
+            aggfunc=lambda x: np.mean(np.abs(x)),
+        ).reset_index()
+
+    # Get unique scenarios for x-axis
+    scenarios = ["NoH", "NoH2", "H2", "H2LSS", "H2LSSH2T"]
+    df = df.replace(
+        {
+            "noh": "NoH",
+            "noh2": "NoH2",
+            "h2": "H2",
+            "h2_lss": "H2LSS",
+            "h2_lss_h2t": "H2LSSH2T",
+        }
+    )
+
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    # Prepare data for boxplot - separate data for test years and train years
+    data = []
+    for scenario in scenarios:
+        # Test years data
+        test_scenario_data = df.query(
+            f'Scenario == "{scenario}"'
+        ).Value.tolist()
+        data.append(test_scenario_data)
+
+    # Create boxplot
+    bp1 = ax.boxplot(
+        data,  widths=0.35, patch_artist=True, whis=(0, 100)
+    )
+
+    # Style the boxplots with different colors
+    for patch in bp1["boxes"]:
+        patch.set_facecolor("lightcoral")
+        patch.set_alpha(0.7)
+
+    # Set x-axis labels at the center positions
+    ax.set_xticks(range(1, len(scenarios) + 1))
+    ax.set_xticklabels(scenarios)
+
+    # Create legend
+    legend_elements = [
+        Patch(facecolor="lightcoral", alpha=0.7, label="Test Years"),
+    ]
+    ax.legend(handles=legend_elements, loc="upper right")
+
+    # Add labels and title
+    ax.set_title(title, fontsize=14)
+    if not (average_regions):
+        ax.set_ylabel("Relative Difference (%)", fontsize=12)
+        ax.set_ylim(-100, 100)
+    else:
+        ax.set_ylabel("Absolute Relative Difference (%)", fontsize=12)
+        ax.set_ylim(0, 100)
+    ax.grid(True, alpha=0.3, axis="y")
+
+    plt.tight_layout()
+
+    return df, fig, ax
 
 
 def plot_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
@@ -202,44 +304,106 @@ def plot_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
 #            2. Main              #
 # ------------------------------- #
 
-
-@click.command()
+@click.group()
 def main():
+    pass
+    
+
+@main.command()
+def model_error_boxplot():
+    """
+    Box plots of deviation between Antares and 
+    Balmorel PtX el. demands for all regions and 
+    weather years.
+    """
+    
     df = collect_and_concat_diff_dataframes()
 
     # Plot the boxplot for all data
-    df, fig, ax = plot_boxplot(
-        df, "Endogenous electricity demands - average error for all regions and WY"
-    )
-    fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison.png")
+    for commodity in ['HYDROGEN', 'HEAT', 'all']:
 
-    # Plot the boxplot for system (aggregated absolute error across regions)
-    df, fig, ax = plot_boxplot(
-        df,
-        "Endogenous electricity demands - average absolute error for system for all WY",
-        True,
-    )
-    fig.savefig(
-        "Workflow/OverallResults/boxplot_endodemand_comparison_averageregions.png"
+        if commodity != 'all':
+            temp = df.query(f'Category == "{commodity}"')
+        else:
+            temp = df
+
+        temp, fig, ax = plot_boxplot(
+            temp, "Endogenous electricity demands - average error for all regions and WY"
+        )
+        fig.savefig(f"Workflow/OverallResults/boxplot_endodemand_{commodity}_comparison.png")
+
+        # Plot the boxplot for system (aggregated absolute error across regions)
+        _, fig, ax = plot_boxplot(
+            temp,
+            "Endogenous electricity demands - average absolute error for system for all WY",
+            True,
+        )
+        fig.savefig(
+            f"Workflow/OverallResults/boxplot_endodemand_{commodity}_comparison_averageregions.png"
+        )
+
+        # Print mean
+        print(
+            "Mean of difference through all test years:    \n",
+            temp.query('YearType=="Test Years"')
+            .pivot_table(
+                index="Scenario", columns="Category", values="Value", aggfunc="mean"
+            )
+            .round(2),
+        )
+        print(
+            "Mean of difference through train years only:  \n",
+            temp.query('YearType=="Train Years"')
+            .pivot_table(
+                index="Scenario", columns="Category", values="Value", aggfunc="mean"
+            )
+            .round(2),
+        )
+
+
+@main.command()
+def wy_balmorel_boxplot():
+    
+    df = (
+        collect_and_concat_dataframes()
+        .query('Model == "Balmorel"')
+        .drop(columns=['AntaresTrainYear', 
+                       'AntaresFile',
+                       'BalmorelFile',
+                       'Unnamed: 0'])
+        .drop_duplicates()
     )
 
-    # Print mean
-    print(
-        "Mean of difference through all test years:    \n",
-        df.query('YearType=="Test Years"')
-        .pivot_table(
-            index="Scenario", columns="Category", values="Value", aggfunc="mean"
-        )
-        .round(2),
+    df_train = (
+        df
+        .query('BalmorelTrainYear == BalmorelTestYear')
+        .drop(columns=['AntaresTestYear',
+                       'BalmorelTestYear',
+                       'BalmorelTrainYear'])
+        .rename(columns={'Value' : 'RefValue'})
+        .copy()
     )
-    print(
-        "Mean of difference through train years only:  \n",
-        df.query('YearType=="Train Years"')
-        .pivot_table(
-            index="Scenario", columns="Category", values="Value", aggfunc="mean"
-        )
-        .round(2),
+    df_test = (
+        df 
+        .query('BalmorelTrainYear != BalmorelTestYear')
+        .drop(columns=['AntaresTestYear',
+                       'BalmorelTestYear',
+                       'BalmorelTrainYear'])
+        .copy()
     )
+
+    merge_keys = list(df_test.columns.drop('Value'))
+    merged = df_test.merge(
+        df_train[merge_keys + ['RefValue']],
+        on=merge_keys,
+        how='left'
+    )
+
+    # Calculate difference
+    merged.loc[:, 'Value'] = (merged.Value - merged.RefValue) / merged.RefValue * 100
+
+    df, fig, ax = plot_single_boxplot(merged, 'BalmorelWYdiff')
+    fig.savefig('Workflow/OverallResults/BalmorelWYdiff_boxplot.png')
 
 
 if __name__ == "__main__":
