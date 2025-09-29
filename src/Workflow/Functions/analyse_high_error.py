@@ -18,7 +18,7 @@ Created on 26.09.2025
 import matplotlib.pyplot as plt
 import click
 import pandas as pd
-from boxplot import collect_and_concat_dataframes
+from boxplot import collect_and_concat_diff_dataframes
 from Formatting import cmcrameri_style
 from pybalmorel import MainResults
 from pathlib import Path
@@ -30,7 +30,7 @@ from pybalmorel.formatting import balmorel_colours
 
 def get_high_error_index(tol: float = 20.0):
 
-    df = collect_and_concat_dataframes()
+    df = collect_and_concat_diff_dataframes()
     df = df.query(f"Value.abs() >= {tol}")
 
     return df
