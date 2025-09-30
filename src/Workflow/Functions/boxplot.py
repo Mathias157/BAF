@@ -100,10 +100,11 @@ def collect_and_concat_dataframes(balmorel_train_year: int = 2000):
     
     return collected_df
 
-def collect_and_concat_diff_dataframes():
+def collect_and_concat_diff_dataframes(weather_years: int = 35,
+                                       csv_name: str = 'multiweather_%dtrained'):
     collected_df = pd.DataFrame()
-    for weather_year in [1982 + i for i in range(35)]:
-        filename = f"Workflow/OverallResults/PtX_demand_comparison_multiweather_{weather_year}trained.csv"
+    for weather_year in [1982 + i for i in range(weather_years)]:
+        filename = f"Workflow/OverallResults/PtX_demand_comparison_{csv_name%weather_year}.csv"
         df, _ = get_difference_table(
             filename,
             "Data",
@@ -202,7 +203,8 @@ def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = Fa
     return df, fig, ax
 
 
-def plot_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
+def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = False,
+                 legend: bool = False):
     """
     Plot boxplot of values with separate boxes for test years and train years
 
@@ -233,8 +235,6 @@ def plot_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
         }
     )
 
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=(9, 6))
 
     # Prepare data for boxplot - separate data for test years and train years
     test_data = []
@@ -259,10 +259,12 @@ def plot_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
 
     # Create boxplots
     bp1 = ax.boxplot(
-        test_data, positions=positions_test, widths=0.35, patch_artist=True
+        test_data, positions=positions_test, widths=0.35, 
+        patch_artist=True, whis=(0, 100)
     )
     bp2 = ax.boxplot(
-        train_data, positions=positions_train, widths=0.35, patch_artist=True
+        train_data, positions=positions_train, widths=0.35,
+        patch_artist=True, whis=(0, 100)
     )
 
     # Style the boxplots with different colors
@@ -283,10 +285,13 @@ def plot_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
         Patch(facecolor="lightcoral", alpha=0.7, label="Test Years"),
         Patch(facecolor="lightblue", alpha=0.7, label="Train Years"),
     ]
-    ax.legend(handles=legend_elements, loc="upper right")
+
+    if legend:
+        ax.legend(handles=legend_elements, loc="lower center",
+                    bbox_to_anchor = (.5, 1.01), ncols=2)
 
     # Add labels and title
-    ax.set_title(title, fontsize=14)
+    # ax.set_title(title, fontsize=14)
     if not (average_regions):
         ax.set_ylabel("Relative Difference (%)", fontsize=12)
         ax.set_ylim(-100, 100)
@@ -310,35 +315,40 @@ def main():
     
 
 @main.command()
-def model_error_boxplot():
+@click.option('--weather-years', type=int, default=35, help="Amount of weather years to load, defaults to 35")
+def model_error_boxplot(weather_years):
     """
     Box plots of deviation between Antares and 
     Balmorel PtX el. demands for all regions and 
     weather years.
     """
     
-    df = collect_and_concat_diff_dataframes()
+    df = collect_and_concat_diff_dataframes(weather_years, 
+                                            'multiweather_%dtrained')
 
     # Plot the boxplot for all data
-    for commodity in ['HYDROGEN', 'HEAT', 'all']:
+    commodities = ['HYDROGEN', 'HEAT']
+    fig, axes = plt.subplots(len(commodities), figsize=(9, 6))
+    for i, commodity in enumerate(commodities):
 
         if commodity != 'all':
             temp = df.query(f'Category == "{commodity}"')
         else:
             temp = df
 
-        temp, fig, ax = plot_boxplot(
-            temp, "Endogenous electricity demands - average error for all regions and WY"
+        temp, fig, ax = plot_boxplot(fig, axes[i], 
+            temp, "Endogenous electricity demands - average error for all regions and WY",
+            legend=True if commodity == 'HYDROGEN' else False
         )
-        fig.savefig(f"Workflow/OverallResults/boxplot_endodemand_{commodity}_comparison.png")
 
         # Plot the boxplot for system (aggregated absolute error across regions)
-        _, fig, ax = plot_boxplot(
+        fig2, ax2 = plt.subplots(figsize=(9,6))
+        _, fig2, ax2 = plot_boxplot(fig2, ax2, 
             temp,
             "Endogenous electricity demands - average absolute error for system for all WY",
             True,
         )
-        fig.savefig(
+        fig2.savefig(
             f"Workflow/OverallResults/boxplot_endodemand_{commodity}_comparison_averageregions.png"
         )
 
@@ -359,6 +369,7 @@ def model_error_boxplot():
             )
             .round(2),
         )
+    fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison.png")
 
 
 @main.command()
