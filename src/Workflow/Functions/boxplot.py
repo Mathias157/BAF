@@ -310,8 +310,18 @@ def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = 
 # ------------------------------- #
 
 @click.group()
-def main():
-    pass
+@click.pass_context
+@click.option('--dark', is_flag=True, default=False, help='Make plots dark')
+def main(ctx, dark):
+    
+    ctx.ensure_object(dict)
+    
+    if dark:
+        ctx.obj['facecolor']='none'
+        plt.style.use('dark_background')
+    else:
+        ctx.obj['facecolor']='white'
+    
     
 
 @main.command()
@@ -329,6 +339,7 @@ def model_error_boxplot(weather_years):
     # Plot the boxplot for all data
     commodities = ['HYDROGEN', 'HEAT']
     fig, axes = plt.subplots(len(commodities), figsize=(9, 6))
+    fig2, axes2 = plt.subplots(len(commodities), figsize=(9, 6))
     for i, commodity in enumerate(commodities):
 
         if commodity != 'all':
@@ -336,20 +347,17 @@ def model_error_boxplot(weather_years):
         else:
             temp = df
 
-        temp, fig, ax = plot_boxplot(fig, axes[i], 
+        temp, fig, _ = plot_boxplot(fig, axes[i], 
             temp, "Endogenous electricity demands - average error for all regions and WY",
             legend=True if commodity == 'HYDROGEN' else False
         )
 
         # Plot the boxplot for system (aggregated absolute error across regions)
-        fig2, ax2 = plt.subplots(figsize=(9,6))
-        _, fig2, ax2 = plot_boxplot(fig2, ax2, 
+        _, fig2, _ = plot_boxplot(fig2, axes2[i], 
             temp,
             "Endogenous electricity demands - average absolute error for system for all WY",
             True,
-        )
-        fig2.savefig(
-            f"Workflow/OverallResults/boxplot_endodemand_{commodity}_comparison_averageregions.png"
+            legend=True if commodity == 'HYDROGEN' else False
         )
 
         # Print mean
@@ -369,7 +377,12 @@ def model_error_boxplot(weather_years):
             )
             .round(2),
         )
-    fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison.png")
+    fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison.png",
+                transparent=True)
+    fig2.savefig(
+        f"Workflow/OverallResults/boxplot_endodemand_comparison_averageregions.png",
+        transparent=True
+    )
 
 
 @main.command()
