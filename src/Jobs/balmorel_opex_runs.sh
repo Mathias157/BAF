@@ -65,7 +65,7 @@ for weather_year in 2000; do
     mv balopt.opt balopt_invest.opt
     mv balopt_dispatch.opt balopt.opt
 
-    gams Balmorel --scenario_name "${name}_dispatch_WY${weather_year}_Iter0" threads $LSB_DJOB_NUMPROC
+    gams Balmorel --scenario_name "${scenario_name}_Iter0" threads $LSB_DJOB_NUMPROC
 
     if [ $? -ne 0 ]; then
       mv balopt.opt balopt_dispatch.opt
