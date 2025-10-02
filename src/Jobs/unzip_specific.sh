@@ -29,51 +29,55 @@
 # here follow the commands you want to execute with input.in as the input file
 
 # Actually, it could be more simple to unzip using * for finding any characters (regex pattern search)
-# By not using -j, you would preserve the folders structure inside a zip file. 
+# By not using -j, you would preserve the folders structure inside a zip file.
+
+# For wildcard matching recursively on several folders, you can do:
+# unzip zip_filename.zip '*noh_wy*_cl1344_iter_y-2050/*'
 
 unzip_to="../../Unzipped"
 
 for name in YYYYMMDD-HHMM_Scenario_Results; do
 
-    # Split name string on '_'
-    parts=(${name//_/ })
-    
-    # Assign middle part to short_name
-    short_name=${parts[1]}
+  # Split name string on '_'
+  parts=(${name//_/ })
 
-    # .csv's
-    unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_LOLD.csv -d "${unzip_to}/OverallResults" 
-    unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_ProcessTime.csv -d "${unzip_to}/OverallResults"
-    unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_results.pkl -d "${unzip_to}/OverallResults"
-    unzip -j Workflow/OverallResults/${name}.zip Workflow/MetaResults/${short_name}_meta.ini -d "${unzip_to}/OverallResults"
+  # Assign middle part to short_name
+  short_name=${parts[1]}
 
-    # Figures 
-    # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_AntaresEmissions.html -d "${unzip_to}/OverallResults" 
-    # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_BalmorelEmissions.html -d "${unzip_to}/OverallResults" 
-    # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_AntaresH2GenerationFuel.html -d "${unzip_to}/OverallResults" 
-    # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_BalmorelH2GenerationFuel.html -d "${unzip_to}/OverallResults" 
-    # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_AntaresGenerationFuel.html -d "${unzip_to}/OverallResults" 
-    # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_BalmorelGenerationFuel.html -d "${unzip_to}/OverallResults"
+  # .csv's
+  unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_LOLD.csv -d "${unzip_to}/OverallResults"
+  unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_ProcessTime.csv -d "${unzip_to}/OverallResults"
+  unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_results.pkl -d "${unzip_to}/OverallResults"
+  unzip -j Workflow/OverallResults/${name}.zip Workflow/MetaResults/${short_name}_meta.ini -d "${unzip_to}/OverallResults"
 
-    # name=20240521-0754_LTCapCredRisk_Results
-    # # Split name string on '_'
-    # parts=(${name//_/ })
+  # Figures
+  # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_AntaresEmissions.html -d "${unzip_to}/OverallResults"
+  # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_BalmorelEmissions.html -d "${unzip_to}/OverallResults"
+  # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_AntaresH2GenerationFuel.html -d "${unzip_to}/OverallResults"
+  # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_BalmorelH2GenerationFuel.html -d "${unzip_to}/OverallResults"
+  # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_AntaresGenerationFuel.html -d "${unzip_to}/OverallResults"
+  # unzip -j Workflow/OverallResults/${name}.zip Workflow/OverallResults/${short_name}_BalmorelGenerationFuel.html -d "${unzip_to}/OverallResults"
 
-    # Assign middle part to short_name
-    short_name=${parts[1]}
-    # for iter in 0 1 2 3 4 5 6 7 8 9; do
-    #     unzip -j Workflow/OverallResults/${name}.zip Balmorel/LTFictDemFunc1Max/model/MainResults_${short_name}_Iter${iter}.gdx -d "${unzip_to}"
-    # done
-    unzip -j Workflow/OverallResults/${name}.zip "Balmorel/*" -d "${unzip_to}"
+  # name=20240521-0754_LTCapCredRisk_Results
+  # # Split name string on '_'
+  # parts=(${name//_/ })
 
-    # Set previous results variable first
-    prev=""
-    # List ALL Antares files and loop through them (but print only highest level directory, i.e. the top level of Antares/output)
-    unzip -l Workflow/OverallResults/${name}.zip | grep -E 'Antares/output/' | awk -F'/' '{print $3}'  | while read -r ant_out; do            
-        # Check if we have already extracted from this folder
-        if [ "${prev}" != "${ant_out}" ]; then
-            unzip -j Workflow/OverallResults/${name}.zip Antares/output/${ant_out}/annualSystemCost.txt -d "${unzip_to}/Antares/${ant_out}"
-        fi
-        prev=$ant_out
-    done
+  # Assign middle part to short_name
+  short_name=${parts[1]}
+  # for iter in 0 1 2 3 4 5 6 7 8 9; do
+  #     unzip -j Workflow/OverallResults/${name}.zip Balmorel/LTFictDemFunc1Max/model/MainResults_${short_name}_Iter${iter}.gdx -d "${unzip_to}"
+  # done
+  unzip -j Workflow/OverallResults/${name}.zip "Balmorel/*" -d "${unzip_to}"
+
+  # Set previous results variable first
+  prev=""
+  # List ALL Antares files and loop through them (but print only highest level directory, i.e. the top level of Antares/output)
+  unzip -l Workflow/OverallResults/${name}.zip | grep -E 'Antares/output/' | awk -F'/' '{print $3}' | while read -r ant_out; do
+    # Check if we have already extracted from this folder
+    if [ "${prev}" != "${ant_out}" ]; then
+      unzip -j Workflow/OverallResults/${name}.zip Antares/output/${ant_out}/annualSystemCost.txt -d "${unzip_to}/Antares/${ant_out}"
+    fi
+    prev=$ant_out
+  done
 done
+
