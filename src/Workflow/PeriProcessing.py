@@ -1080,7 +1080,9 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         batch_results = pd.Series(batch_results)
         idx = batch_results.values != None
         if len(batch_results[idx]) > 0:
+            log(f'Amount of batch results: {len(batch_results[idx])}')
             for region, unserved_energy_cost_value, scenariobuilder_values in batch_results[idx]:
+                log(f'Amount of virtual thermal clusters in {region}: {len(scenariobuilder_values)}')
                 for cluster in scenariobuilder_values:
                     set_scenariobuilder_values(cluster)
 

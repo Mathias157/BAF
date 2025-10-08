@@ -345,6 +345,20 @@ def virginie_data():
     collect_ptx_results(antbalm_list, 'virginie_data')
 
 @CLI.command()
+def new_sensitivities():
+
+    collection_list = []
+    antares_outputs = Path('Antares/output').glob('20251008*')
+    for antares_output in antares_outputs:
+        scenario = antares_output.name.split('eco-')[1].split('_h2')[0]
+        collection_list.append(
+            [[f"MainResults_{scenario}_dispatch_WY2000_Iter0.gdx", scenario],
+            [antares_output.name, "00019"]]
+        )
+
+    collect_ptx_results(collection_list, 'new_sensitivities')
+
+@CLI.command()
 def multiweather():
 
     weather_years = [1982+i for i in range(35)]

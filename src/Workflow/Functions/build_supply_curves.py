@@ -130,9 +130,23 @@ def get_inverse_residual_load(
     # Get data
     model_year = str(model_year)
 
+    # Check if heat results are available
+    try: 
+        heat_demand = (
+            result.get_result("H_DEMAND_YCRA")
+            .query("Scenario == @scenario and Year == @model_year")
+            .query('Category == "EXOGENOUS"')
+            .pivot_table(columns=["Region"], values="Value", aggfunc="sum")
+        )
+        heat_demand_exists = True
+        data_choices = ["onshore_wind", "offshore_wind", "solar_pv", "load", "heat"]
+    except pd.errors.UndefinedVariableError:
+        heat_demand_exists = False
+        data_choices = ["onshore_wind", "offshore_wind", "solar_pv", "load"]
+
     # Reduce to timeslices of Balmorel, and convert to Balmorel timeslice naming
     all_data = {}
-    for data in ["onshore_wind", "offshore_wind", "solar_pv", "load", "heat"]:
+    for data in data_choices:
         if data != "load":
             all_data[data] = ctx.obj[data][weather_year].copy()
         else:
@@ -195,25 +209,32 @@ def get_inverse_residual_load(
         * 1e6
     )
 
-    heat_demand = (
-        result.get_result("H_DEMAND_YCRA")
-        .query("Scenario == @scenario and Year == @model_year")
-        .query('Category == "EXOGENOUS"')
-        .pivot_table(columns=["Region"], values="Value", aggfunc="sum")
-        .reindex(columns=regions, fill_value=0)
-    )
-    all_data["heat"] = (
-        all_data["heat"][regions]
-        / all_data["heat"][regions].sum()
-        * heat_demand.values
-        * 1e6
-    )
 
     # Calculate inverse residual load
     inverse_residual_load = (
         inverse_residual_load
         .sub(all_data["load"], fill_value=0)
-        .sub(all_data["heat"], fill_value=0)
+    )
+
+    if heat_demand_exists:
+        heat_demand = (
+            heat_demand
+            .reindex(columns=regions, fill_value=0)
+        )
+
+        all_data["heat"] = (
+            all_data["heat"][regions]
+            / all_data["heat"][regions].sum()
+            * heat_demand.values
+            * 1e6
+        )
+        inverse_residual_load = (
+            inverse_residual_load
+            .sub(all_data["heat"], fill_value=0)
+        )
+
+    inverse_residual_load = (
+        inverse_residual_load
         .stack()
         .reset_index()
         .rename(columns={"country": "Region", 0: "Value"})
@@ -251,9 +272,23 @@ def get_exo_demand(
     # Get data
     model_year = str(model_year)
 
+    # Check if heat results are available
+    try: 
+        heat_demand = (
+            result.get_result("H_DEMAND_YCRA")
+            .query("Scenario == @scenario and Year == @model_year")
+            .query('Category == "EXOGENOUS"')
+            .pivot_table(columns=["Region"], values="Value", aggfunc="sum")
+        )
+        heat_demand_exists = True
+        data_choices = ["load", "heat"]
+    except pd.errors.UndefinedVariableError:
+        heat_demand_exists = False
+        data_choices = ["load"]
+
     # Reduce to timeslices of Balmorel, and convert to Balmorel timeslice naming
     all_data = {}
-    for data in ["load", "heat"]:
+    for data in data_choices:
         if data != "load":
             all_data[data] = ctx.obj[data][weather_year].copy()
         else:
@@ -282,12 +317,9 @@ def get_exo_demand(
         * 1e6
     )
 
-    try:
+    if heat_demand_exists:
         heat_demand = (
-            result.get_result("H_DEMAND_YCRA")
-            .query("Scenario == @scenario and Year == @model_year")
-            .query('Category == "EXOGENOUS"')
-            .pivot_table(columns=["Region"], values="Value", aggfunc="sum")
+            heat_demand
             .reindex(columns=regions, fill_value=0)
         )
         all_data["heat"] = (
@@ -299,7 +331,7 @@ def get_exo_demand(
 
         exo_demand = all_data["load"] + all_data["heat"]
     
-    except pd.errors.UndefinedVariableError:
+    else:
         # If no heat demand
         exo_demand = all_data["load"]
 
