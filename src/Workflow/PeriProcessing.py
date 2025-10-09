@@ -1085,6 +1085,13 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         scenariobuilder.read("Antares/settings/scenariobuilder.dat")
         existing_options = scenariobuilder.options('default ruleset')
 
+        # Prepare parallel function
+        parallel_func = partial(
+            parallel_scenariobuilding,
+            existing_options,
+            35
+        )
+
         if len(batch_results[idx]) > 0:
             log(f'Amount of batch results: {len(batch_results[idx])}')
             for region, unserved_energy_cost_value, scenariobuilder_values in batch_results[idx]:
@@ -1092,7 +1099,7 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
 
                 with Pool() as pool:
                     batch_results = pool.starmap(
-                        parallel_scenariobuilding,
+                        parallel_func,
                         list(zip(scenariobuilder_values))
                     )
 
@@ -1102,6 +1109,7 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
 
                 if to_append != '':
                     with open("Antares/settings/scenariobuilder.dat", "a") as f:
+                        f.write('\n')
                         f.write(to_append)
 
                 unserved_energy_cost.set('unserverdenergycost', f'{region}_{commodity}'.lower(), str(unserved_energy_cost_value[0]))
