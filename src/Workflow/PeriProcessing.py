@@ -1079,12 +1079,30 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         # Filter none values
         batch_results = pd.Series(batch_results)
         idx = batch_results.values != None
+
+        # Prepare scenariobuilder configuration file
+        scenariobuilder = configparser.ConfigParser()
+        scenariobuilder.read("Antares/settings/scenariobuilder.dat")
+        existing_options = scenariobuilder.options('default ruleset')
+
         if len(batch_results[idx]) > 0:
             log(f'Amount of batch results: {len(batch_results[idx])}')
             for region, unserved_energy_cost_value, scenariobuilder_values in batch_results[idx]:
                 log(f'Amount of virtual thermal clusters in {region}: {len(scenariobuilder_values)}')
-                for cluster in scenariobuilder_values:
-                    set_scenariobuilder_values(cluster)
+
+                with Pool() as pool:
+                    batch_results = pool.starmap(
+                        parallel_scenariobuilding,
+                        list(zip(scenariobuilder_values))
+                    )
+
+                to_append = "\n".join([
+                    string for string in batch_results if string is not None
+                ])
+
+                if to_append != '':
+                    with open("Antares/settings/scenariobuilder.dat", "a") as f:
+                        f.write(to_append)
 
                 unserved_energy_cost.set('unserverdenergycost', f'{region}_{commodity}'.lower(), str(unserved_energy_cost_value[0]))
                 unserved_energy_cost.set('unserverdenergycost', region.lower(), str(unserved_energy_cost_value[1]))
@@ -1094,6 +1112,18 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
     # Store unserved
     with open('Antares/input/thermal/areas.ini', 'w') as f:
         unserved_energy_cost.write(f)
+
+
+def parallel_scenariobuilding(
+    existing_options, weather_years, cluster
+):
+    # Random check in existing_options
+    clusteroption = cluster%7
+
+    if clusteroption not in existing_options:
+        string = "\n".join([f'{cluster%i} = {i+1}' for i in range(weather_years)])
+        return string
+
 
 def process_in_batches(
     regions, regional_unserved_energy_costs, model_func, batch_size=33
