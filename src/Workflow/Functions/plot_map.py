@@ -14,9 +14,18 @@ def get_transmission(results: MainResults, commodity: str):
     return df
 
 @click.group()
-def main():
+@click.pass_context
+@click.option('--dark', is_flag=True, default=False, help='Make plots dark')
+def main(ctx, dark):
     
-    pass
+    ctx.ensure_object(dict)
+    
+    if dark:
+        ctx.obj['facecolor']='none'
+        plt.style.use('dark_background')
+    else:
+        ctx.obj['facecolor']='white'
+    
 
 @click.command()
 @click.argument('scenario', type=str, required=True)
@@ -59,11 +68,11 @@ def pybalm(scenario, commodity, year, scenario_folder):
     fig, _ = res.plot_map(scenario=scenario, year=year,
                           commodity=commodity, lines='FlowYear', 
                           generation='Production', path_to_geofile='./2025AntBalmMap.geojson',
-                          # background='H2 Net Export'
+                          background='H2 Net Export',
                             pie_value_max = 1000000
                           )
 
-    fig.savefig(f'Workflow/OverallResults/map_{scenario}_{commodity}_{year}.png')
+    fig.savefig(f'Workflow/OverallResults/map_{scenario}_{commodity}_{year}.png', transparent=True)
 
 if __name__ == '__main__':
     main()

@@ -1055,7 +1055,7 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
         all_parameters = get_supply_curve_parameters_all(result, scenario, year, choices[commodity]) # all, for later
         fit_parameters = get_supply_curve_parameters_fit(result, scenario, year, choices[commodity], temporal_resolution) # for fitting to Balmorel results
         log(f'Getting supply curves for {commodity}')
-        supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, cluster_size, price_rounding_level, plot_overall_curves=True, style=style)
+        supply_curves[commodity] = get_supply_curves(scenario, year, commodity, fit_parameters, fuel_consumption, el_prices, cluster_size, price_rounding_level, plot_overall_curves=False, style=style)
         
         model_func = partial(
             model_supply_curves_in_antares,

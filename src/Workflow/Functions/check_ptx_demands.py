@@ -376,6 +376,23 @@ def multiweather():
         collect_ptx_results(collection_list, f'multiweather_{training_year}trained')
 
 @CLI.command()
+def largescale():
+    result_collection = [
+        [["MainResults_noh_eu_operun_Iter0.gdx", "noh"], ["20251009-1201eco-noh_wy2000_1344_h2vrehexo_iter0_y-2050", "00019"]],
+        [["MainResults_noh2_eu_operun_Iter0.gdx", "noh2"], ["20250930-0348eco-noh2_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_eu_operun_Iter0.gdx", "h2"], ["20251001-0845eco-h2_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_eu_operun_Iter0.gdx", "h2_lss"], ["20251010-0033eco-h2_lss_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_h2t_eu_operun_Iter0.gdx", "h2_lss_h2t"], ["20251010-1009eco-h2_lss_h2t_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_noh_eu_operun_Iter0.gdx", "noh"], ["20251003-1252eco-noh_wy2000_672_h2vrehexo_iter0_y-2050", "00019"]],
+        [["MainResults_noh2_eu_operun_Iter0.gdx", "noh2"], ["20251004-0833eco-noh2_wy2000_672_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_eu_operun_Iter0.gdx", "h2"], ["20251005-1523eco-h2_wy2000_672_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_eu_operun_Iter0.gdx", "h2_lss"], ["20251007-0348eco-h2_lss_wy2000_672_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_h2t_eu_operun_Iter0.gdx", "h2_lss_h2t"], ["20251008-1231eco-h2_lss_h2t_wy2000_672_h2exohexo_iter0_y-2050", "00019"]]
+    ]
+
+    collect_ptx_results(result_collection, 'largescale')
+
+@CLI.command()
 def h2exotest():
     
     result_list = [
