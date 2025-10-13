@@ -344,11 +344,12 @@ def virginie_data():
 
     collect_ptx_results(antbalm_list, 'virginie_data')
 
+
 @CLI.command()
 def new_sensitivities():
 
     collection_list = []
-    antares_outputs = Path('Antares/output').glob('20251008*')
+    antares_outputs = Path('Antares/output').glob('202510*_h2*h*_cl*_iter0_y-2050')
     for antares_output in antares_outputs:
         scenario = antares_output.name.split('eco-')[1].split('_h2')[0]
         collection_list.append(

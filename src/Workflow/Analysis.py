@@ -987,26 +987,28 @@ def plot_all(ctx, scenario, overwrite, region, mc_year):
 
 @CLI.command()
 def plot_virginie_clustering_table():
-    filename = 'Workflow/OverallResults/PtX_demand_comparison_virginie_clustering.csv'
-    df_diff, df_diff_mean = get_difference_table(filename, '# Demand Curves', r'cl(\d+)', int)
-    print(df_diff_mean.to_string())
-    df_diff_mean.loc['noh', [4, 8, 52, 168]] = df_diff_mean.loc['noh_fullyear', [4, 8, 52, 168]].values
-    
-    # print(df_diff.loc[['noh2', 'h2', 'h2_lss']].round())
+    """
+    Generate a table of annual, absolute differences in PtX demands 
+    between Antares and Balmorel for the clustering sensitivity analysis
+    """
+    filename = 'Workflow/OverallResults/PtX_demand_comparison_new_sensitivities.csv'
+    file = pd.read_csv(filename).query('(AntaresFile.str.contains("h2exohexo") and not AntaresFile.str.contains("noh_")) or (AntaresFile.str.contains("h2vrehexo") and AntaresFile.str.contains("noh_"))')
+    df_diff, df_diff_mean = get_difference_table(file, '# Demand Curves', r'cl(\d+)', int, r'eco-(.*)_h2')
+
+    # print(df_diff_mean.to_string())
     print(df_diff_mean.loc[['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']].round().to_string())
 
 @CLI.command()
 def plot_virginie_data_table():
-    filename = 'Workflow/OverallResults/PtX_demand_comparison_virginie_data.csv'
-    df_diff, df_diff_mean = get_difference_table(filename, 'Data', r'fullyear_(.+)\_iter0', str)
+    """
+    Generate a table of annual, absolute differences in PtX demands 
+    between Antares and Balmorel for the data sensitivity analysis
+    """
+    filename = 'Workflow/OverallResults/PtX_demand_comparison_new_sensitivities.csv'
+    df_diff, df_diff_mean = get_difference_table(filename, 'Data', r'\_(h2.{3}h.{3})\_cl1344', str, r"eco-(.*)\_h2")
 
-    df_diff_mean.loc[:, 'h2surhsur'] = df_diff_mean.loc[:, ['h2surhsur_oldrounding', 'h2surhsur_cl168']].sum(axis=1)
-    df_diff_mean.loc[:, 'h2vrehsur'] = df_diff_mean.loc[:, ['h2vrehsur_oldrounding', 'h2vrehsur_cl168']].sum(axis=1)
-    df_diff_mean.loc[:, 'h2surhexo'] = df_diff_mean.loc[:, ['h2surhexo_oldrounding', 'h2surhexo_cl168']].sum(axis=1)
-    df_diff_mean.loc[:, 'h2vrehexo'] = df_diff_mean.loc[:, ['h2vrehexo_oldrounding', 'h2vrehexo_cl168']].sum(axis=1)
-    
-    # print(df_diff.loc[['noh', 'noh2', 'h2', 'h2_lss']].round())
-    print(df_diff_mean.loc[['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t'], ['h2vrehexo', 'h2vrehsur', 'h2surhexo', 'h2surhsur']].round().to_string())
+    # print(df_diff_mean.to_string())
+    print(df_diff_mean.loc[['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t'], ['h2vrehexo', 'h2vrehsur', 'h2surhexo', 'h2surhsur', 'h2exohexo']].round().to_string())
 
 @CLI.command()
 @click.argument('weather_year', type=int)
