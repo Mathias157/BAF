@@ -326,15 +326,16 @@ def main(ctx, dark):
 
 @main.command()
 @click.option('--weather-years', type=int, default=35, help="Amount of weather years to load, defaults to 35")
-def model_error_boxplot(weather_years):
+@click.option('--csv-name', type=str, default='multiweather_%dtrained')
+def model_error_boxplot(weather_years, csv_name):
     """
     Box plots of deviation between Antares and 
     Balmorel PtX el. demands for all regions and 
     weather years.
     """
-    
+
     df = collect_and_concat_diff_dataframes(weather_years, 
-                                            'multiweather_%dtrained')
+                                            csv_name)
 
     # Plot the boxplot for all data
     commodities = ['HYDROGEN', 'HEAT']
@@ -427,7 +428,8 @@ def wy_balmorel_boxplot():
     merged.loc[:, 'Value'] = (merged.Value - merged.RefValue) / merged.RefValue * 100
 
     df, fig, ax = plot_single_boxplot(merged, 'BalmorelWYdiff')
-    fig.savefig('Workflow/OverallResults/BalmorelWYdiff_boxplot.png')
+    fig.savefig('Workflow/OverallResults/BalmorelWYdiff_boxplot.png',
+                transparent=True)
 
 
 if __name__ == "__main__":

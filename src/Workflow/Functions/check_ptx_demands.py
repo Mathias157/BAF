@@ -359,12 +359,19 @@ def new_sensitivities():
     collect_ptx_results(collection_list, 'new_sensitivities')
 
 @CLI.command()
-def multiweather():
+@click.argument('clustersize', type=str, default='cl1344')
+def multiweather(clustersize: str = 'cl1344'):
+    """
+    The small-scale multiweather year cross-runs
 
+    Args:
+       clustersize (str): Either 'cl1344' or '672' for the two runs.
+    """
+    
     weather_years = [1982+i for i in range(35)]
     for training_year in weather_years:
         collection_list = []
-        antares_outputs = Path('Antares/output').glob(f'*wy{training_year}_cl1344*')
+        antares_outputs = Path('Antares/output').glob(f'*wy{training_year}_{clustersize}*')
         for antares_output in antares_outputs:
             scenario = antares_output.name.split('eco-')[1].split('_wy')[0]
             for test_year in weather_years:
@@ -373,7 +380,8 @@ def multiweather():
                     [antares_output.name, f"{test_year-1982+1:05.0f}"]]
                 )
 
-        collect_ptx_results(collection_list, f'multiweather_{training_year}trained')
+        collect_ptx_results(collection_list, f'multiweather_{clustersize}_{training_year}trained')
+
 
 @CLI.command()
 def largescale():
