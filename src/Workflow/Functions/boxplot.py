@@ -127,6 +127,34 @@ def collect_and_concat_diff_dataframes(weather_years: int = 35,
 
     return collected_df
 
+def collect_and_concat_diff_dataframes_largescale():
+    collected_df = pd.DataFrame()
+    for weather_year in [2000]:
+        filename = "Workflow/OverallResults/PtX_demand_comparison_largescale.csv"
+        df, _ = get_difference_table(
+            filename,
+            "Data",
+            r"eco-(.+)\_iter",
+            str,
+            r"MainResults\_(.+)\_eu",
+            "AntaresFile",
+            "BalmorelFile",
+            absolute_difference=False,
+        )
+
+        formatted_df = (
+            df
+            .stack()
+            .stack()
+            .reset_index(name="Value")
+            .rename(columns={"Data": "TestYear"})
+        )
+
+        formatted_df["TrainYear"] = weather_year
+        collected_df = pd.concat((collected_df, formatted_df), ignore_index=True)
+
+    return collected_df
+
 
 def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
     """
@@ -204,7 +232,7 @@ def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = Fa
 
 
 def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = False,
-                 legend: bool = False):
+                 legend: bool = False, commodity: str = ''):
     """
     Plot boxplot of values with separate boxes for test years and train years
 
@@ -235,7 +263,6 @@ def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = 
         }
     )
 
-
     # Prepare data for boxplot - separate data for test years and train years
     test_data = []
     train_data = []
@@ -258,14 +285,22 @@ def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = 
     positions_train = [i + 0.2 for i in range(1, len(scenarios) + 1)]
 
     # Create boxplots
-    bp1 = ax.boxplot(
-        test_data, positions=positions_test, widths=0.35, 
-        patch_artist=True, whis=(0, 100)
-    )
-    bp2 = ax.boxplot(
-        train_data, positions=positions_train, widths=0.35,
-        patch_artist=True, whis=(0, 100)
-    )
+    if np.sum([np.sum(element) for element in test_data]) > 0 and np.sum([np.sum(element) for element in train_data]) > 0:
+        bp1 = ax.boxplot(
+            test_data, positions=positions_test, widths=0.35, 
+            patch_artist=True, whis=(0, 100)
+        )
+        bp2 = ax.boxplot(
+            train_data, positions=positions_train, widths=0.35,
+            patch_artist=True, whis=(0, 100)
+        )
+    else:
+        bp1 = ax.boxplot(
+            test_data, widths=0.35, 
+            patch_artist=True, whis=(0, 100)
+        )
+        bp2 = {'boxes' : []}
+
 
     # Style the boxplots with different colors
     for patch in bp1["boxes"]:
@@ -293,10 +328,10 @@ def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = 
     # Add labels and title
     # ax.set_title(title, fontsize=14)
     if not (average_regions):
-        ax.set_ylabel("Relative Difference (%)", fontsize=12)
+        ax.set_ylabel(f"Power-to-{commodity.capitalize()}\nRelative Difference (%)", fontsize=12)
         ax.set_ylim(-100, 100)
     else:
-        ax.set_ylabel("Absolute Relative Difference (%)", fontsize=12)
+        ax.set_ylabel(f"Power-to-{commodity.capitalize()}\nAbsolute Relative Difference (%)", fontsize=12)
         ax.set_ylim(0, 100)
     ax.grid(True, alpha=0.3, axis="y")
 
@@ -350,7 +385,8 @@ def model_error_boxplot(weather_years, csv_name):
 
         temp, fig, _ = plot_boxplot(fig, axes[i], 
             temp, "Endogenous electricity demands - average error for all regions and WY",
-            legend=True if commodity == 'HYDROGEN' else False
+            legend=True if commodity == 'HYDROGEN' else False,
+            commodity=commodity
         )
 
         # Plot the boxplot for system (aggregated absolute error across regions)
@@ -358,7 +394,8 @@ def model_error_boxplot(weather_years, csv_name):
             temp,
             "Endogenous electricity demands - average absolute error for system for all WY",
             True,
-            legend=True if commodity == 'HYDROGEN' else False
+            legend=True if commodity == 'HYDROGEN' else False,
+            commodity=commodity
         )
 
         # Print mean
@@ -381,9 +418,53 @@ def model_error_boxplot(weather_years, csv_name):
     fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison.png",
                 transparent=True)
     fig2.savefig(
-        f"Workflow/OverallResults/boxplot_endodemand_comparison_averageregions.png",
+        "Workflow/OverallResults/boxplot_endodemand_comparison_averageregions.png",
         transparent=True
     )
+
+@main.command()
+def model_error_boxplot_largescale():
+    """
+    Box plots of deviation between Antares and 
+    Balmorel PtX el. demands for all regions and 
+    weather years.
+    """
+
+    df = collect_and_concat_diff_dataframes_largescale()
+
+    # Plot the boxplot for all data
+    commodities = ['HYDROGEN', 'HEAT']
+    fig, axes = plt.subplots(len(commodities), figsize=(9, 6))
+    fig2, axes2 = plt.subplots(len(commodities), figsize=(9, 6))
+    for i, commodity in enumerate(commodities):
+
+        if commodity != 'all':
+            temp = df.query(f'Category == "{commodity}"')
+        else:
+            temp = df
+
+        temp, fig, _ = plot_boxplot(fig, axes[i], 
+            temp, "Endogenous electricity demands - average error for all regions and WY",
+            legend=False,
+            commodity=commodity
+        )
+
+        # Plot the boxplot for system (aggregated absolute error across regions)
+        _, fig2, _ = plot_boxplot(fig2, axes2[i], 
+            temp,
+            "Endogenous electricity demands - average absolute error for system for all WY",
+            True,
+            legend=False,
+            commodity=commodity
+        )
+
+    fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison_largescale.pdf",
+                transparent=True)
+    fig2.savefig(
+        "Workflow/OverallResults/boxplot_endodemand_comparison_averageregions_largescale.pdf",
+        transparent=True
+    )
+
 
 
 @main.command()
