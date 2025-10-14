@@ -110,7 +110,7 @@ def collect_ptx_results(ctx, antbalm_result_list: list, csv_filename: str):
 
 @click.group()
 @click.pass_context
-@click.option('--gams-directory', type=str, default='/appl/gams/47.6.0/', help='System directory of GAMS')
+@click.option('--gams-directory', type=str, default='/opt/gams/50.4/', help='System directory of GAMS')
 def CLI(ctx, gams_directory: str):
     
     ctx.ensure_object(dict)
@@ -351,7 +351,7 @@ def new_sensitivities():
     collection_list = []
     antares_outputs = Path('Antares/output').glob('202510*_h2*h*_cl*_iter0_y-2050')
     for antares_output in antares_outputs:
-        scenario = antares_output.name.split('eco-')[1].split('_h2')[0]
+        scenario = antares_output.name.split('eco-')[1].split('_cl')[0][:-10]
         collection_list.append(
             [[f"MainResults_{scenario}_dispatch_WY2000_Iter0.gdx", scenario],
             [antares_output.name, "00019"]]
