@@ -232,7 +232,7 @@ def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = Fa
 
 
 def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = False,
-                 legend: bool = False, commodity: str = ''):
+                 legend: bool = False, commodity: str = '', two_per_scenario: bool = True):
     """
     Plot boxplot of values with separate boxes for test years and train years
 
@@ -285,7 +285,7 @@ def plot_boxplot(fig, ax, df: pd.DataFrame, title: str, average_regions: bool = 
     positions_train = [i + 0.2 for i in range(1, len(scenarios) + 1)]
 
     # Create boxplots
-    if np.sum([np.sum(element) for element in test_data]) > 0 and np.sum([np.sum(element) for element in train_data]) > 0:
+    if two_per_scenario:
         bp1 = ax.boxplot(
             test_data, positions=positions_test, widths=0.35, 
             patch_artist=True, whis=(0, 100)
@@ -361,7 +361,7 @@ def main(ctx, dark):
 
 @main.command()
 @click.option('--weather-years', type=int, default=35, help="Amount of weather years to load, defaults to 35")
-@click.option('--csv-name', type=str, default='multiweather_%dtrained')
+@click.option('--csv-name', type=str, default='multiweather_cl1344_%dtrained')
 def model_error_boxplot(weather_years, csv_name):
     """
     Box plots of deviation between Antares and 
@@ -415,10 +415,10 @@ def model_error_boxplot(weather_years, csv_name):
             )
             .round(2),
         )
-    fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison.png",
+    fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison.pdf",
                 transparent=True)
     fig2.savefig(
-        "Workflow/OverallResults/boxplot_endodemand_comparison_averageregions.png",
+        "Workflow/OverallResults/boxplot_endodemand_comparison_averageregions.pdf",
         transparent=True
     )
 
@@ -446,7 +446,8 @@ def model_error_boxplot_largescale():
         temp, fig, _ = plot_boxplot(fig, axes[i], 
             temp, "Endogenous electricity demands - average error for all regions and WY",
             legend=False,
-            commodity=commodity
+            commodity=commodity,
+            two_per_scenario=False
         )
 
         # Plot the boxplot for system (aggregated absolute error across regions)
@@ -455,7 +456,8 @@ def model_error_boxplot_largescale():
             "Endogenous electricity demands - average absolute error for system for all WY",
             True,
             legend=False,
-            commodity=commodity
+            commodity=commodity,
+            two_per_scenario=False
         )
 
     fig.savefig("Workflow/OverallResults/boxplot_endodemand_comparison_largescale.pdf",
