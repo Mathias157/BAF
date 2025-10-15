@@ -788,6 +788,7 @@ def get_supply_curves(scenario: str,
                       price_rounding_level: int,
                       plot_overall_curves: bool = False,
                       plot_all_curves: bool = False,
+                      plot_clustering: bool = True,
                       style: str = 'report'):
     """Create seasonal curves for hydrogen and heat for every region in a scenario 
 
@@ -823,6 +824,26 @@ def get_supply_curves(scenario: str,
     
     ## Cluster parameters (works independently within each region)
     parameters = parameters.groupby('Region').apply(lambda x: cluster_values(x, cluster_size)).fillna(0)
+
+    if plot_clustering:
+        for region in regions:
+            fig, ax = plt.subplots()
+            plot_pars = (
+                parameters
+                .query('Region == @region')
+                .pivot_table(index=['Season', 'Time'],
+                             columns='Cluster',
+                             values=parameter_name)
+            )
+            plot_pars.index = range(len(plot_pars))
+            for cluster in plot_pars.columns:
+                print(plot_pars[cluster])
+                ax.scatter(x=plot_pars[cluster].index, 
+                            y=plot_pars[cluster], 
+                            label=cluster)
+            ax.set_ylabel(parameter_name)
+            ax.legend()
+            fig.savefig(f'Workflow/MetaResults/{commodity}_{region}_clustering.png')
     
     resulting_curves = get_curves(
         scenario,
@@ -839,7 +860,16 @@ def get_supply_curves(scenario: str,
 
     return resulting_curves
 
-def get_curves(scenario, parameters, commodity, parameter_name, df1_temp, df2_temp, price_rounding_level: int, plot_all_curves: bool, plot_overall_curves: bool, regions: list):
+def get_curves(scenario, 
+               parameters, 
+               commodity, 
+               parameter_name, 
+               df1_temp, 
+               df2_temp, 
+               price_rounding_level: int, 
+               plot_all_curves: bool, 
+               plot_overall_curves: bool, 
+               regions: list):
 
     # Get regional parameters and amount of clusters
     resulting_curves = {}
