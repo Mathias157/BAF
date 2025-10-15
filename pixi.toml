@@ -4,6 +4,9 @@ name = "BAF"
 platforms = ["linux-64", "win-64"]
 version = "0.1.0"
 
+[activation.env]
+MPLBACKEND = "Agg"
+
 [tasks]
 generate-mappings = "cd src && python -u Pre-Processing/preprocessing.py generate-mappings"
 generate-antares-vre = "cd src && pixi run python -u Pre-Processing/preprocessing.py generate-antares-vre"
