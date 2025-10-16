@@ -78,7 +78,7 @@ def get_difference_table(
     return df_diff, df_diff_mean
 
 
-def collect_and_concat_dataframes(balmorel_train_year: int = 2000):
+def collect_and_concat_dataframes(balmorel_train_year: int = 2000, filesuffix: str = 'multiweather_cl1344_%dtrained'):
     """
     Collect dataframes of PtX el. demands
 
@@ -92,7 +92,7 @@ def collect_and_concat_dataframes(balmorel_train_year: int = 2000):
 
     collected_df = pd.DataFrame()
     for weather_year in [1982 + i for i in range(35)]:
-        filename = f"Workflow/OverallResults/PtX_demand_comparison_multiweather_{weather_year}trained.csv"
+        filename = f"Workflow/OverallResults/PtX_demand_comparison_{filesuffix%weather_year}.csv"
 
         temp = pd.read_csv(filename)
         temp["Scenario"] = temp["AntaresFile"].str.extract(r"eco-(.+)\_wy")
@@ -166,13 +166,15 @@ def collect_and_concat_diff_dataframes_largescale():
     return collected_df
 
 
-def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = False):
+def plot_single_boxplot(df: pd.DataFrame, commodity: str, ax, average_regions: bool = False):
     """
     Plot boxplot of values with separate boxes for test years and train years
 
     Parameters:
     df: DataFrame with columns Value, Region, TestYear, TrainYear
     """
+
+    df = df.query(f'Category == "{commodity}"')
 
     if average_regions:
         # Do average across regions
@@ -193,9 +195,6 @@ def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = Fa
             "h2_lss_h2t": "H2LSSH2T",
         }
     )
-
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=(9, 6))
 
     # Prepare data for boxplot - separate data for test years and train years
     data = []
@@ -220,21 +219,24 @@ def plot_single_boxplot(df: pd.DataFrame, title: str, average_regions: bool = Fa
     legend_elements = [
         Patch(facecolor="lightcoral", alpha=0.7, label="Test Years"),
     ]
-    ax.legend(handles=legend_elements, loc="upper right")
+    if commodity == 'HYDROGEN':
+        ax.legend(
+            handles=legend_elements,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 1.01),
+            ncols=2,
+        )
 
     # Add labels and title
-    ax.set_title(title, fontsize=14)
     if not (average_regions):
-        ax.set_ylabel("Relative Difference (%)", fontsize=12)
+        ax.set_ylabel(f"Power-to-{commodity.capitalize()}\nRelative Difference (%)", fontsize=12)
         ax.set_ylim(-100, 100)
     else:
-        ax.set_ylabel("Absolute Relative Difference (%)", fontsize=12)
+        ax.set_ylabel(f"Power-to-{commodity.capitalize()}\nAbsolute Relative Difference (%)", fontsize=12)
         ax.set_ylim(0, 100)
     ax.grid(True, alpha=0.3, axis="y")
 
     plt.tight_layout()
-
-    return df, fig, ax
 
 
 def plot_boxplot(
@@ -537,8 +539,13 @@ def wy_balmorel_boxplot():
     # Calculate difference
     merged.loc[:, "Value"] = (merged.Value - merged.RefValue) / merged.RefValue * 100
 
-    df, fig, ax = plot_single_boxplot(merged, "BalmorelWYdiff")
-    fig.savefig("Workflow/OverallResults/BalmorelWYdiff_boxplot.png", transparent=True)
+    # Create figure and axis
+    fig, axes = plt.subplots(2, figsize=(9, 6))
+    axes_dict = {'HYDROGEN' : axes[0], 
+                 'HEAT' : axes[1]}
+    for commodity in ['HYDROGEN', 'HEAT']:
+        plot_single_boxplot(merged, commodity, axes_dict[commodity])
+    fig.savefig("Workflow/OverallResults/BalmorelWYdiff_boxplot.pdf", transparent=True)
 
 
 if __name__ == "__main__":
