@@ -4,6 +4,7 @@
 
 import gams
 import gams.control
+from ipywidgets.widgets.widget import comm
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -22,7 +23,7 @@ from pybalmorel import MainResults
 from pybalmorel.utils import symbol_to_df
 from pybalmorel.formatting import balmorel_colours
 from Functions.Formatting import newplot, set_style, stacked_bar
-from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput
+from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput, get_ptx_demand_timeseries
 from Functions.boxplot import get_difference_table
 import warnings
 
@@ -232,95 +233,8 @@ def get_antares_results(ctx,
                 
     return Antobj, pro, emi, pro_hourly
 
-@click.pass_context
-def get_ptx_demand_timeseries(ctx, balmorel_scenario: str, antares_scenario: str, 
-                              balmorel_scfolder: str, temporal: str = 'weekly',
-                              mc_year: str = 'mc-all', plot: bool = False,
-                              return_output_classes: bool = False):
-    """
-    Get electricity demands for power-to-heat and power-to-hydrogen across models
 
-    Args:
-       balmorel_scenario (str): The concrete Balmorel scenario to load.
-       antares_scenario (str): The concrete Antares scenario to load.
-       balmorel_scfolder (str): The scenario folder, where the Balmorel MainResults resides.
-       temporal (str): The temporal granularity of the timeseries, weekly or hourly.
-       mc_year (str): The monte-carlo year to read from Antares result.
-       plot (bool): Plot the series or not
 
-    Returns:
-       (pd.DataFrame, pd.DataFrame) | (pd.DataFrame, pd.DataFrame, MainResults, AntaresOutput): Dataframes with Balmorel and Antares PtX electricity demands.
-       possibly including Balmorel and Antares output classes.
-    """
-    
-
-    # Get files
-    balmorel_output = MainResults(f'MainResults_{balmorel_scenario}_Iter0.gdx', 
-                                  f'Balmorel/{balmorel_scfolder}/model',
-                                  system_directory=ctx.obj['gams_system_directory'])
-    antares_output  = AntaresOutput(antares_scenario)
-
-    # Get Balmorel series 
-    df_balm = (
-        balmorel_output
-        .get_result('F_CONS_YCRAST')
-        .query('Fuel == "ELECTRIC"')
-        .query('Technology in ["ELECT-TO-HEAT", "ELECTROLYZER"]')
-        .replace({'Technology' : 'ELECT-TO-HEAT'}, 'HEAT')
-        .replace({'Technology' : 'ELECTROLYZER'}, 'HYDROGEN')
-    )
-    df_balm.Season = df_balm.Season.str.replace('S', '').astype(int)
-    df_balm = (
-        df_balm
-        .pivot_table(
-            index=['Season', 'Region', 'Technology'] if temporal == 'weekly' else ['Season', 'Time', 'Region', 'Technology'],
-            values='Value',
-            aggfunc='sum'
-        )
-    )
-    regions = ['ES', 'FR', 'DE']
-    commodities = ['HEAT', 'HYDROGEN']
-    df_ant = pd.DataFrame()
-    for region in regions:
-        for commodity in commodities:
-            temp = antares_output.load_link_results(
-                [region, f'{region}_{commodity}'],
-                temporal=temporal,
-                mc_year=mc_year
-            )
-            temp['Region'] = region
-            temp['Commodity'] = commodity
-            df_ant = pd.concat((df_ant, temp[[temporal, 'Region', 'Commodity', 'FLOW LIN.']]),
-                               ignore_index=True)
-
-    df_ant = (
-        df_ant
-        .pivot_table(
-            index=[temporal, 'Region', 'Commodity'],
-            values='FLOW LIN.',
-            aggfunc='sum'
-        )
-    )
-
-    if plot:
-        for commodity in commodities:
-            fig, axes = plt.subplots(3)
-            
-            for i, region in enumerate(regions):
-                slices = (slice(None), slice(None), region, commodity) if temporal == 'hourly' else (slice(None), region, commodity)
-                df_balm.loc[slices].plot(ax=axes[i], label='Balmorel')
-                df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
-                axes[i].set_ylabel(region)
-                axes[i].legend(('Balmorel', 'Antares'))
-
-            axes[0].set_title(commodity)
-
-            plt.show()
-
-    if not return_output_classes:
-        return df_balm, df_ant
-    else:
-        return df_balm, df_ant, balmorel_output, antares_output
 
 
 @click.pass_context
@@ -789,8 +703,11 @@ def CLI(ctx, dark):
     else:
         ctx.obj["fc"], ctx.obj["plotly_theme"] = set_style("report")
 
-    ## 1.0 Plot design
+    # 1.0 Plot design
     ctx.obj["figsize"] = (10, 5)
+
+    # GAMS
+    ctx.obj['gams_system_directory'] = '/opt/gams/50.4/'
 
 
 @CLI.command()
@@ -991,7 +908,7 @@ def plot_virginie_clustering_table():
     Generate a table of annual, absolute differences in PtX demands 
     between Antares and Balmorel for the clustering sensitivity analysis
     """
-    filename = 'Workflow/OverallResults/PtX_demand_comparison_new_sensitivities.csv'
+    filename = 'Workflow/OverallResults/PtX_demand_comparison_new_sensitivities_vre.csv'
     file = pd.read_csv(filename).query('(AntaresFile.str.contains("h2exohexo") and not AntaresFile.str.contains("noh_")) or (AntaresFile.str.contains("h2vrehexo") and AntaresFile.str.contains("noh_"))')
     df_diff, df_diff_mean = get_difference_table(file, '# Demand Curves', r'cl(\d+)', int, r'eco-(.*)_h2')
 
@@ -1004,11 +921,11 @@ def plot_virginie_data_table():
     Generate a table of annual, absolute differences in PtX demands 
     between Antares and Balmorel for the data sensitivity analysis
     """
-    filename = 'Workflow/OverallResults/PtX_demand_comparison_new_sensitivities.csv'
+    filename = 'Workflow/OverallResults/PtX_demand_comparison_new_sensitivities_vre.csv'
     df_diff, df_diff_mean = get_difference_table(filename, 'Data', r'\_(h2.{3}h.{3})\_cl1344', str, r"eco-(.*)\_h2")
 
     # print(df_diff_mean.to_string())
-    print(df_diff_mean.loc[['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t'], ['h2vrehexo', 'h2vrehsur', 'h2surhexo', 'h2surhsur', 'h2exohexo']].round().to_string())
+    print(df_diff_mean.loc[['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t'], ['h2vrehvre']].round().to_string())
 
 @CLI.command()
 @click.argument('weather_year', type=int)
@@ -1027,6 +944,7 @@ def plot_multiweather_table(weather_year: int):
     print(f'Average deviation for other weather years:  {df_diff_mean.loc[:, df_diff_mean.columns.drop(weather_year)].mean().mean().round(2)}')
 
 @CLI.command()
+@click.pass_context
 @click.argument('balmorel_scenario', type=str, default='h2_dispatch_WY1983')
 @click.argument('balmorel_scfolder', type=str, default='h2')
 # @click.argument('antares_scenario', type=str, default='20250922-1419eco-h2_wy1983_cl1344_iter0_y-2050')
@@ -1035,12 +953,13 @@ def plot_multiweather_table(weather_year: int):
 @click.option('--temporal', type=str, default='weekly', help="The choice of temporal aggregation for the result")
 @click.option('--plot', is_flag=True, default=False, help="Plot the series or not")
 @click.option('--overwrite', is_flag=True, default=False, help="Overwrite collected results")
-def ptx_elmix(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year, 
+def ptx_elmix(ctx, balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year, 
                  temporal, plot, overwrite, iteration: int = 0, year: int = 2050):
 
     ptx_balm, ptx_ant, balmorel_output, antares_output = get_ptx_demand_timeseries(balmorel_scenario, antares_scenario, balmorel_scfolder,
                                                                                    temporal='hourly', mc_year=mc_year, plot=plot, 
-                                                                                   return_output_classes=True)
+                                                                                   return_output_classes=True, regions = ['ES', 'FR', 'DE'],
+                                                                                   gams_system_directory=ctx.obj['gams_system_directory'])
     ptx_ant = ptx_ant.rename(columns={'FLOW LIN.' : 'Value'})
 
     results, plot_name = collect_or_load_results(balmorel_scenario, mc_year=mc_year, 
@@ -1162,6 +1081,60 @@ def ptx_elmix(balmorel_scenario, balmorel_scfolder, antares_scenario, mc_year,
         ax.set_xlim(-0.6, max_val*1.1)
         fig.savefig(f'Workflow/OverallResults/elmix_at_ptx_{value}.png', bbox_inches='tight')
         # plt.show()
+
+@CLI.command()
+@click.pass_context
+@click.argument('scenario', type=str)
+@click.argument('system', type=str, default='large')
+def plot_system_ptx_profile(ctx, 
+                            scenario: str,
+                            system: str = 'large',
+                            temporal: str = 'weekly',
+                            mc_year: str = '00019'):
+
+    # Find scenarios
+    antares_path = Path('Antares/output')
+    if system == 'large':
+        regions = ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'UK']
+        balmorel_scenario = f'{scenario}_eu_operun'
+        antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_wy2000_1344_h2*hexo_iter0_y-2050')]
+    elif system == 'small':
+        balmorel_scenario = f'{scenario}_dispatch_WY2000'
+        antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_wy2000_*1344_h2*hexo_iter0_y-2050')]
+        regions = ['DE', 'FR', 'ES']
+    else:
+        raise ValueError("Invalid system choice!")
+
+    if len(antares_scenario) > 1:
+        raise ValueError("Several Antares outputs found!\n" + "\n".join(antares_scenario))
+    else:
+        antares_scenario = antares_scenario[0]
+
+    if scenario == 'noh':
+        commodities = ['HYDROGEN']
+    elif scenario == 'noh2':
+        commodities = ['HEAT']
+    else:
+        commodities = ['HEAT', 'HYDROGEN']
+    
+    ptx_balm, ptx_ant = get_ptx_demand_timeseries(balmorel_scenario, antares_scenario, scenario,
+                                                temporal=temporal, mc_year=mc_year, plot=False, 
+                                                return_output_classes=False, regions = regions,
+                                                gams_system_directory=ctx.obj['gams_system_directory'])
+
+    sum_func = lambda x: np.sum(x)/1e6
+    for i,commodity in enumerate(commodities):
+        fig, ax = plt.subplots(figsize=(4, 1))
+        ptx_balm.loc[:, :, commodity].pivot_table(index='Season' if temporal == 'weekly' else ['Season', 'Time'], 
+                                                  values='Value',
+                                                  aggfunc=sum_func).plot(ax=ax, label='Balmorel', legend=False)
+        ptx_ant.loc[:,:,commodity].pivot_table(index=temporal,
+                                               values='FLOW LIN.',
+                                               aggfunc=sum_func).plot(ax=ax, label='Antares', legend=False)
+        # ax.legend(['Balmorel', 'Antares'], loc='upper right')
+        # ax.set_ylabel(f'Power-to-{commodity.capitalize()} TWh')
+        ax.set_xlabel('')
+        fig.savefig(f'Workflow/OverallResults/{scenario}_{system}_{commodity}_ptx_profile.pdf')
 
 if __name__ == "__main__":
     CLI()
