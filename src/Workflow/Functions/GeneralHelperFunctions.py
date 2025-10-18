@@ -386,19 +386,17 @@ def get_marginal_costs(
         # Fuel cost
         try:
             mc_cost_temp += (
-                FPRICE
-                .query('F == @fuel and A.str.contains(@region)')                
-                .loc[:, 'Value']
+                FPRICE.query("F == @fuel and A.str.contains(@region)")
+                .loc[:, "Value"]
                 .mean()
-                * 3.6 # From €/GJ to €/MWh
+                * 3.6  # From €/GJ to €/MWh
                 / GDATA.loc[(G, "GDFE"), "Value"]
                 * Gcap
                 / totalcap
             )  # Same prices everywhere as in DK
             # print('Added fuel cost: ', mc_cost_temp)
         except KeyError:
-            log(f'No fuel cost for {region, G, fuel}')
-
+            log(f"No fuel cost for {region, G, fuel}")
 
         # Carbon cost
         try:
@@ -519,17 +517,24 @@ def get_capex(
 
     return capex_temp
 
+
 # ------------------- #
 #       Outputs       #
 # ------------------- #
 
-def get_ptx_demand_timeseries(balmorel_scenario: str, antares_scenario: str, 
-                              balmorel_scfolder: str, temporal: str = 'weekly',
-                              mc_year: str = 'mc-all', plot: bool = False,
-                              return_output_classes: bool = False,
-                              regions: list = ['ES', 'FR', 'DE'],
-                              commodities: list = ['HYDROGEN', 'HEAT'],
-                              gams_system_directory: str = '/appl/gams/47.6.0'):
+
+def get_ptx_demand_timeseries(
+    balmorel_scenario: str,
+    antares_scenario: str,
+    balmorel_scfolder: str,
+    temporal: str = "weekly",
+    mc_year: str = "mc-all",
+    plot: bool = False,
+    return_output_classes: bool = False,
+    regions: list = ["ES", "FR", "DE"],
+    commodities: list = ["HYDROGEN", "HEAT"],
+    gams_system_directory: str = "/appl/gams/47.6.0",
+):
     """
     Get electricity demands for power-to-heat and power-to-hydrogen across models
 
@@ -545,64 +550,62 @@ def get_ptx_demand_timeseries(balmorel_scenario: str, antares_scenario: str,
        (pd.DataFrame, pd.DataFrame) | (pd.DataFrame, pd.DataFrame, MainResults, AntaresOutput): Dataframes with Balmorel and Antares PtX electricity demands.
        possibly including Balmorel and Antares output classes.
     """
-    
 
     # Get files
-    balmorel_output = MainResults(f'MainResults_{balmorel_scenario}_Iter0.gdx', 
-                                  f'Balmorel/{balmorel_scfolder}/model',
-                                  system_directory=gams_system_directory)
-    antares_output  = AntaresOutput(antares_scenario)
+    balmorel_output = MainResults(
+        f"MainResults_{balmorel_scenario}_Iter0.gdx",
+        f"Balmorel/{balmorel_scfolder}/model",
+        system_directory=gams_system_directory,
+    )
+    antares_output = AntaresOutput(antares_scenario)
 
-    # Get Balmorel series 
+    # Get Balmorel series
     df_balm = (
-        balmorel_output
-        .get_result('F_CONS_YCRAST')
+        balmorel_output.get_result("F_CONS_YCRAST")
         .query('Fuel == "ELECTRIC"')
         .query('Technology in ["ELECT-TO-HEAT", "ELECTROLYZER"]')
-        .replace({'Technology' : 'ELECT-TO-HEAT'}, 'HEAT')
-        .replace({'Technology' : 'ELECTROLYZER'}, 'HYDROGEN')
+        .replace({"Technology": "ELECT-TO-HEAT"}, "HEAT")
+        .replace({"Technology": "ELECTROLYZER"}, "HYDROGEN")
     )
-    df_balm.Season = df_balm.Season.str.replace('S', '').astype(int)
-    df_balm = (
-        df_balm
-        .pivot_table(
-            index=['Season', 'Region', 'Technology'] if temporal == 'weekly' else ['Season', 'Time', 'Region', 'Technology'],
-            values='Value',
-            aggfunc='sum'
-        )
+    df_balm.Season = df_balm.Season.str.replace("S", "").astype(int)
+    df_balm = df_balm.pivot_table(
+        index=["Season", "Region", "Technology"]
+        if temporal == "weekly"
+        else ["Season", "Time", "Region", "Technology"],
+        values="Value",
+        aggfunc="sum",
     )
     df_ant = pd.DataFrame()
     for region in regions:
         for commodity in commodities:
             temp = antares_output.load_link_results(
-                [region, f'{region}_{commodity}'],
-                temporal=temporal,
-                mc_year=mc_year
+                [region, f"{region}_{commodity}"], temporal=temporal, mc_year=mc_year
             )
-            temp['Region'] = region
-            temp['Commodity'] = commodity
-            df_ant = pd.concat((df_ant, temp[[temporal, 'Region', 'Commodity', 'FLOW LIN.']]),
-                               ignore_index=True)
+            temp["Region"] = region
+            temp["Commodity"] = commodity
+            df_ant = pd.concat(
+                (df_ant, temp[[temporal, "Region", "Commodity", "FLOW LIN."]]),
+                ignore_index=True,
+            )
 
-    df_ant = (
-        df_ant
-        .pivot_table(
-            index=[temporal, 'Region', 'Commodity'],
-            values='FLOW LIN.',
-            aggfunc='sum'
-        )
+    df_ant = df_ant.pivot_table(
+        index=[temporal, "Region", "Commodity"], values="FLOW LIN.", aggfunc="sum"
     )
 
     if plot:
         for commodity in commodities:
             fig, axes = plt.subplots(3)
-            
+
             for i, region in enumerate(regions):
-                slices = (slice(None), slice(None), region, commodity) if temporal == 'hourly' else (slice(None), region, commodity)
-                df_balm.loc[slices].plot(ax=axes[i], label='Balmorel')
-                df_ant.loc[:, region, commodity].plot(ax=axes[i], label='Antares')
+                slices = (
+                    (slice(None), slice(None), region, commodity)
+                    if temporal == "hourly"
+                    else (slice(None), region, commodity)
+                )
+                df_balm.loc[slices].plot(ax=axes[i], label="Balmorel")
+                df_ant.loc[:, region, commodity].plot(ax=axes[i], label="Antares")
                 axes[i].set_ylabel(region)
-                axes[i].legend(('Balmorel', 'Antares'))
+                axes[i].legend(("Balmorel", "Antares"))
 
             axes[0].set_title(commodity)
 
@@ -612,6 +615,7 @@ def get_ptx_demand_timeseries(balmorel_scenario: str, antares_scenario: str,
         return df_balm, df_ant
     else:
         return df_balm, df_ant, balmorel_output, antares_output
+
 
 # %% ------------------------------- ###
 ###            5. Classes           ###

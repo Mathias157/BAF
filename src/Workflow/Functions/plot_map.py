@@ -4,6 +4,7 @@ import geopandas as gpd
 from pathlib import Path
 from matplotlib.patches import FancyArrowPatch, ArrowStyle, Circle
 from pybalmorel import MainResults
+import pandas as pd
 import matplotlib.pyplot as plt
 from GeneralHelperFunctions import AntaresOutput
 
@@ -111,7 +112,7 @@ def get_balmorel_flows(ctx):
     df_flow = (
         res.get_result("X_FLOW_YCR")
         .query(f'Year == "{year}"')
-        .pivot_table(index="From", columns="To", values="Value")
+        .pivot_table(index="From", columns="To", values="Value", aggfunc='sum')
     )
 
     return unique_capacities, df_flow
@@ -133,25 +134,51 @@ def get_antares_flows(ctx):
                     df = ant_res.load_link_results([region_from, region_to],
                                         temporal='annual',
                                         mc_year=ctx.obj['mc_year'])
-                    data.append(df.loc[0, 'FLOW LIN.'])
+                    net_flow = df.loc[:, 'FLOW LIN.'].sum()/1e6
+                    if net_flow > 0:
+                        data.append([region_from, region_to, net_flow])
+                    else:
+                        data.append([region_to, region_from, -net_flow])
                 except FileNotFoundError:
                     pass
 
-    print(data)
+    df_flow_from = pd.DataFrame(
+        data,
+        columns=['From', 'To', 'Value']
+    )
+    df_flow_to = pd.DataFrame(
+        data,
+        columns=['To', 'From', 'Value']
+    )
+    df_flow_to.Value = 0
+    df_flow = (
+        pd.concat(
+                (df_flow_from,
+                df_flow_to),
+            )
+        .pivot_table(
+        index="From",
+        columns="To",
+        values="Value",
+        aggfunc='sum'
+        )
+    )
 
-    return unique_capacities, data
+    return unique_capacities, df_flow
 
 @main.command()
+@click.pass_context
 @click.argument('model', type=str, default='balmorel')
-def flow(model: str = 'Balmorel'):
+def flow(ctx, model: str = 'Balmorel'):
     if model.lower() == 'balmorel':
         unique_capacities, df_flow = get_balmorel_flows()
     else:
         unique_capacities, df_flow = get_antares_flows()
 
-    plot_elflow(unique_capacities, df_flow)
+    filename = f"{ctx.obj['scenario']}_{model}_elflows.png"
+    plot_elflow(unique_capacities, df_flow, filename)
 
-def plot_elflow(unique_capacities, df_flow):
+def plot_elflow(unique_capacities, df_flow, filename):
 
     # Plot
     gf = gpd.read_file("2025AntBalmMap.geojson").query('ADMIN != "Ukraine" and ADMIN != "Turkey" and ADMIN != "Belarus"')
@@ -163,8 +190,20 @@ def plot_elflow(unique_capacities, df_flow):
         for region_to in unique_capacities.columns:
             if (
                 unique_capacities.loc[region_from, region_to] > 0
-                and f"{region_to}-{region_from}"
             ):
+                # Calculate net flow
+                try:
+                    net_flow = (
+                        df_flow.loc[region_from, region_to]
+                        - df_flow.loc[region_to, region_from]
+                    )
+                except KeyError:
+                    net_flow = df_flow.loc[region_from, region_to]
+
+                # Skip, if net flow is in the other direction
+                if net_flow < 0:
+                    continue
+
                 # Find coordinates
                 if region_from not in special_coordinates.keys():
                     c1 = gf.query(f"id == '{region_from}' ").centroid.values[0]
@@ -191,16 +230,6 @@ def plot_elflow(unique_capacities, df_flow):
                     x_coords = [x1, x2]
                     y_coords = [y1, y2]
 
-                # Calculate net flow
-                net_flow = (
-                    df_flow.loc[region_from, region_to]
-                    - df_flow.loc[region_to, region_from]
-                )
-
-                # Skip, if net flow is in the other direction
-                if net_flow < 0:
-                    continue
-
                 print(f"Flow from {region_from} to {region_to}: {net_flow} TWh")
 
                 # Make arrow if flow is larger than 10 TWh
@@ -222,7 +251,7 @@ def plot_elflow(unique_capacities, df_flow):
                     color="lightblue"
                 )
 
-    fig.savefig("test.png")
+    fig.savefig(filename)
 
 
 @main.command()

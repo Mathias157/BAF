@@ -788,7 +788,7 @@ def get_supply_curves(scenario: str,
                       price_rounding_level: int,
                       plot_overall_curves: bool = False,
                       plot_all_curves: bool = False,
-                      plot_clustering: bool = True,
+                      plot_clustering: bool = False,
                       style: str = 'report'):
     """Create seasonal curves for hydrogen and heat for every region in a scenario 
 
@@ -837,12 +837,11 @@ def get_supply_curves(scenario: str,
             )
             plot_pars.index = range(len(plot_pars))
             for cluster in plot_pars.columns:
-                print(plot_pars[cluster])
                 ax.scatter(x=plot_pars[cluster].index, 
                             y=plot_pars[cluster], 
-                            label=cluster)
+                            label=cluster,
+                           s=1)
             ax.set_ylabel(parameter_name)
-            ax.legend()
             fig.savefig(f'Workflow/MetaResults/{commodity}_{region}_clustering.png')
     
     resulting_curves = get_curves(
@@ -919,6 +918,18 @@ def get_curves(scenario,
             fig_season.savefig('Workflow/OverallResults/supply_curve_%s_%s.png'%(commodity, region),
                                         bbox_inches='tight')
             plt.close(fig_season)
+
+        # The plot below is just the same as plotting the curve! Just in a 
+        # meaningless, scatter-way. Plotting on input data makes more sense.
+        # fig, ax = plt.subplots()
+        # n_parameters = len(resulting_curves[region].keys())
+        # i = 0
+        # for parameter in resulting_curves[region].keys():
+        #     print(resulting_curves[region][parameter]['price'])
+        #     ax.scatter(x=resulting_curves[region][parameter]['price'],
+        #                 y=resulting_curves[region][parameter]['capacity'],
+        #                 )
+        # fig.savefig(f'Workflow/MetaResults/{commodity}_{region}_result_clusters.png')
 
     return resulting_curves
 
