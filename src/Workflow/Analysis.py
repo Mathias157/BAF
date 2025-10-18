@@ -707,7 +707,7 @@ def CLI(ctx, dark):
     ctx.obj["figsize"] = (10, 5)
 
     # GAMS
-    ctx.obj['gams_system_directory'] = '/opt/gams/50.4/'
+    ctx.obj['gams_system_directory'] = '/appl/gams/47.6.0/'
 
 
 @CLI.command()
@@ -753,8 +753,12 @@ def collect_results(ctx, scenario: str, mc_year: str, specific_antares_result: s
 
     ### 0.4 Which results to import?
     if not(specific_antares_result):
-        ant_out = pd.Series(os.listdir(ctx.obj['wk_dir'] + '/Antares/output'))
-        ant_out = ant_out[ant_out.str.find(('eco-' + scenario.replace('dispatch_', '').lower() + '_cl1344_iter').lower().replace('+',' ')) != -1].sort_values(ascending=False).values[0]
+        ant_out_find = Path('Antares/output')
+        ant_out = [result.name for result in ant_out_find.glob(f'*eco-{scenario.replace('dispatch_', '').lower()}*')]
+        if len(ant_out) > 1:
+            raise ValueError("Too many results found!")
+        else:
+            ant_out = ant_out[0]
     else:
         ant_out = specific_antares_result
     ctx.obj['antares_output'] = ant_out
