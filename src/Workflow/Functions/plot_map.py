@@ -181,10 +181,12 @@ def flow(ctx, model: str = 'Balmorel'):
 def plot_elflow(unique_capacities, df_flow, filename):
 
     # Plot
-    gf = gpd.read_file("2025AntBalmMap.geojson").query('ADMIN != "Ukraine" and ADMIN != "Turkey" and ADMIN != "Belarus"')
+    gf = gpd.read_file("Pre-Processing/2025AntBalmMap.geojson").query('ADMIN != "Ukraine" and ADMIN != "Turkey" and ADMIN != "Belarus"')
     fig, ax = plt.subplots(dpi=200, figsize=(15, 10))
     gf.plot(ax=ax, facecolor='grey')
     scaling = 5
+    max_flow = df_flow.max().max()
+    min_flow = df_flow.min().min()
 
     for region_from in unique_capacities.index:
         for region_to in unique_capacities.columns:
@@ -198,7 +200,11 @@ def plot_elflow(unique_capacities, df_flow, filename):
                         - df_flow.loc[region_to, region_from]
                     )
                 except KeyError:
-                    net_flow = df_flow.loc[region_from, region_to]
+                    try:
+                        net_flow = df_flow.loc[region_from, region_to]
+                    except KeyError:
+                        print(f'No flow from {region_from} to {region_to} despite non-zero capacity')
+                        continue
 
                 # Skip, if net flow is in the other direction
                 if net_flow < 0:
@@ -251,7 +257,9 @@ def plot_elflow(unique_capacities, df_flow, filename):
                     color="lightblue"
                 )
 
-    fig.savefig(filename)
+    # Set title
+    ax.set_title(f'Max flow: {max_flow:0.2f} TWh, min flow: {min_flow:0.2f} TWh')
+    fig.savefig(f'Workflow/OverallResults/{filename}')
 
 
 @main.command()
@@ -268,7 +276,7 @@ def pybalm(ctx, commodity):
         commodity=commodity,
         lines="FlowYear",
         generation="Production",
-        path_to_geofile="./2025AntBalmMap.geojson",
+        path_to_geofile="./Pre-Processing/2025AntBalmMap.geojson",
         background="H2 Net Export",
         pie_value_max=1000000,
     )
