@@ -1,5 +1,6 @@
 import enum
 import click
+import numpy as np
 import geopandas as gpd
 from pathlib import Path
 from matplotlib.patches import FancyArrowPatch, ArrowStyle, Circle
@@ -51,7 +52,7 @@ def main(ctx, scenario, year, scenario_folder, antares_scenario, mc_year, dark):
     else:
         ctx.obj["facecolor"] = "white"
 
-    ctx.obj["gams_system_directory"] = "/opt/gams/50.4/"
+    ctx.obj["gams_system_directory"] = "/appl/gams/47.6.0/"
 
     # Find MainResults
     ctx.obj["MainResults"] = MainResults(
@@ -185,8 +186,7 @@ def plot_elflow(unique_capacities, df_flow, filename):
     fig, ax = plt.subplots(dpi=200, figsize=(15, 10))
     gf.plot(ax=ax, facecolor='grey')
     scaling = 5
-    max_flow = df_flow.max().max()
-    min_flow = df_flow.min().min()
+    all_net_flows = []
 
     for region_from in unique_capacities.index:
         for region_to in unique_capacities.columns:
@@ -257,7 +257,12 @@ def plot_elflow(unique_capacities, df_flow, filename):
                     color="lightblue"
                 )
 
+                # Store net flow
+                all_net_flows.append(net_flow)
+
     # Set title
+    max_flow = np.max(all_net_flows)
+    min_flow = np.min(all_net_flows)
     ax.set_title(f'Max flow: {max_flow:0.2f} TWh, min flow: {min_flow:0.2f} TWh')
     fig.savefig(f'Workflow/OverallResults/{filename}')
 
