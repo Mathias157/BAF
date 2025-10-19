@@ -16,7 +16,8 @@ rule all:
             "Balmorel/base/data/WND_VAR_T.inc",
             "Balmorel/base/data/WTRRRVAR_T.inc",
             "Balmorel/base/data/done.txt",
-            "Balmorel/base/data/DH_VAR_T.inc"
+            "Balmorel/base/data/DH_VAR_T.inc",
+            "Antares/input/bindingconstraints/bindingconstraints.ini"
         ]
 
 
@@ -40,6 +41,15 @@ rule generate_antares_vre:
         "Antares/input/renewables/series/es/onshore/series.txt"
     shell:
         preprocessing_cli_cmd + "generate-antares-vre"
+
+# Rule for generating PSP and battery constraints for Antares
+rule generate_antares_bindingconstraints:
+    output:
+        [
+          "Antares/input/bindingconstraints/bindingconstraints.ini"
+        ]
+    shell:
+        preprocessing_cli_cmd + "generate-antares-bindingconstraints"
 
 # Rule for generating Balmorel timeseries (VRE and exogenous electricity)
 rule generate_balmorel_timeseries:
