@@ -231,7 +231,7 @@ group = default
 00_{storage_name}_sto%{region} = -{efficiency:0.5f}
 00_xtra.z_{region}_{storage_name}_1 = 1.000000%-1
 00_xtra.z_{region}_{storage_name}_2 = -1.000000
-de.z_{storage_name}_gen = -1.000000
+{region}.z_{storage_name}_gen = -1.000000
 
 [{number+2}]
 name = 00_xtra_{region}_{storage_name}_3
@@ -256,15 +256,15 @@ group = default
 00_xtra.z_{region}_{storage_name}_2 = 1.000000
 
 [{number+4}]
-name = {region}_bat
-id = {region}_bat
+name = {region}_{storage_name}
+id = {region}_{storage_name}
 enabled = true
 type = weekly
 operator = equal
 filter-year-by-year = 
 filter-synthesis = 
 group = default
-00_bat_sto%{region} = {efficiency:0.5f}
+00_{storage_name}_sto%{region} = {efficiency:0.5f}
 {region}.z_{storage_name}_gen = 1.000000
 """
 
