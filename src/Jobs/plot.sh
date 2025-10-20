@@ -13,6 +13,7 @@ for scenario in noh noh2 h2; do
   fi
 
   if [ $scale = "large" ]; then
+
     # Maps
     python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_${clustering_name}_stofixflowbased --mc-year 00019 ${scenario}_eu_operun_flowbased_Iter0 flow balmorel
     python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_${clustering_name}_stofixflowbased --mc-year 00019 ${scenario}_eu_operun_flowbased_Iter0 flow antares
@@ -34,6 +35,10 @@ for scenario in noh noh2 h2; do
 done
 
 if [ $scale = "large" ]; then
+  # Capacities
+  cd Balmorel
+  python analysis/analyse.py --overwrite cap --filters "Scenario in ['noh_eu_operun_flowbased_Iter0','noh2_eu_operun_flowbased_Iter0','h2_eu_operun_flowbased_Iter0','h2_lss_eu_operun_flowbased_Iter0','h2_lss_h2t_eu_operun_flowbased_Iter0']"
+  cd ../
 
   # Seasonal PtX profile
   python Workflow/Analysis.py plot-system-ptx-profile $scale
@@ -42,6 +47,10 @@ if [ $scale = "large" ]; then
   python Workflow/Functions/boxplot.py model-error-boxplot-largescale
 
 elif [ $scale = "small" ]; then
+  # Capacities
+  cd Balmorel
+  python analysis/analyse.py --overwrite cap --filters "Scenario in ['noh_dispatch_WY2000_Iter0','noh2_dispatch_WY2000_Iter0','h2_dispatch_WY2000_Iter0','h2_lss_dispatch_WY2000_Iter0','h2_lss_h2t_dispatch_WY2000_Iter0']"
+  cd ../
 
   weather_year=1982
   while [ $weather_year -le 2016 ]; do
