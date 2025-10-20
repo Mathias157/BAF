@@ -1027,7 +1027,15 @@ def create_demand_response_hourly_constraint(
             f.write("\n".join([str(n) for n in hydrogen_RHS]))
             f.write("\n".join(["0" for i in range(49)]))
 
-def create_demand_response(weather_years: list, result: MainResults, scenario: str, year: int, temporal_resolution: dict, cluster_size: int, price_rounding_level: int, choices: dict, style: str = 'report'):
+def create_demand_response(weather_years: list, 
+                           result: MainResults, 
+                           scenario: str, 
+                           year: int, 
+                           temporal_resolution: dict, 
+                           cluster_size: int, 
+                           price_rounding_level: int, 
+                           choices: dict, 
+                           style: str = 'report'):
     """Create demand response curves for all hours per season
 
     Args:
@@ -1116,6 +1124,12 @@ def create_demand_response(weather_years: list, result: MainResults, scenario: s
                 unserved_energy_cost.set('unserverdenergycost', region.lower(), str(unserved_energy_cost_value[1]))
         else: 
             log(f'No batch results for {commodity}')
+
+        # Store supply curve
+        supply_curves[f'{commodity}_meta_data'] = {'parameter_choice' : choices[commodity]}
+
+    with open(f'Workflow/MetaResults/{scenario}_{year}_cl{cluster_size}_supplycurve.pkl', 'wb') as f:
+        pickle.dump(supply_curves, f)
 
     # Store unserved
     with open('Antares/input/thermal/areas.ini', 'w') as f:

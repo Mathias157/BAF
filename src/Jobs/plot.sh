@@ -1,18 +1,25 @@
-# python Workflow/Analysis.py plot noh2_fullyear
-# python Workflow/Analysis.py plot h2_fullyear
-# python Workflow/Analysis.py plot h2_lss_fullyear
+###!/bin/sh
+for scenario in noh noh2 h2; do
 
-python Workflow/Functions/plot_map.py --scenario-folder noh --antares-scenario noh_wy2000_cl1344 --mc-year 00019 noh_dispatch_WY2000_Iter0 flow balmorel
-python Workflow/Functions/plot_map.py --scenario-folder noh --antares-scenario noh_wy2000_cl1344 --mc-year 00019 noh_dispatch_WY2000_Iter0 flow antares
+  if [ $scenario = "noh" ]; then
+    # h2_clustering_technique="vre_availability"
+    clustering_name="h2vrehexo"
+  else
+    # h2_clustering_technique="exogenous_demand"
+    clustering_name="h2exohexo"
+  fi
 
-python Workflow/Functions/plot_map.py --scenario-folder noh2 --antares-scenario noh2_wy2000_cl1344 --mc-year 00019 noh2_dispatch_WY2000_Iter0 flow balmorel
-python Workflow/Functions/plot_map.py --scenario-folder noh2 --antares-scenario noh2_wy2000_cl1344 --mc-year 00019 noh2_dispatch_WY2000_Iter0 flow antares
+  # Maps
+  python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_${clustering_name}_stofixflowbased --mc-year 00019 ${scenario}_eu_operun_flowbased_Iter0 flow balmorel
+  python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_${clustering_name}_stofixflowbased --mc-year 00019 ${scenario}_eu_operun_flowbased_Iter0 flow antares
 
-python Workflow/Functions/plot_map.py --scenario-folder h2 --antares-scenario h2_wy2000_cl1344 --mc-year 00019 h2_dispatch_WY2000_Iter0 flow balmorel
-python Workflow/Functions/plot_map.py --scenario-folder h2 --antares-scenario h2_wy2000_cl1344 --mc-year 00019 h2_dispatch_WY2000_Iter0 flow antares
+  # Electricity generation
+  python Workflow/Analysis.py plot-all --overwrite ${scenario}_eu_operun_flowbased --mc-year 00019
 
-python Workflow/Functions/plot_map.py --scenario-folder h2_lss --antares-scenario h2_lss_wy2000_cl1344 --mc-year 00019 h2_lss_dispatch_WY2000_Iter0 flow balmorel
-python Workflow/Functions/plot_map.py --scenario-folder h2_lss --antares-scenario h2_lss_wy2000_cl1344 --mc-year 00019 h2_lss_dispatch_WY2000_Iter0 flow antares
+  # Boxplot
+  python Workflow/Functions/boxplot.py model-error-boxplot-largescale
 
-python Workflow/Functions/plot_map.py --scenario-folder h2_lss_h2t --antares-scenario h2_lss_h2t_wy2000_cl1344 --mc-year 00019 h2_lss_h2t_dispatch_WY2000_Iter0 flow balmorel
-python Workflow/Functions/plot_map.py --scenario-folder h2_lss_h2t --antares-scenario h2_lss_h2t_wy2000_cl1344 --mc-year 00019 h2_lss_h2t_dispatch_WY2000_Iter0 flow antares
+  # Seasonal PtX profile
+  python Workflow/Analysis.py plot-system-ptx-profile $scenario large
+
+done

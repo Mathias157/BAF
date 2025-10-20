@@ -15,6 +15,7 @@ import sys
 sys.path.append('.')
 from Functions.GeneralHelperFunctions import load_OSMOSE_data, data_context
 from pybalmorel import IncFile
+import itertools
 import pickle
 import configparser
 
@@ -192,6 +193,82 @@ def convert_to_52weeks(ctx, year: int, filename: str, values: str):
 def list_of_str(value):
     return value.replace(' ', '').split(',')
 
+def generate_storage_bc(number: int, 
+                        region: str,
+                        storage_name: str):
+
+    region = region.lower()
+    storage_name = storage_name.lower()
+    if storage_name == 'bat':
+        efficiency = 0.90
+    elif storage_name == 'psp':
+        efficiency = 0.75
+    else:
+        raise ValueError("Wrong choice of storage!")
+
+    storage_constraints = f"""
+[{number}]
+name = 00_xtra_{region}_{storage_name}_1
+id = 00_xtra_{region}_{storage_name}_1
+enabled = true
+type = hourly
+operator = equal
+filter-year-by-year = 
+filter-synthesis = 
+group = default
+00_xtra.z_{region}_{storage_name}_1 = 1.000000
+00_xtra.z_{region}_{storage_name}_2 = -1.000000
+
+[{number+1}]
+name = 00_xtra_{region}_{storage_name}_2
+id = 00_xtra_{region}_{storage_name}_2
+enabled = true
+type = hourly
+operator = equal
+filter-year-by-year = 
+filter-synthesis = 
+group = default
+00_{storage_name}_sto%{region} = -{efficiency:0.5f}
+00_xtra.z_{region}_{storage_name}_1 = 1.000000%-1
+00_xtra.z_{region}_{storage_name}_2 = -1.000000
+{region}.z_{storage_name}_gen = -1.000000
+
+[{number+2}]
+name = 00_xtra_{region}_{storage_name}_3
+id = 00_xtra_{region}_{storage_name}_3
+enabled = true
+type = hourly
+operator = less
+filter-year-by-year = 
+filter-synthesis = 
+group = default
+00_xtra.z_{region}_{storage_name}_2 = 1.000000
+
+[{number+3}]
+name = 00_xtra_{region}_{storage_name}_3
+id = 00_xtra_{region}_{storage_name}_3
+enabled = true
+type = hourly
+operator = greater
+filter-year-by-year = 
+filter-synthesis = 
+group = default
+00_xtra.z_{region}_{storage_name}_2 = 1.000000
+
+[{number+4}]
+name = {region}_{storage_name}
+id = {region}_{storage_name}
+enabled = true
+type = weekly
+operator = equal
+filter-year-by-year = 
+filter-synthesis = 
+group = default
+00_{storage_name}_sto%{region} = {efficiency:0.5f}
+{region}.z_{storage_name}_gen = 1.000000
+"""
+
+    return storage_constraints
 
 #%% ------------------------------- ###
 ###        Hardcoded Mappings       ###
@@ -623,6 +700,43 @@ def generate_balmorel_hydro(ctx):
         f.write(GKFX_start)
         f.write(hydro_GKFX)
         f.write(GKFX_end)
+
+@CLI.command()
+@click.pass_context
+def generate_antares_bindingconstraints(ctx):
+    """
+    Create binding constraints in Antares
+    """
+
+    bindingconstraints = ""
+    n_constraints = 0
+    regions = ctx.obj['geographical_scope'] 
+    for region, storage_type in itertools.product(regions, ['psp', 'bat']):
+        region = region.lower()
+
+        # Skip regions without PSP
+        if storage_type == 'psp' and region in ['al', 'dk', 'ee', 'hu', 'lv', 'me', 'se']:
+            continue
+
+        bindingconstraints += generate_storage_bc(n_constraints, region, storage_type)
+
+        # The _lt file will be generated in peri-processing
+        with open(f'Antares/input/bindingconstraints/00_xtra_{region}_{storage_type}_3_gt.txt', 'w') as f:
+            f.write('')
+
+        with open(f'Antares/input/bindingconstraints/00_xtra_{region}_{storage_type}_2_eq.txt', 'w') as f:
+            f.write('')
+
+        with open(f'Antares/input/bindingconstraints/00_xtra_{region}_{storage_type}_1_eq.txt', 'w') as f:
+            f.write('')
+
+        with open(f'Antares/input/bindingconstraints/{region}_{storage_type}_eq.txt', 'w') as f:
+            f.write('')
+
+        n_constraints += 5
+
+    with open('Antares/input/bindingconstraints/bindingconstraints.ini', 'w') as f:
+        f.write(bindingconstraints)
 
 
 ### Main
