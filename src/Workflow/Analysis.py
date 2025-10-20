@@ -1093,8 +1093,7 @@ def ptx_elmix(ctx, balmorel_scenario, balmorel_scfolder, antares_scenario, mc_ye
 def plot_system_ptx_profile(ctx, 
                             system: str = 'large',
                             weather_year: int = 2000,
-                            temporal: str = 'weekly',
-                            mc_year: str = '00019'):
+                            temporal: str = 'weekly'):
 
     fig, axes = plt.subplots(4, 2, figsize=(4*2, 4))
     commodity_column = {
@@ -1118,6 +1117,8 @@ def plot_system_ptx_profile(ctx,
         }
     else:
         raise ValueError("Choose small or large system!")
+
+    mc_year = f'{weather_year-1982+1:05.0f}'
 
     for i, scenario in enumerate(['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']):
 
