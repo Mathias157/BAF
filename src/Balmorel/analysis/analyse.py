@@ -49,7 +49,7 @@ def CLI(ctx, overwrite: bool, dark_style: bool, plot_ext: str, path: str,
     # Detect which command has been passed
     command = ctx.invoked_subcommand
     if command in ['all', 'all-bars', 'all-profiles', 'all_maps',
-                   'costs', 'cost-change', 'cap', 'map', 'profile', 'bar-chart', 'adequacy']:
+                   'costs', 'cost-change', 'cap', 'map', 'dem', 'profile', 'bar-chart', 'adequacy']:
 
         # Locate results
         model = Balmorel(path)
@@ -225,7 +225,8 @@ def fuel():
     
 @CLI.command()
 @click.argument('commodity', type=str)
-def dem(commodity: str):
+@click.option('--filters', type=str, required=False, default=None, help="Query input for filtering")
+def dem(commodity: str, filters: str):
     """
     Plot fuel consumption
     """
@@ -242,6 +243,9 @@ def dem(commodity: str):
     df = (
         collect_results(symbol[commodity.lower()])
     ) 
+
+    if filters != None:
+        df = df.query(filters)
     
     (
         df
