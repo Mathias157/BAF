@@ -21,7 +21,7 @@ import click
 import re
 from premailer import transform
 from typing import Union
-import gams
+from pathlib import Path
 from specific.pit_storage.pit_storage import get_storage_profiles, polygon_with_point
 from pybalmorel import Balmorel, MainResults
 from pybalmorel.utils import symbol_to_df
@@ -925,6 +925,40 @@ def load_geofile(scenario: str, cluster_params: str = 'DE, DH, WNDFLH, SOLEFLH')
         
     return geofile
 
+@CLI.command()
+@click.pass_context
+@click.argument('sc_search_string', type=str)
+def prices(ctx, sc_search_string: str):
+
+    path = Path('.')
+    df = MainResults(
+        [file.name for file in path.glob(f'**/model/MainResults_{sc_search_string}.gdx')],
+        [file.parent for file in path.glob(f'**/model/MainResults_{sc_search_string}.gdx')]
+    ).get_result('EL_PRICE_YCRST')
+
+    print(
+        "\nMin price:\n",
+        df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='min'),
+        "\nMedian price:\n",
+        df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='median'),
+        "\nMax price:\n",
+        df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='max'),
+        "\nTemporal std deviation:\n",
+        df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='std'),
+        "\nGeographic std deviation on median price:\n",
+        df.pivot_table(index=['Scenario', 'Region'], values='Value', aggfunc='median').pivot_table(index='Scenario', values='Value', aggfunc='std'),
+    )
+
+    fig, ax = plt.subplots()
+    data = []
+    for scenario in df.Scenario.unique():
+        # Test years data
+        test_scenario_data = df.query(f'Scenario == "{scenario}"').Value.tolist()
+        data.append(test_scenario_data)
+
+    # Create boxplot
+    bp1 = ax.boxplot(data, widths=0.35, patch_artist=True, whis=(0, 100))
+    fig.savefig('analysis/plots/el_price_boxplot.png')
 
 # 3. Main
 if __name__ == '__main__':
