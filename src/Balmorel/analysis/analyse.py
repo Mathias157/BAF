@@ -958,7 +958,8 @@ def prices(ctx, sc_search_string: str):
         data.append(scenario_data)
 
     # Create violinplot
-    bp1 = ax.violinplot(data, positions=scenarios)
+    bp1 = ax.violinplot(data, positions=range(len(scenarios)))
+    ax.set_xticklabels(scenarios)
     fig.savefig('analysis/plots/el_price_violinplot.png')
 
 # 3. Main
