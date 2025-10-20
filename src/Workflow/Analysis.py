@@ -23,7 +23,7 @@ from pybalmorel import MainResults
 from pybalmorel.utils import symbol_to_df
 from pybalmorel.formatting import balmorel_colours
 from Functions.Formatting import newplot, set_style, stacked_bar
-from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput, get_ptx_demand_timeseries
+from Functions.GeneralHelperFunctions import filter_low_max, AntaresOutput, get_ptx_demand_timeseries, get_antares_inadequacy
 from Functions.boxplot import get_difference_table
 import warnings
 
@@ -1187,6 +1187,24 @@ def plot_system_ptx_profile(ctx,
                 ax.set_xlabel('Week')
 
     fig.savefig(f'Workflow/OverallResults/{system}_wy{weather_year}_ptx_profile.pdf', bbox_inches="tight")
+
+@CLI.command()
+@click.argument('sc_search_string', type=str)
+def antares_adequacy(sc_search_string):
+
+    path = Path('Antares/output')
+    scenarios = [file.name for file in path.glob(sc_search_string)]
+    
+    for scenario in scenarios:
+        # Region mappings
+        with open("Pre-Processing/Output/A2B_regi.pkl", "rb") as f:
+            A2B_regi = pickle.load(f)
+
+        df = get_antares_inadequacy(scenario, A2B_regi)
+
+        # print(df)
+        print('\n\n', scenario)
+        print(df[["LOLE", "ENS"]].sum())
 
 if __name__ == "__main__":
     CLI()

@@ -616,6 +616,27 @@ def get_ptx_demand_timeseries(
     else:
         return df_balm, df_ant, balmorel_output, antares_output
 
+def get_antares_inadequacy(antares_result: str, regional_mapping: dict):
+    AntOut = AntaresOutput(antares_result)
+
+    data = []
+
+    for region in regional_mapping.keys():
+        # 1.4 Load Antares Results
+        region_result = AntOut.load_area_results(region, temporal="annual")
+
+        # Unsupplied Energy
+        ENS = region_result.loc[0, "UNSP. ENRG"]
+        # UNSENR_arr = AntOut.collect_mcyears('UNSP. ENRG', region).quantile(.5, axis=1)   # Hourly median unsupplied energy
+
+        # Loss of load expectation
+        LOLE = region_result.loc[0, "LOLD"]
+
+        data.append([region, ENS, LOLE])
+
+    df = pd.DataFrame(data, columns=["Region", "ENS", "LOLE"])
+
+    return df
 
 # %% ------------------------------- ###
 ###            5. Classes           ###
