@@ -754,7 +754,7 @@ def collect_results(ctx, scenario: str, mc_year: str, specific_antares_result: s
     ### 0.4 Which results to import?
     if not(specific_antares_result):
         ant_out_find = Path('Antares/output')
-        ant_out = [result.name for result in ant_out_find.glob(f'*eco-{scenario.replace('dispatch_', '').lower()}*')]
+        ant_out = [result.name for result in ant_out_find.glob(f'*eco-{scenario.replace('dispatch_', '').replace('eu_operun_flowbased', 'h2*hexo_stofixflowbased').lower()}*')]
         if len(ant_out) > 1:
             raise ValueError("Too many results found!")
         else:
@@ -1088,57 +1088,104 @@ def ptx_elmix(ctx, balmorel_scenario, balmorel_scfolder, antares_scenario, mc_ye
 
 @CLI.command()
 @click.pass_context
-@click.argument('scenario', type=str)
 @click.argument('system', type=str, default='large')
+@click.option('--weather-year', type=int, default=2000, help="NOTE: Only weather year 2000 is available for large-scale")
 def plot_system_ptx_profile(ctx, 
-                            scenario: str,
                             system: str = 'large',
+                            weather_year: int = 2000,
                             temporal: str = 'weekly',
                             mc_year: str = '00019'):
 
-    # Find scenarios
-    antares_path = Path('Antares/output')
+    fig, axes = plt.subplots(4, 2, figsize=(4*2, 4))
+    commodity_column = {
+        'HEAT' : 0,
+        'HYDROGEN' : 1
+    }
+
     if system == 'large':
-        regions = ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'UK']
-        balmorel_scenario = f'{scenario}_eu_operun'
-        antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_wy2000_1344_h2*hexo_iter0_y-2050')]
+        max_flow = {
+            'HYDROGEN' : 40,
+            'HEAT' : 45
+        }
+
+        if weather_year != 2000:
+            raise ValueError("Not available!")
+
     elif system == 'small':
-        balmorel_scenario = f'{scenario}_dispatch_WY2000'
-        antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_wy2000_*1344_h2*hexo_iter0_y-2050')]
-        regions = ['DE', 'FR', 'ES']
+        max_flow = {
+            'HYDROGEN' : 20,
+            'HEAT' : 20
+        }
     else:
-        raise ValueError("Invalid system choice!")
+        raise ValueError("Choose small or large system!")
 
-    if len(antares_scenario) > 1:
-        raise ValueError("Several Antares outputs found!\n" + "\n".join(antares_scenario))
-    else:
-        antares_scenario = antares_scenario[0]
+    for i, scenario in enumerate(['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']):
 
-    if scenario == 'noh':
-        commodities = ['HYDROGEN']
-    elif scenario == 'noh2':
-        commodities = ['HEAT']
-    else:
-        commodities = ['HEAT', 'HYDROGEN']
-    
-    ptx_balm, ptx_ant = get_ptx_demand_timeseries(balmorel_scenario, antares_scenario, scenario,
-                                                temporal=temporal, mc_year=mc_year, plot=False, 
-                                                return_output_classes=False, regions = regions,
-                                                gams_system_directory=ctx.obj['gams_system_directory'])
+        if scenario == 'noh2':
+            i = 0
+        elif i != 0:
+            i = i - 1
 
-    sum_func = lambda x: np.sum(x)/1e6
-    for i,commodity in enumerate(commodities):
-        fig, ax = plt.subplots(figsize=(4, 1))
-        ptx_balm.loc[:, :, commodity].pivot_table(index='Season' if temporal == 'weekly' else ['Season', 'Time'], 
-                                                  values='Value',
-                                                  aggfunc=sum_func).plot(ax=ax, label='Balmorel', legend=False)
-        ptx_ant.loc[:,:,commodity].pivot_table(index=temporal,
-                                               values='FLOW LIN.',
-                                               aggfunc=sum_func).plot(ax=ax, label='Antares', legend=False)
-        # ax.legend(['Balmorel', 'Antares'], loc='upper right')
-        # ax.set_ylabel(f'Power-to-{commodity.capitalize()} TWh')
-        ax.set_xlabel('')
-        fig.savefig(f'Workflow/OverallResults/{scenario}_{system}_{commodity}_ptx_profile.pdf')
+        # Find scenarios
+        antares_path = Path('Antares/output')
+        if system == 'large':
+            regions = ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'UK']
+            balmorel_scenario = f'{scenario}_eu_operun'
+            antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_h2*hexo_stofixflowbased_iter0_y-2050')]
+        elif system == 'small':
+            balmorel_scenario = f'{scenario}_dispatch_WY{weather_year}'
+            antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_wy{weather_year}_*1344_h2*hexo_iter0_y-2050')]
+            regions = ['DE', 'FR', 'ES']
+        else:
+            raise ValueError("Invalid system choice!")
+
+        if len(antares_scenario) > 1:
+            raise ValueError("Several Antares outputs found!\n" + "\n".join(antares_scenario))
+        else:
+            antares_scenario = antares_scenario[0]
+
+        if scenario == 'noh':
+            commodities = ['HYDROGEN']
+        elif scenario == 'noh2':
+            commodities = ['HEAT']
+        else:
+            commodities = ['HEAT', 'HYDROGEN']
+        
+        ptx_balm, ptx_ant = get_ptx_demand_timeseries(balmorel_scenario, antares_scenario, scenario,
+                                                    temporal=temporal, mc_year=mc_year, plot=False, 
+                                                    return_output_classes=False, regions = regions,
+                                                    gams_system_directory=ctx.obj['gams_system_directory'])
+
+        sum_func = lambda x: np.sum(x)/1e6
+        for commodity in commodities:
+            ax = axes[i,commodity_column[commodity]]
+            ptx_balm.loc[:, :, commodity].pivot_table(index='Season' if temporal == 'weekly' else ['Season', 'Time'], 
+                                                    values='Value',
+                                                    aggfunc=sum_func).plot(ax=ax, label='Balmorel', legend=False)
+            ptx_ant.loc[:,:,commodity].pivot_table(index=temporal,
+                                                values='FLOW LIN.',
+                                                aggfunc=sum_func).plot(ax=ax, label='Antares', legend=False)
+            ax.set_xlabel('')
+            ax.set_xlim(1, 52)
+            ax.set_ylim(0, max_flow[commodity])
+
+            if i == 0 and commodity == 'HEAT':
+                ax.legend(['Balmorel', 'Antares'], loc='lower center', bbox_to_anchor=(1.01, 1.3),
+                          ncols=2)
+                ax.set_title(f'Power-to-{commodity.capitalize()} [TWh]')
+                ax.set_ylabel('NoH2')
+            elif i == 0 and commodity == 'HYDROGEN':
+                ax.set_title(f'Power-to-{commodity.capitalize()} [TWh]')
+                ax.set_ylabel('NoH')
+            elif i != 0 and commodity == 'HEAT':
+                ax.set_ylabel(scenario.upper().replace('_', ''))
+            
+            if i != 3:
+                ax.set_xticklabels([])
+            else:
+                ax.set_xlabel('Week')
+
+    fig.savefig(f'Workflow/OverallResults/{system}_wy{weather_year}_ptx_profile.pdf', bbox_inches="tight")
 
 if __name__ == "__main__":
     CLI()

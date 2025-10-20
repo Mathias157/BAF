@@ -182,7 +182,11 @@ def flow(ctx, model: str = 'Balmorel'):
 def plot_elflow(unique_capacities, df_flow, filename):
 
     # Plot
-    gf = gpd.read_file("Pre-Processing/2025AntBalmMap.geojson").query('ADMIN != "Ukraine" and ADMIN != "Turkey" and ADMIN != "Belarus"')
+    if 'dispatch_WY2000' in filename:
+        gf = gpd.read_file("Pre-Processing/2025AntBalmMap.geojson").query('id in ["FR", "DE", "ES"]')
+    else:
+        gf = gpd.read_file("Pre-Processing/2025AntBalmMap.geojson").query('ADMIN != "Ukraine" and ADMIN != "Turkey" and ADMIN != "Belarus"')
+
     fig, ax = plt.subplots(dpi=200, figsize=(15, 10))
     gf.plot(ax=ax, facecolor='grey')
     scaling = 5
