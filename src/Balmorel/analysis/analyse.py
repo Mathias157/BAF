@@ -951,14 +951,15 @@ def prices(ctx, sc_search_string: str):
 
     fig, ax = plt.subplots()
     data = []
-    for scenario in df.Scenario.unique():
+    scenarios = df.Scenario.unique()
+    for scenario in scenarios:
         # Test years data
-        test_scenario_data = df.query(f'Scenario == "{scenario}"').Value.tolist()
-        data.append(test_scenario_data)
+        scenario_data = df.query(f'Scenario == "{scenario}"').Value.tolist()
+        data.append(scenario_data)
 
-    # Create boxplot
-    bp1 = ax.boxplot(data, widths=0.35, patch_artist=True, whis=(0, 100))
-    fig.savefig('analysis/plots/el_price_boxplot.png')
+    # Create violinplot
+    bp1 = ax.violinplot(data, positions=scenarios)
+    fig.savefig('analysis/plots/el_price_violinplot.png')
 
 # 3. Main
 if __name__ == '__main__':
