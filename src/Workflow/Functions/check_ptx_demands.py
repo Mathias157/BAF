@@ -417,10 +417,11 @@ def h2exotest():
 def flowbased():
     
     antbalm_list = [
-        [["MainResults_noh_dispatch_WY1982_flowbased_Iter0.gdx", "noh"], 
-        ["20250927-1133eco-noh_wy1982_flowbased_cl1344_iter0_y-2050", "00001"]],
-        [["MainResults_noh_dispatch_WY1982_Iter0.gdx", "noh"],
-         ["20250922-1308eco-noh_wy1982_cl1344_iter0_y-2050", "00001"]]
+        [["MainResults_noh_eu_operun_flowbased_Iter0.gdx", "noh"], ["20251019-1940eco-noh_h2vrehexo_stofixflowbased_iter0_y-2050", "00019"]],
+        [["MainResults_noh2_eu_operun_flowbased_Iter0.gdx", "noh2"], ["20251020-0053eco-noh2_h2exohexo_stofixflowbased_iter0_y-2050", "00019"]],
+        [["MainResults_h2_eu_operun_flowbased_Iter0.gdx", "h2"], ["20251020-0813eco-h2_h2exohexo_stofixflowbased_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_eu_operun_flowbased_Iter0.gdx", "h2_lss"], ["20251020-1738eco-h2_lss_h2exohexo_stofixflowbased_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_h2t_eu_operun_flowbased_Iter0.gdx", "h2_lss_h2t"], ["20251021-0158eco-h2_lss_h2t_h2exohexo_stofixflowbased_iter0_y-2050", "00019"]],
     ]
 
     collect_ptx_results(antbalm_list, 'flowbasedtest')

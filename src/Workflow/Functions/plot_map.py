@@ -1,9 +1,8 @@
-import enum
 import click
 import numpy as np
 import geopandas as gpd
 from pathlib import Path
-from matplotlib.patches import FancyArrowPatch, ArrowStyle, Circle
+from matplotlib.patches import FancyArrowPatch, ArrowStyle 
 from pybalmorel import MainResults
 import pandas as pd
 import matplotlib.pyplot as plt

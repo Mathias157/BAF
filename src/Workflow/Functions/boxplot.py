@@ -141,7 +141,7 @@ def collect_and_concat_diff_dataframes(
 def collect_and_concat_diff_dataframes_largescale():
     collected_df = pd.DataFrame()
     for weather_year in [2000]:
-        filename = "Workflow/OverallResults/PtX_demand_comparison_largescale.csv"
+        filename = "Workflow/OverallResults/PtX_demand_comparison_flowbasedtest.csv"
         df, _ = get_difference_table(
             filename,
             "Data",
