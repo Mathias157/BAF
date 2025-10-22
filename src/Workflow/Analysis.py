@@ -30,9 +30,10 @@ import warnings
 
 warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
-balmorel_colours["Spilled"] = "black"
+balmorel_colours["Spilled"] = "lightblue"
 balmorel_colours["WOOD"] = "orange"
-balmorel_colours["DUMMY"] = "orange"
+balmorel_colours["WATER"] = "blue"
+balmorel_colours["DUMMY"] = balmorel_colours["NATGAS"]
 balmorel_colours["WOODWASTE"] = "orange"
 balmorel_colours["RETORTGAS"] = "orange"
 balmorel_colours["CHP-EXTRACTION-CCS"] = "gray"
@@ -1188,6 +1189,66 @@ def plot_system_ptx_profile(ctx,
                 ax.set_xlabel('Week')
 
     fig.savefig(f'Workflow/OverallResults/{system}_wy{weather_year}_ptx_profile.pdf', bbox_inches="tight")
+
+@CLI.command()
+@click.pass_context
+@click.argument('sc_search_string', type=str)
+def el_generation(ctx, sc_search_string):
+    
+    df = pd.DataFrame()
+    path = Path('Workflow/OverallResults')
+    for file in [file for file in path.glob(sc_search_string + '_results.pkl')]:
+
+        with open(file, 'rb') as f:
+            temp = pickle.load(f)
+
+        temp = (
+            temp['pro']
+            .pivot_table(index="Model", 
+                         columns="F", 
+                         values="Value", 
+                         aggfunc="sum")
+        )
+
+        # Store scenario
+        temp = temp.reset_index()
+        temp['Scenario'] = (
+            file.name
+            .rstrip('_results.pkl')
+            .replace('eu_operun_flowbased_00019', '')
+            .replace('dispatch_WY2000_00019', '')
+            .replace('_', '')
+        ) 
+
+        df=pd.concat((df, temp), ignore_index=True)
+
+    scenarios = df.Scenario.unique()
+    n_scenarios = len(scenarios)
+    df = (
+        df
+        .pivot_table(index=['Scenario', 'Model'])
+        .rename(columns={'Spilled' : 'SPILLED', 
+                            'DUMMY' : 'NATGAS'})
+    )
+
+    # Filter values below 10 TWh
+    for col in df:
+        if np.abs(df[col].sum().sum()) < 10:
+            df = df.drop(columns=col)
+
+    # Plot
+    fig, ax = plt.subplots()
+    scenario_order=['noh', 'noh2', 'h2', 'h2lss', 'h2lssh2t']
+    df.loc[(scenario_order, slice(None)), :].plot(
+        ax=ax, kind="bar", stacked=True, color=balmorel_colours,
+    )
+    ax.set_ylabel("Electricity Generation (TWh)")
+    ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left")
+    ax.set_xticks(np.linspace(0.5, n_scenarios*2-1.5, n_scenarios))
+    ax.set_xticklabels(['NoH', 'NoH2', 'H2', 'H2LSS', 'H2LSSH2T'])
+    ax.set_xlabel('')
+    fig.savefig('Workflow/OverallResults/scenario_elec_gen.pdf',
+                bbox_inches='tight')
 
 @CLI.command()
 @click.argument('sc_search_string', type=str)
