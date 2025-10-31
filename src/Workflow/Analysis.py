@@ -36,6 +36,7 @@ balmorel_colours["WATER"] = "blue"
 balmorel_colours["DUMMY"] = balmorel_colours["NATGAS"]
 balmorel_colours["WOODWASTE"] = "orange"
 balmorel_colours["RETORTGAS"] = "orange"
+balmorel_colours["SHALE"] = "orange"
 balmorel_colours["CHP-EXTRACTION-CCS"] = "gray"
 balmorel_colours["CONDENSING-CCS"] = "gray"
 balmorel_colours["WIND OFFSHORE"] = balmorel_colours["WIND-OFF"]
@@ -591,8 +592,19 @@ def plot_annual_electricity_generation(results: dict, **kwargs):
         region = kwargs.get('region')
         pro = pro.query(f'R == "{region}"')
 
+    # Correcting format
+    pro = pro.reset_index()
+    pro.Tech = pro.Tech.str.upper()
+    pro.F = (
+        pro.F
+        .str.upper()
+        .replace('SOLAR', 'SUN')
+    )
+    # pro.query('Iter == 6')
+    # pro = pro.query('Y == "2020"')
+
     fig, ax = plt.subplots()
-    pro.pivot_table(index="Model", columns="F", values="Value", aggfunc="sum").plot(
+    pro.pivot_table(index=["Y", "Model"], columns="F", values="Value", aggfunc="sum").plot(
         ax=ax, kind="bar", stacked=True, color=balmorel_colours
     )
     # print(pro.pivot_table(index=["Model", "F"], values="Value", aggfunc="sum"))

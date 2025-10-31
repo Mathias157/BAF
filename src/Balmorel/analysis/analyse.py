@@ -249,7 +249,7 @@ def dem(commodity: str, filters: str):
     
     (
         df
-        .pivot_table(index='Scenario', columns='Category', 
+        .pivot_table(index=['Year','Scenario'], columns='Category', 
                         values='Value', aggfunc='sum')
         .plot(ax=ax, kind='bar', stacked=True)
     )
@@ -945,6 +945,8 @@ def prices(ctx, sc_search_string: str):
         df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='min'),
         "\nMedian price:\n",
         df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='median'),
+        "\nMean price:\n",
+        df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='mean'),
         "\nMax price:\n",
         df.pivot_table(index='Region', columns='Scenario', values='Value', aggfunc='max'),
         "\nTemporal std deviation:\n",
