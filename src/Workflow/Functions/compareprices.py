@@ -22,7 +22,9 @@ from pathlib import Path
 # ------------------------------- #
 
 
-def get_antares_choice(analysis: str = "weather", year: int = 2050):
+def get_antares_choice(
+    analysis: str = "weather", year: int = 2050, just_regions: bool = False
+):
     if analysis == "weather":
         el_regions = [
             "uk00",
@@ -140,35 +142,39 @@ def get_antares_choice(analysis: str = "weather", year: int = 2050):
     el_regions.sort()
     hydrogen_regions.sort()
 
-    # Find scenarios
-    ## Antares
-    ant = Path("Antares/output").glob(antares_scenario)
-    scenarios = [scenario.name for scenario in ant]
+    if not just_regions:
+        # Find scenarios
+        ## Antares
+        ant = Path("Antares/output").glob(antares_scenario)
+        scenarios = [scenario.name for scenario in ant]
 
-    if len(scenarios) > 1:
-        raise ValueError("Found more than one Antares scenario!")
+        if len(scenarios) > 1:
+            raise ValueError("Found more than one Antares scenario!")
+        else:
+            antares_scenario = scenarios[0]
+            antares_result = AntaresOutput(antares_scenario)
+
+        ## Balmorel
+        balm = Path("Balmorel")
+        scenarios = [
+            scenario.name for scenario in balm.glob("./**/model/" + balmorel_scenario)
+        ]
+        path = [
+            str(scenario.parent)
+            for scenario in balm.glob("./**/model/" + balmorel_scenario)
+        ]
+
+        if len(scenarios) > 1:
+            raise ValueError("Found more than one Balmorel scenario!")
+        else:
+            balmorel_scenario = scenarios[0]
+            path = path[0]
+            balmorel_result = MainResults(balmorel_scenario, path)
+
+        return antares_result, balmorel_result, el_regions, hydrogen_regions
+
     else:
-        antares_scenario = scenarios[0]
-        antares_result = AntaresOutput(antares_scenario)
-
-    ## Balmorel
-    balm = Path("Balmorel")
-    scenarios = [
-        scenario.name for scenario in balm.glob("./**/model/" + balmorel_scenario)
-    ]
-    path = [
-        str(scenario.parent)
-        for scenario in balm.glob("./**/model/" + balmorel_scenario)
-    ]
-
-    if len(scenarios) > 1:
-        raise ValueError("Found more than one Balmorel scenario!")
-    else:
-        balmorel_scenario = scenarios[0]
-        path = path[0]
-        balmorel_result = MainResults(balmorel_scenario, path)
-
-    return antares_result, balmorel_result, el_regions, hydrogen_regions
+        return el_regions, hydrogen_regions
 
 
 # ------------------------------- #
@@ -212,6 +218,25 @@ def compare_prices(analysis, year):
 
     h2_prices_balm = balmorel_result.get_result("H2_PRICE_YCR")
     print(h2_prices_balm.pivot_table(index="Region", values="Value"))
+
+
+@main.command()
+def get_average_adequacies():
+    ant = AntaresOutput(
+        "20240806-2040eco-ltcapcredconsnegfeedlowinitresmar_iter0_y-2050"
+    )
+    ant_ade = AntaresOutput(
+        "20240905-1950eco-ltcapcredconsnflirmiter6highh2ensc_iter0_y-2050"
+    )
+
+    el_regions, h2_regions = get_antares_choice("weather", 2050, just_regions=True)
+
+    for result in [ant, ant_ade]:
+        for regions in [el_regions, h2_regions]:
+            adequacy = ant.collect_result_areas(regions, "LOLD", temporal="annual")
+            print("Result:", result.name)
+            print("Regions:", regions)
+            print(adequacy.sum().mean())
 
 
 if __name__ == "__main__":
