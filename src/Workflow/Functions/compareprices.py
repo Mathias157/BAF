@@ -26,6 +26,8 @@ def get_antares_choice(
     analysis: str = "weather", year: int = 2050, just_regions: bool = False,
     **kwargs
 ):
+    scale = kwargs.get('scale')
+    case = kwargs.get('case')
     if analysis == "weather":
         el_regions = [
             "uk00",
@@ -133,7 +135,7 @@ def get_antares_choice(
         antares_scenario = "*eco-ltcapcredconsnflirmiter6highh2ensc_iter0_y-%d" % year
         balmorel_scenario = "MainResults_LTCapCredConsNFLIRMIter6HighH2ENSC_Iter0.gdx"
 
-    elif analysis == "sectors":
+    elif analysis == "sectors" and scale == "largescale":
         el_regions = [
             "de",
             "fr",
@@ -172,25 +174,53 @@ def get_antares_choice(
 
         hydrogen_regions = []
 
-        scale = kwargs.get('scale')
-        case = kwargs.get('case')
-        if scale == 'largescale' and case == 0:
+        if case == 0:
             antares_scenario = "20251021-1856eco-noh_h2vrehexo_stofixflowbased_iter0_y-2050"
             balmorel_scenario = "MainResults_noh_eu_operun_flowbased_Iter0.gdx"
-        elif scale == 'largescale' and case == 1:
+        elif case == 1:
             antares_scenario = "20251020-0053eco-noh2_h2exohexo_stofixflowbased_iter0_y-2050"
             balmorel_scenario = "MainResults_noh2_eu_operun_flowbased_Iter0.gdx"
-        elif scale == 'largescale' and case == 2:
+        elif case == 2:
             antares_scenario = "20251020-0813eco-h2_h2exohexo_stofixflowbased_iter0_y-2050"
             balmorel_scenario = "MainResults_h2_eu_operun_flowbased_Iter0.gdx"
-        elif scale == 'largescale' and case == 3:
+        elif case == 3:
             antares_scenario = "20251020-1738eco-h2_lss_h2exohexo_stofixflowbased_iter0_y-2050"
             balmorel_scenario = "MainResults_h2_lss_eu_operun_flowbased_Iter0.gdx"
-        elif scale == 'largescale' and case == 4:
+        elif case == 4:
             antares_scenario = "20251021-0158eco-h2_lss_h2t_h2exohexo_stofixflowbased_iter0_y-2050"
             balmorel_scenario = "MainResults_h2_lss_h2t_eu_operun_flowbased_Iter0.gdx"
         else:
             raise ValueError("Case and scale not covered!")
+
+    elif analysis == "sectors" and scale == "smallscale":
+
+        el_regions = [
+            "de",
+            "fr",
+            "es",
+        ]
+        hydrogen_regions = []
+
+        if case == 0:
+            antares_scenario = "20250923-0522eco-noh_wy2000_cl1344_iter0_y-2050"
+            balmorel_scenario = "MainResults_noh_dispatch_WY2000_Iter0.gdx"
+        elif case == 1:
+            antares_scenario = "20250930-1226eco-noh2_wy2000_cl1344_h2exohexo_iter0_y-2050"
+            balmorel_scenario = "MainResults_noh2_dispatch_WY2000_Iter0.gdx"
+        elif case == 2:
+            antares_scenario = "20250930-1240eco-h2_wy2000_cl1344_h2exohexo_iter0_y-2050"
+            balmorel_scenario = "MainResults_h2_dispatch_WY2000_Iter0.gdx"
+        elif case == 3:
+            antares_scenario = "20251008-1720eco-h2_lss_wy2000_cl1344_h2exohexo_iter0_y-2050"
+            balmorel_scenario = "MainResults_h2_lss_dispatch_WY2000_Iter0.gdx"
+        elif case == 4:
+            antares_scenario = "20251013-0134eco-h2_lss_h2t_wy2000_cl1344_h2exohexo_iter0_y-2050"
+            balmorel_scenario = "MainResults_h2_lss_h2t_dispatch_WY2000_Iter0.gdx"
+        else:
+            raise ValueError("Case and scale not covered!")
+
+        # "20250930-1301eco-h2_lss_h2t_wy2000_cl1344_h2exohexo_iter0_y-2050"
+        # "20250930-1215eco-noh_wy2000_cl1344_h2exohexo_iter0_y-2050"
 
     else:
         raise ValueError("Pick appropriate analysis")
@@ -226,7 +256,7 @@ def get_antares_choice(
         else:
             balmorel_scenario = scenarios[0]
             path = path[0]
-            balmorel_result = MainResults(balmorel_scenario, path)
+            balmorel_result = MainResults(balmorel_scenario, path, system_directory='/opt/gams/50.4')
 
         return antares_result, balmorel_result, el_regions, hydrogen_regions
 
@@ -279,15 +309,16 @@ def compare_annual_prices(analysis, year):
 
 @main.command()
 @click.argument("analysis", type=str, default="weather")
+@click.argument("scale", type=str, default="largescale")
 @click.argument("year", type=int, default=2050)
-def compare_weekly_prices(analysis, year):
+def compare_weekly_prices(analysis, year, scale):
 
     for scale, case in [
-        ["largescale", 0],
-        ["largescale", 1],
-        ["largescale", 2],
-        ["largescale", 3],
-        ["largescale", 4],
+        [scale, 0],
+        [scale, 1],
+        [scale, 2],
+        [scale, 3],
+        [scale, 4],
     ]:
         antares_result, balmorel_result, el_regions, h2_regions = get_antares_choice(
             analysis, year, **{'scale' : scale, 'case' : case}
