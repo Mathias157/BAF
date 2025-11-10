@@ -23,7 +23,8 @@ from pathlib import Path
 
 
 def get_antares_choice(
-    analysis: str = "weather", year: int = 2050, just_regions: bool = False
+    analysis: str = "weather", year: int = 2050, just_regions: bool = False,
+    **kwargs
 ):
     if analysis == "weather":
         el_regions = [
@@ -171,13 +172,25 @@ def get_antares_choice(
 
         hydrogen_regions = []
 
-        # antares_scenario = "20251021-0053eco-noh2_h2exohexo_stofixflowbased_iter0_y-2050",
-        # antares_scenario = "20251020-0813eco-h2_h2exohexo_stofixflowbased_iter0_y-2050",
-        antares_scenario = "20251020-1738eco-h2_lss_h2exohexo_stofixflowbased_iter0_y-2050",
-        # antares_scenario = "20251021-0158eco-h2_lss_h2t_h2exohexo_stofixflowbased_iter0_y-2050",
-        # antares_scenario = "20251021-1856eco-noh_h2vrehexo_stofixflowbased_iter0_y-2050",
-
-        balmorel_scenario = "MainResults_h2_lss_eu_operun_flowbased_Iter0.gdx"
+        scale = kwargs.get('scale')
+        case = kwargs.get('case')
+        if scale == 'largescale' and case == 0:
+            antares_scenario = "20251021-1856eco-noh_h2vrehexo_stofixflowbased_iter0_y-2050"
+            balmorel_scenario = "MainResults_noh_eu_operun_flowbased_Iter0.gdx"
+        elif scale == 'largescale' and case == 1:
+            antares_scenario = "20251020-0053eco-noh2_h2exohexo_stofixflowbased_iter0_y-2050"
+            balmorel_scenario = "MainResults_noh2_eu_operun_flowbased_Iter0.gdx"
+        elif scale == 'largescale' and case == 2:
+            antares_scenario = "20251020-0813eco-h2_h2exohexo_stofixflowbased_iter0_y-2050"
+            balmorel_scenario = "MainResults_h2_eu_operun_flowbased_Iter0.gdx"
+        elif scale == 'largescale' and case == 3:
+            antares_scenario = "20251020-1738eco-h2_lss_h2exohexo_stofixflowbased_iter0_y-2050"
+            balmorel_scenario = "MainResults_h2_lss_eu_operun_flowbased_Iter0.gdx"
+        elif scale == 'largescale' and case == 4:
+            antares_scenario = "20251021-0158eco-h2_lss_h2t_h2exohexo_stofixflowbased_iter0_y-2050"
+            balmorel_scenario = "MainResults_h2_lss_h2t_eu_operun_flowbased_Iter0.gdx"
+        else:
+            raise ValueError("Case and scale not covered!")
 
     else:
         raise ValueError("Pick appropriate analysis")
@@ -268,34 +281,51 @@ def compare_annual_prices(analysis, year):
 @click.argument("analysis", type=str, default="weather")
 @click.argument("year", type=int, default=2050)
 def compare_weekly_prices(analysis, year):
-    antares_result, balmorel_result, el_regions, h2_regions = get_antares_choice(
-        analysis, year
-    )
 
-    el_prices_ant = antares_result.collect_result_areas(
-        el_regions, "MRG. PRICE", temporal="weekly"
-    )
-    print(el_prices_ant.T)
-    lold_el_ant = antares_result.collect_result_areas(
-        el_regions, "LOLD", temporal="weekly"
-    )
-    print(lold_el_ant.T)
-
-    el_prices_balm = balmorel_result.get_result("EL_PRICE_YCRST")
-    print(el_prices_balm.pivot_table(index=["Season", "Region"], values="Value"))
-
-    if len(h2_regions) > 0:
-        h2_prices_ant = antares_result.collect_result_areas(
-            h2_regions, "MRG. PRICE", temporal="annual"
+    for scale, case in [
+        ["largescale", 0],
+        ["largescale", 1],
+        ["largescale", 2],
+        ["largescale", 3],
+        ["largescale", 4],
+    ]:
+        antares_result, balmorel_result, el_regions, h2_regions = get_antares_choice(
+            analysis, year, **{'scale' : scale, 'case' : case}
         )
-        print(h2_prices_ant.T)
-        lold_h2_ant = antares_result.collect_result_areas(
-            h2_regions, "LOLD", temporal="annual"
-        )
-        print(lold_h2_ant.T)
 
-        h2_prices_balm = balmorel_result.get_result("H2_PRICE_YCR")
-        print(h2_prices_balm.pivot_table(index="Region", values="Value"))
+        el_prices_ant = antares_result.collect_result_areas(
+            el_regions, "MRG. PRICE", temporal="weekly"
+        )
+        el_prices_ant.index = [int(i)+1 for i in el_prices_ant.index]
+        lold_el_ant = antares_result.collect_result_areas(
+            el_regions, "LOLD", temporal="weekly"
+        )
+        print(el_prices_ant.mean(axis=1))
+        print('Total LOLD:')
+        print(lold_el_ant.sum().sum())
+
+        el_prices_balm = balmorel_result.get_result("EL_PRICE_YCRST")
+        el_prices_balm = el_prices_balm.pivot_table(index="Season", columns="Region", values="Value", aggfunc='mean')
+        el_prices_balm.index = [int(i.replace('S', '')) for i in el_prices_balm.index]
+
+        fig, ax = plt.subplots()
+        ax.plot(el_prices_ant.mean(axis=1), label='Antares')
+        ax.plot(el_prices_balm.mean(axis=1), label='Balmorel')
+        ax.legend()
+        fig.savefig(f'Workflow/OverallResults/{balmorel_result.sc[0].replace('MainResults_', '').replace('.gdx','')}_{year}_elprices.png')
+
+        if len(h2_regions) > 0:
+            h2_prices_ant = antares_result.collect_result_areas(
+                h2_regions, "MRG. PRICE", temporal="annual"
+            )
+            print(h2_prices_ant.T)
+            lold_h2_ant = antares_result.collect_result_areas(
+                h2_regions, "LOLD", temporal="annual"
+            )
+            print(lold_h2_ant.T)
+
+            h2_prices_balm = balmorel_result.get_result("H2_PRICE_YCR")
+            print(h2_prices_balm.pivot_table(index="Region", values="Value"))
 
 @main.command()
 def get_average_adequacies():
