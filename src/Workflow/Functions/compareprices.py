@@ -133,7 +133,51 @@ def get_antares_choice(
         balmorel_scenario = "MainResults_LTCapCredConsNFLIRMIter6HighH2ENSC_Iter0.gdx"
 
     elif analysis == "sectors":
-        raise ValueError("Need to define")
+        el_regions = [
+            "de",
+            "fr",
+            "es",
+            "no",
+            "dk",
+            "fi",
+            "nl",
+            "se",
+            "uk",
+            "ee",
+            "lv",
+            "lt",
+            "pl",
+            "be",
+            "it",
+            "ch",
+            "at",
+            "cz",
+            "pt",
+            "sk",
+            "hu",
+            "si",
+            "hr",
+            "ro",
+            "bg",
+            "gr",
+            "ie",
+            "lu",
+            "al",
+            "me",
+            "mk",
+            "ba",
+            "rs",
+        ]
+
+        hydrogen_regions = []
+
+        # antares_scenario = "20251021-0053eco-noh2_h2exohexo_stofixflowbased_iter0_y-2050",
+        # antares_scenario = "20251020-0813eco-h2_h2exohexo_stofixflowbased_iter0_y-2050",
+        antares_scenario = "20251020-1738eco-h2_lss_h2exohexo_stofixflowbased_iter0_y-2050",
+        # antares_scenario = "20251021-0158eco-h2_lss_h2t_h2exohexo_stofixflowbased_iter0_y-2050",
+        # antares_scenario = "20251021-1856eco-noh_h2vrehexo_stofixflowbased_iter0_y-2050",
+
+        balmorel_scenario = "Balmorel/h2_lss/model/MainResults_h2_lss_eu_operun_flowbased_Iter0.gdx"
 
     else:
         raise ValueError("Pick appropriate analysis")
@@ -207,17 +251,18 @@ def compare_prices(analysis, year):
     # el_prices_balm = balmorel_result.get_result("EL_PRICE_YCR")
     # print(el_prices_balm.pivot_table(index="Region", values="Value"))
 
-    h2_prices_ant = antares_result.collect_result_areas(
-        h2_regions, "MRG. PRICE", temporal="annual"
-    )
-    print(h2_prices_ant.T)
-    lold_h2_ant = antares_result.collect_result_areas(
-        h2_regions, "LOLD", temporal="annual"
-    )
-    print(lold_h2_ant.T)
+    if len(h2_regions) > 0:
+        h2_prices_ant = antares_result.collect_result_areas(
+            h2_regions, "MRG. PRICE", temporal="annual"
+        )
+        print(h2_prices_ant.T)
+        lold_h2_ant = antares_result.collect_result_areas(
+            h2_regions, "LOLD", temporal="annual"
+        )
+        print(lold_h2_ant.T)
 
-    h2_prices_balm = balmorel_result.get_result("H2_PRICE_YCR")
-    print(h2_prices_balm.pivot_table(index="Region", values="Value"))
+        h2_prices_balm = balmorel_result.get_result("H2_PRICE_YCR")
+        print(h2_prices_balm.pivot_table(index="Region", values="Value"))
 
 
 @main.command()
