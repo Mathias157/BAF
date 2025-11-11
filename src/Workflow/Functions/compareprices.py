@@ -323,7 +323,13 @@ def compare_weekly_prices(analysis, year, scale):
         antares_result, balmorel_result, el_regions, h2_regions = get_antares_choice(
             analysis, year, **{'scale' : scale, 'case' : case}
         )
+        print('Antares result:', antares_result.name)
+        print('Balmorel result:', balmorel_result.sc[0])
 
+        el_prices_ant_hourly = antares_result.collect_result_areas(
+            el_regions, "MRG. PRICE", temporal="hourly"
+        )
+        el_prices_ant_hourly.columns = [col.upper() for col in el_prices_ant_hourly.columns]
         el_prices_ant = antares_result.collect_result_areas(
             el_regions, "MRG. PRICE", temporal="weekly"
         )
@@ -331,11 +337,18 @@ def compare_weekly_prices(analysis, year, scale):
         lold_el_ant = antares_result.collect_result_areas(
             el_regions, "LOLD", temporal="weekly"
         )
-        print(el_prices_ant.mean(axis=1))
-        print('Total LOLD:')
-        print(lold_el_ant.sum().sum())
+        # print(el_prices_ant.mean(axis=1))
+        # print('Total LOLD:')
+        # print(lold_el_ant.sum().sum())
 
+        # Balmorel prices
         el_prices_balm = balmorel_result.get_result("EL_PRICE_YCRST")
+
+        # Get hourly deviations 
+        el_prices_balm_hourly = el_prices_balm.pivot_table(index=['Season', 'Time'], columns='Region', values='Value')
+        el_prices_balm_hourly.index = range(8736)
+        print(((el_prices_ant_hourly-el_prices_balm_hourly)).abs().mean())
+
         el_prices_balm = el_prices_balm.pivot_table(index="Season", columns="Region", values="Value", aggfunc='mean')
         el_prices_balm.index = [int(i.replace('S', '')) for i in el_prices_balm.index]
 
