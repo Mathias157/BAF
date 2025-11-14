@@ -123,6 +123,7 @@ def get_balmorel_results(ctx,
     pro = pd.concat((pro, curt))
     curt = curt.reset_index()
     curt['Tech'] = 'Spilled'
+    curt = curt.query('F != "WATER"')
     curt['F'] = 'Spilled'
     curt = curt.pivot_table(index=['Y', 'Model', 'R', 'F', 'Tech', 'Iter'],
                             values='Value',
@@ -768,7 +769,7 @@ def collect_results(ctx, scenario: str, mc_year: str, specific_antares_result: s
     ### 0.4 Which results to import?
     if not(specific_antares_result):
         ant_out_find = Path('Antares/output')
-        ant_out = [result.name for result in ant_out_find.glob(f'*eco-{scenario.replace('dispatch_', '').replace('eu_operun_flowbased', 'h2???hexo_stofixflowbased').lower()}*')]
+        ant_out = [result.name for result in ant_out_find.glob(f'*eco-{scenario.replace('dispatch_', '').replace('eu_rorfix_operun', 'eu_rorfix')}*')]
         if len(ant_out) > 1:
             raise ValueError("Too many results found!")
         else:
@@ -1145,8 +1146,9 @@ def plot_system_ptx_profile(ctx,
         antares_path = Path('Antares/output')
         if system == 'large':
             regions = ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'UK']
-            balmorel_scenario = f'{scenario}_eu_operun'
-            antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_h2???hexo_stofixflowbased_iter0_y-2050')]
+            balmorel_scenario = f'{scenario}_eu_rorfix_operun'
+            # 20251112-0938eco-noh_eu_rorfix_wy2000_1344_h2vrehexo_iter0_y-2050
+            antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_eu_rorfix_wy{weather_year}_1344_h2???hexo_iter0_y-2050')]
         elif system == 'small':
             balmorel_scenario = f'{scenario}_dispatch_WY{weather_year}'
             antares_scenario = [scenario.name for scenario in antares_path.glob(f'*eco-{scenario}_wy{weather_year}_*1344_h2???hexo_iter0_y-2050')]

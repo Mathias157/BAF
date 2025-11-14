@@ -256,7 +256,7 @@ def get_antares_choice(
         else:
             balmorel_scenario = scenarios[0]
             path = path[0]
-            balmorel_result = MainResults(balmorel_scenario, path, system_directory='/opt/gams/50.4')
+            balmorel_result = MainResults(balmorel_scenario, path)
 
         return antares_result, balmorel_result, el_regions, hydrogen_regions
 
@@ -337,6 +337,7 @@ def compare_weekly_prices(analysis, year, scale):
         lold_el_ant = antares_result.collect_result_areas(
             el_regions, "LOLD", temporal="weekly"
         )
+        el_prices_ant.columns = [col.upper() for col in el_prices_ant.columns]
         # print(el_prices_ant.mean(axis=1))
         # print('Total LOLD:')
         # print(lold_el_ant.sum().sum())
@@ -347,10 +348,14 @@ def compare_weekly_prices(analysis, year, scale):
         # Get hourly deviations 
         el_prices_balm_hourly = el_prices_balm.pivot_table(index=['Season', 'Time'], columns='Region', values='Value')
         el_prices_balm_hourly.index = range(8736)
-        print(((el_prices_ant_hourly-el_prices_balm_hourly)).abs().mean())
+        # print("Mean difference across all hours:")
+        # print(((el_prices_ant_hourly-el_prices_balm_hourly)).abs().mean())
 
         el_prices_balm = el_prices_balm.pivot_table(index="Season", columns="Region", values="Value", aggfunc='mean')
         el_prices_balm.index = [int(i.replace('S', '')) for i in el_prices_balm.index]
+
+        print("Mean difference across all average weekly prices:")
+        print(((el_prices_ant-el_prices_balm)).mean())
 
         fig, ax = plt.subplots()
         ax.plot(el_prices_ant.mean(axis=1), label='Antares')

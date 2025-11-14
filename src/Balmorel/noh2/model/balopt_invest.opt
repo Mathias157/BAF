@@ -98,7 +98,7 @@ $setglobal NETDEMAND
 *---- Generation investments options----
 
 * Permit investments in generation and storage capacity:
-$setglobal TechInvest   
+$setglobal TechInvest   yes
 *!option yes
 
 SCALAR GINVESTSTART 'Year from which endogenous decisions in generation capacities are allowed' ;
@@ -109,7 +109,7 @@ GINVESTSTART= 2025;
 *---- Transmission investments options----
 
 * Permit investments in transmission capacity:
-$setglobal TransInvest 
+$setglobal TransInvest YES
 *!option yes
 
 SCALAR XINVESTSTART 'Year from which endogenous decisions in transmission capacities are allowed' ;
@@ -341,7 +341,7 @@ $setglobal COMBTECH
 *-----------------HYDROGEN ADDON---------------------------------------
 * overall control variable HYDROGEN must be 'yes' if any of the other HYDROGEN controls are:
 * Set demands for hydrogen consumption and enable hydrogen technologies (some options require COMBTECH to be activated too).
-$Setglobal HYDROGEN YES
+$Setglobal HYDROGEN
 *!option yes
 
 * Allows investments in hydrogen transport
@@ -355,7 +355,7 @@ XH2INVESTSTART= 2030;
 $setglobal ES_H2TRANS 
 
 * Allows import of Hydrogen from 3rd countries outside Balmorel
-$Setglobal IMPORT_H2
+$Setglobal IMPORT_H2 
 *!option yes
 
 * Allows flexible demand of H2 in regions (set ratio of flexible demand in HYDROGEN_FLEXDH2 with the scalar THETA_FLEX_DH2)
@@ -451,7 +451,7 @@ $setglobal bypass yes
 
 *-----------------------TECHNOLOGY DECOMMISSIONING--------------------------------------------------------
 * overall control variable DECOM must be 'yes' if any of the other decommissioning controls are.
-$setglobal DECOM 
+$setglobal DECOM yes
 *!option yes
 
 *-------ENDOGENOUS CAPACITIES----------
@@ -650,7 +650,7 @@ $Setglobal export_results yes
 * Overall control to import results so they can be used in future runs:
 *NOTE: In order for results to work fine, the set S used in the runs should be contained in the import results.
 *NOTE: In order for results to work fine, the first element in set T of the import results should match the one used in the current run.
-$Setglobal import_results yes
+$Setglobal import_results
 *!option yes
 
 *------------ IMPORT OPTIONS ----------------
@@ -723,23 +723,23 @@ $Setglobal ADDEVSTOS  none
 *NOTE: The set Y should be the same in the optimization should be the same as the one in the import results.
 
 *Import generation and storage technology capacity development from previous runs
-$setglobal ADDTECHDEV yes
+$setglobal ADDTECHDEV
 *!option yes
 
 *Add expensive to operate backup generation technologies (electricity, heat, ...). It often occurs that the investment optimization underestimates the need for power.
-$setglobal ADDBACKUPGEN yes
+$setglobal ADDBACKUPGEN
 *!option yes
 
 *Import transmission development from previous runs
-$setglobal ADDTRANSDEV yes
+$setglobal ADDTRANSDEV
 *!option yes
 
 *Import heat transmission development from previous runs
-$setglobal ADDHEATTRANSDEV yes
+$setglobal ADDHEATTRANSDEV
 *!option yes
 
 *Import H2 transmission development from previous runs
-$setglobal ADDH2TRANSDEV yes
+$setglobal ADDH2TRANSDEV
 *!option yes
 *--------------------END OF INVESTMENTS AND DECOMMISSIONING-----------------------------------------------------------
 
@@ -796,7 +796,6 @@ $setglobal ADDGROUP_DEMAND_SHIFT
 $setglobal ANTBALM
 *!option yes
 
-$setglobal FICTDEM
 * NOTE: The following options are chosen by the BAF framework 
 * Only change these if working with Balmorel stand-alone!
 
@@ -821,7 +820,6 @@ $setglobal AGGR2
 
 
 *--------------------END OF ANTARES SOFT-LINK-----------------------------------------------------------
-
 
 
 *===============================================================================

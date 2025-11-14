@@ -192,10 +192,14 @@ def cap(gen: bool, sto: bool, filters: str, include_backup: bool,
             
             df = df.loc[:, cols]
         
+        scenarios = [f'{scenario}_eu_operun_flowbased_Iter0' for scenario in ['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']]
         (
             df
+            .loc[scenarios]
             .plot(ax=ax, kind='bar', stacked=True, color=balmorel_colours)
         )
+        ax.set_xticklabels(['NoH', 'NoH2', 'H2', 'H2LSS', 'H2LSSH2T'])
+
         
         fig, ax = plot_style(fig, ax, '%s_capacity'%key)
 
@@ -669,21 +673,19 @@ def get(ctx, symbol: str, pars, filters: str, diff: bool):
 @CLI.command()
 @click.pass_context
 @click.argument('scenario', type=str, required=True)
-@click.argument('epoch-string', type=str, required=True)
 @click.option('--nth-max', type=int, required=False, default=3, help="Which nth maximum backup production to interpret as required backup capacity Default is 3, as it could be interpreted as a LOLE = 3 h condition.")
-def adequacy(ctx, scenario: str, epoch_string: str, nth_max: int):
+def adequacy(ctx, scenario: str, nth_max: int):
     "Quantify the adequacy in terms of LOLE (h) and energy not supplied (TWh)"
     
     # Find path to scenario
-    epoch_scenario_name = scenario+f'_E{epoch_string}'
     model = ctx.obj['Balmorel']
-    model_path = os.path.join(ctx.obj['path'], model.scname_to_scfolder[epoch_scenario_name], 'model')
+    model_path = os.path.join(ctx.obj['path'], model.scname_to_scfolder[scenario], 'model')
 
     # Get mainresults files
-    res = MainResults('MainResults_%s.gdx'%epoch_scenario_name, paths=model_path, system_directory=ctx.obj['gams_system_directory'])
+    res = MainResults('MainResults_%s.gdx'%scenario, paths=model_path, system_directory=ctx.obj['gams_system_directory'])
     
     # Get backup production
-    df = res.get_result('PRO_YCRAGFST').query('Scenario == @epoch_scenario_name and Generation.str.contains("BACKUP")')
+    df = res.get_result('PRO_YCRAGFST').query('Scenario == @scenario and Generation.str.contains("BACKUP")')
 
     # Get backup 'capacity' based on the nth maximum production from BACKUP units (nth_max = 1 => No inadequacy, nth_max = 3 => LOLE = 3 h, perhaps)
     if nth_max == -1:
@@ -697,27 +699,20 @@ def adequacy(ctx, scenario: str, epoch_string: str, nth_max: int):
         )
     
     ## Get energy not served
-    ENS = df.pivot_table(index=['Season', 'Time'], columns='Commodity',
+    ENS = df.pivot_table(index=['Season', 'Time'], columns=['Commodity','Region'],
                           values='Value', aggfunc='sum')
     
-    epoch = int(epoch_string)
     df_out = pd.DataFrame({
-        'epoch'   : epoch,
         'ENS_TWh' : ENS.sum() / 1e6,
         'LOLE_h'  : ENS.count()
     })
-    cap['epoch'] = epoch
 
     # Save
     files = [f'analysis/output/{scenario}_backcapN{nth_max}.csv',
              f'analysis/output/{scenario}_adeq.csv']
     
-    if epoch == 0:
-        cap.to_csv(files[0])
-        df_out.to_csv(files[1])
-    else:
-        cap.to_csv(files[0], mode='a', header=False)
-        df_out.to_csv(files[1], mode='a', header=False)
+    cap.to_csv(files[0])
+    df_out.to_csv(files[1])
 
 
 @CLI.command()

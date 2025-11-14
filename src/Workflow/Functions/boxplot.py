@@ -141,7 +141,7 @@ def collect_and_concat_diff_dataframes(
 def collect_and_concat_diff_dataframes_largescale():
     collected_df = pd.DataFrame()
     for weather_year in [2000]:
-        filename = "Workflow/OverallResults/PtX_demand_comparison_flowbasedtest.csv"
+        filename = "Workflow/OverallResults/PtX_demand_comparison_largescale.csv"
         df, _ = get_difference_table(
             filename,
             "Data",
@@ -353,7 +353,7 @@ def plot_boxplot(
         ax.set_ylabel(
             f"Power-to-{commodity.capitalize()}\nRelative Difference (%)", fontsize=12
         )
-        ax.set_ylim(-100, 100)
+        ax.set_ylim(-100, 200)
     else:
         ax.set_ylabel(
             f"Power-to-{commodity.capitalize()}\nAbsolute Relative Difference (%)",

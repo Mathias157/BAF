@@ -355,7 +355,7 @@ XH2INVESTSTART= 2030;
 $setglobal ES_H2TRANS 
 
 * Allows import of Hydrogen from 3rd countries outside Balmorel
-$Setglobal IMPORT_H2 YES
+$Setglobal IMPORT_H2 
 *!option yes
 
 * Allows flexible demand of H2 in regions (set ratio of flexible demand in HYDROGEN_FLEXDH2 with the scalar THETA_FLEX_DH2)
