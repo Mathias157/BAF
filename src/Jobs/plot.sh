@@ -17,6 +17,9 @@ if [ $scale = "large" ]; then
   # Boxplot
   python Workflow/Functions/boxplot.py model-error-boxplot-largescale
 
+  # Electricity generation across scenarios
+  python Workflow/Analysis.py el-generation *rorfix_operun_00019
+
 elif [ $scale = "small" ]; then
   # Capacities
   cd Balmorel
@@ -34,6 +37,9 @@ elif [ $scale = "small" ]; then
 
   # Boxplot
   python Workflow/Functions/boxplot.py model-error-boxplot
+
+  # Electricity generation across scenarios
+  python Workflow/Analysis.py el-generation *dispatch_WY2000_00019
 
 fi
 

@@ -1229,7 +1229,7 @@ def el_generation(ctx, sc_search_string):
         temp['Scenario'] = (
             file.name
             .rstrip('_results.pkl')
-            .replace('eu_operun_flowbased_00019', '')
+            .replace('eu_rorfix_operun_00019', '')
             .replace('dispatch_WY2000_00019', '')
             .replace('_', '')
         ) 
