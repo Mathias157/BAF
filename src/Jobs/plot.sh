@@ -4,11 +4,11 @@ scale=$1
 
 if [ $scale = "large" ]; then
   # PtX demands
-  python Workflow/Functions/check_ptx_demands.py flowbased
+  python Workflow/Functions/check_ptx_demands.py largescale
 
   # Capacities
   cd Balmorel
-  python analysis/analyse.py --overwrite cap --filters "Scenario in ['noh_eu_operun_flowbased_Iter0','noh2_eu_operun_flowbased_Iter0','h2_eu_operun_flowbased_Iter0','h2_lss_eu_operun_flowbased_Iter0','h2_lss_h2t_eu_operun_flowbased_Iter0']"
+  python analysis/analyse.py --overwrite cap --filters "Scenario in ['noh_eu_rorfix_operun_Iter0','noh2_eu_rorfix_operun_Iter0','h2_eu_rorfix_operun_Iter0','h2_lss_eu_rorfix_operun_Iter0','h2_lss_h2t_eu_rorfix_operun_Iter0']"
   cd ../
 
   # Seasonal PtX profile
@@ -48,13 +48,11 @@ for scenario in noh noh2 h2 h2_lss h2_lss_h2t; do
   fi
 
   if [ $scale = "large" ]; then
-
-    # Maps
-    python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_${clustering_name}_stofixflowbased --mc-year 00019 ${scenario}_eu_operun_flowbased_Iter0 flow balmorel
-    python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_${clustering_name}_stofixflowbased --mc-year 00019 ${scenario}_eu_operun_flowbased_Iter0 flow antares
+    python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_eu_rorfix_wy2000_1344_${clustering_name} --mc-year 00019 ${scenario}_eu_rorfix_operun_Iter0 flow balmorel
+    python Workflow/Functions/plot_map.py --scenario-folder $scenario --antares-scenario ${scenario}_eu_rorfix_wy2000_1344_${clustering_name} --mc-year 00019 ${scenario}_eu_rorfix_operun_Iter0 flow antares
 
     # Electricity generation
-    python Workflow/Analysis.py plot-all --overwrite ${scenario}_eu_operun_flowbased --mc-year 00019
+    python Workflow/Analysis.py plot-all --overwrite ${scenario}_eu_rorfix_operun --mc-year 00019
 
   elif [ $scale = "small" ]; then
     # Maps
