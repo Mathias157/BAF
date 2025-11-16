@@ -393,7 +393,24 @@ def largescale():
         [["MainResults_h2_lss_h2t_eu_rorfix_operun_Iter0.gdx", "h2_lss_h2t"], ["20251115-1951eco-h2_lss_h2t_eu_rorfix_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
     ]
 
-    collect_ptx_results(result_collection, 'largescale')
+    if len([file.name for file in Path('Antares/output').glob('*eco-*_rorfix*')]) > 0:
+        collect_ptx_results(result_collection, 'largescale')
+    else: 
+        print("No rorfix results")
+
+    result_collection = [
+        [["MainResults_noh_dispatch_WY2000_Iter0.gdx", "noh"],["20250923-0522eco-noh_wy2000_cl1344_iter0_y-2050", "00019"]],
+        [["MainResults_noh2_dispatch_WY2000_Iter0.gdx", "noh2"], ["20250930-1226eco-noh2_wy2000_cl1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_dispatch_WY2000_Iter0.gdx", "h2"], ["20250930-1240eco-h2_wy2000_cl1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_dispatch_WY2000_Iter0.gdx", "h2_lss"], ["20251008-1720eco-h2_lss_wy2000_cl1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_h2t_dispatch_WY2000_Iter0.gdx", "h2_lss_h2t"], ["20251013-0134eco-h2_lss_h2t_wy2000_cl1344_h2exohexo_iter0_y-2050", "00019"]],
+    ]
+
+    if len([file.name for file in Path('Antares/output').glob('*eco-*_wy2000_cl1344*')]) > 0:
+        df = collect_ptx_results(result_collection, 'largescale_related_smallscale')
+
+        if 'PtX_demand_comparison_largescale.csv' in [file.name for file in Path('Workflow/OverallResults').glob('*.csv')]:
+            df.to_csv('Workflow/OverallResults/PtX_demand_comparison_largescale.csv', mode='a', header=False)
 
 @CLI.command()
 def h2exotest():

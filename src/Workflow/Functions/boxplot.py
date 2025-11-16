@@ -147,7 +147,7 @@ def collect_and_concat_diff_dataframes_largescale():
             "Data",
             r"eco-(.+)\_iter",
             str,
-            r"MainResults\_(.+)\_eu",
+            r"MainResults\_(.+)*\.gdx",
             "AntaresFile",
             "BalmorelFile",
             absolute_difference=False,
@@ -160,7 +160,21 @@ def collect_and_concat_diff_dataframes_largescale():
             .rename(columns={"Data": "TestYear"})
         )
 
-        formatted_df["TrainYear"] = weather_year
+        formatted_df["TestYear"] = 'Large Scale' 
+        idx = formatted_df.Scenario.str.find('rorfix') == -1
+        formatted_df.loc[idx, "TestYear"] = 'Small Scale'
+        formatted_df["TrainYear"] = 'Large Scale'
+
+        formatted_df.Scenario = (
+            formatted_df
+            .Scenario
+            .str.replace('_dispatch_WY2000_Iter0', '')
+            .str.replace('_eu_rorfix_operun_Iter0', '')
+        )
+
+        print(formatted_df)
+        print('Scenarios:\n', formatted_df.Scenario.unique())
+
         collected_df = pd.concat((collected_df, formatted_df), ignore_index=True)
 
     return collected_df
@@ -353,7 +367,7 @@ def plot_boxplot(
         ax.set_ylabel(
             f"Power-to-{commodity.capitalize()}\nRelative Difference (%)", fontsize=12
         )
-        ax.set_ylim(-100, 200)
+        ax.set_ylim(-100, 100)
     else:
         ax.set_ylabel(
             f"Power-to-{commodity.capitalize()}\nAbsolute Relative Difference (%)",
@@ -483,9 +497,8 @@ def model_error_boxplot_largescale():
             axes[i],
             temp,
             "Endogenous electricity demands - average error for all regions and WY",
-            legend=False,
+            legend=True if commodity == 'HYDROGEN' else False,
             commodity=commodity,
-            two_per_scenario=False,
         )
 
         # Plot the boxplot for system (aggregated absolute error across regions)
@@ -497,7 +510,6 @@ def model_error_boxplot_largescale():
             True,
             legend=False,
             commodity=commodity,
-            two_per_scenario=False,
         )
 
     fig.savefig(
