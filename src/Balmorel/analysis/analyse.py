@@ -192,7 +192,7 @@ def cap(gen: bool, sto: bool, filters: str, include_backup: bool,
             
             df = df.loc[:, cols]
         
-        scenarios = [f'{scenario}_eu_operun_flowbased_Iter0' for scenario in ['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']]
+        scenarios = [f'{scenario}_eu_rorfix_operun_Iter0' for scenario in ['noh', 'noh2', 'h2', 'h2_lss', 'h2_lss_h2t']]
         (
             df
             .loc[scenarios]

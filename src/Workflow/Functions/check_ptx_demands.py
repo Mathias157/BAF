@@ -383,27 +383,14 @@ def multiweather(clustersize: str = 'cl1344'):
 
         collect_ptx_results(collection_list, f'multiweather_{clustersize}_{training_year}trained')
 
-
 @CLI.command()
 def largescale():
     result_collection = [
-        # [["MainResults_noh_eu_operun_Iter0.gdx", "noh"], ["20251019-1527eco-h2_h2exohexo_storagefix_iter0_y-2050", "00019"]],
-        # [["MainResults_noh2_eu_operun_Iter0.gdx", "noh2"], ["20250930-0348eco-noh2_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_noh_eu_operun_Iter0.gdx", "noh"],       ["20251021-1856eco-noh_h2vrehexo_stofixflowbased_iter0_y-2050", "00019"]],
-        [["MainResults_noh_eu_rorfix_operun_Iter0.gdx", "noh"],["20251112-0938eco-noh_eu_rorfix_wy2000_1344_h2vrehexo_iter0_y-2050", "00019"]],
-        # [["MainResults_noh2_eu_operun_Iter0.gdx", "noh2"], ["20251020-0813eco-h2_h2exohexo_stofixflowbased_iter0_y-2050", "00019"]],
+        [["MainResults_noh_eu_rorfix_operun_Iter0.gdx", "noh"],["20251116-1300eco-noh_eu_rorfix_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
         [["MainResults_noh2_eu_rorfix_operun_Iter0.gdx", "noh2"], ["20251112-1718eco-noh2_eu_rorfix_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_eu_operun_Iter0.gdx", "h2"], ["20251020-0813eco-h2_h2exohexo_stofixflowbased_iter0_y-2050", "00019"]],
         [["MainResults_h2_eu_rorfix_operun_Iter0.gdx", "h2"], ["20251113-0212eco-h2_eu_rorfix_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_eu_operun_Iter0.gdx", "h2"], ["20251001-0845eco-h2_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_eu_operun_Iter0.gdx", "h2"], ["20251019-1527eco-h2_h2exohexo_storagefix_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_lss_eu_operun_Iter0.gdx", "h2_lss"], ["20251010-0033eco-h2_lss_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_lss_h2t_eu_operun_Iter0.gdx", "h2_lss_h2t"], ["20251010-1009eco-h2_lss_h2t_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_noh_eu_operun_Iter0.gdx", "noh"], ["20251003-1252eco-noh_wy2000_672_h2vrehexo_iter0_y-2050", "00019"]],
-        # [["MainResults_noh2_eu_operun_Iter0.gdx", "noh2"], ["20251004-0833eco-noh2_wy2000_672_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_eu_operun_Iter0.gdx", "h2"], ["20251005-1523eco-h2_wy2000_672_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_lss_eu_operun_Iter0.gdx", "h2_lss"], ["20251007-0348eco-h2_lss_wy2000_672_h2exohexo_iter0_y-2050", "00019"]],
-        # [["MainResults_h2_lss_h2t_eu_operun_Iter0.gdx", "h2_lss_h2t"], ["20251008-1231eco-h2_lss_h2t_wy2000_672_h2exohexo_iter0_y-2050", "00019"]]
+        [["MainResults_h2_lss_eu_rorfix_operun_Iter0.gdx", "h2_lss"], ["20251114-1145eco-h2_lss_eu_rorfix_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
+        [["MainResults_h2_lss_h2t_eu_rorfix_operun_Iter0.gdx", "h2_lss_h2t"], ["20251115-1951eco-h2_lss_h2t_eu_rorfix_wy2000_1344_h2exohexo_iter0_y-2050", "00019"]],
     ]
 
     collect_ptx_results(result_collection, 'largescale')
