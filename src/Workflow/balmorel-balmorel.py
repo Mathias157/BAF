@@ -61,81 +61,6 @@ else:
     gams_path = r"C:\GAMS\41"
 ant_study = "/BZModelSMALLDKDE"  # the specific antares study
 
-### 0.4 Technologies transfered from Balmorel, with marginal costs
-kgGJ2tonMWh = 3.6 / 1e3  # Conversion from kg/GJ to ton/MWh
-BalmTechs = {
-    "CHP-BACK-PRESSURE": {
-        "NATGAS": {"CO2": 56.1 * kgGJ2tonMWh, "MC": 40},
-        "WOODCHIPS": {"CO2": 0, "MC": 20},
-        "BIOGAS": {"CO2": 0, "MC": 10},
-        "MUNIWASTE": {"CO2": 0, "MC": 20},
-    },
-    "CHP-EXTRACTION": {
-        "NATGAS": {"CO2": 56.1 * kgGJ2tonMWh, "MC": 40},
-        "WOODCHIPS": {"CO2": 0, "MC": 20},
-        "BIOGAS": {"CO2": 0, "MC": 10},
-        "MUNIWASTE": {"CO2": 0, "MC": 20},
-    },
-    "CONDENSING": {
-        "NATGAS": {"CO2": 56.1 * kgGJ2tonMWh, "MC": 40},
-        "WOODCHIPS": {"CO2": 0, "MC": 20},
-        "BIOGAS": {"CO2": 0, "MC": 10},
-        "MUNIWASTE": {"CO2": 0, "MC": 20},
-        "NUCLEAR": {"CO2": 0, "MC": 5},
-    },
-    "FUELCELL": {"HYDROGEN": {"CO2": 0, "MC": 0}},
-}
-
-### 0.4 Hard-coded dictionaries for Balmorel/Antares set translation
-
-# Fuels
-# B2A_fuel = {'WOODCHIPS' : 'woodchips',
-#             'BIOGAS' : 'biogas',
-#             }
-# A2B_fuel = {B2A_fuel[k] : k for k in B2A_fuel.keys()}
-
-# Technologies
-# B2A_tech = {'CHP-BACK-PRESSURE' : 'CHP-BP',
-#             'CONDENSING' : 'Cond',
-#             'CHP-EXTRACTION' }
-# A list from DE-DK output: (GW)
-# CHP-BACK-PRESSURE LIGHTOIL 0.0
-# CHP-BACK-PRESSURE NATGAS 2.220446049250313e-16
-# CHP-BACK-PRESSURE STRAW 0.0
-# CHP-BACK-PRESSURE WOODCHIPS 2.292637202895013
-# CHP-BACK-PRESSURE WOODPELLETS 0.0
-# CHP-BACK-PRESSURE BIOGAS 10.86009872138417
-# CHP-BACK-PRESSURE COAL 0.0
-# CHP-BACK-PRESSURE MUNIWASTE 2.390979571976841
-# CHP-BACK-PRESSURE FUELOIL 0.0
-# CHP-BACK-PRESSURE LIGNITE 0.0
-# CONDENSING LIGHTOIL 0.0
-# CONDENSING NATGAS 0.0
-# CONDENSING BIOGAS 7.771561172376096e-16
-# CONDENSING COAL 0.0
-# CONDENSING MUNIWASTE 0.0
-# CONDENSING FUELOIL 0.0
-# CONDENSING WASTEHEAT 0.0
-# CONDENSING LIGNITE 0.0
-# CONDENSING NUCLEAR 0.0
-# CHP-EXTRACTION NATGAS 0.0
-# CHP-EXTRACTION WOODPELLETS 0.0
-# CHP-EXTRACTION BIOGAS 0.0
-# CHP-EXTRACTION COAL 0.0
-# CHP-EXTRACTION LIGNITE 0.0
-# SOLAR-PV SUN 353.80588155731743
-# HYDRO-RUN-OF-RIVER WATER 8.849395
-# WIND-ON WIND 111.19999999999996
-# WIND-OFF WIND 113.59742761200643
-# INTRASEASONAL-ELECT-STORAGE ELECTRIC 31.555227736978406
-# FUELCELL HYDROGEN 4.07380644459292
-# HYDRO-RESERVOIRS WATER 0.124
-
-
-# Renewables
-B2A_ren = {"SOLAR-PV": "solar", "WIND-ON": "wind", "WIND-OFF": "wind"}
-A2B_tech = {B2A_ren[k]: k for k in B2A_ren.keys()}
-
 # Regions
 with open(wk_dir + "/Pre-Processing/B2A_regi.pkl", "rb") as f:
     B2A_regi = pickle.load(f)
@@ -249,42 +174,6 @@ def symbol_to_df(db, symbol, cols="None"):
         except:
             pass
     return df
-
-
-def B2A_area_equal_weight(area):
-    """
-    Gets the weight of a Balmorel-to-Antares Parameter
-
-    Returns:
-        scalar: weight
-    """
-    # For a higher resolution in Balmorel,
-    # weight is 1 since parameters will be summed
-    if len(A2B_regi[area]) > 1:
-        weight = 1
-    # For a higher resolution in Antares,
-    # weight will be 1/(the amount of Antares areas)
-    else:
-        weight = 1 / len(B2A_regi[A2B_regi[area][0]])
-    return weight
-
-
-def A2B_area_equal_weight(area):
-    """
-    Gets the weight of a Antares-to-Balmorel Parameter
-
-    Returns:
-        scalar: weight
-    """
-    # For a higher resolution in Antares,
-    # weight is 1 since parameters will be summed
-    if len(B2A_regi[area]) > 1:
-        weight = 1
-    # For a higher resolution in Antares,
-    # weight will be 1/(the amount of Antares areas)
-    else:
-        weight = 1 / len(A2B_regi[B2A_regi[area][0]])
-    return weight
 
 
 ### 0.7 Example of inputting something from command-line
