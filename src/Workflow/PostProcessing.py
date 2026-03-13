@@ -9,19 +9,13 @@ Created on 29/03/2023 by
 ### ------------------------------- ###
 
 import click
-import sys
 import configparser
+from pathlib import Path
 from Functions.Methods import (
     calculate_link_capacity_credits,
     calculate_generator_capacity_credits,
     calculate_h2generator_capacity_credits,
     recalculate_resmar,
-    calculate_elmarket_values,
-    calculate_h2market_values,
-    calculate_antares_elmarket_profits,
-    calculate_antares_h2market_profits,
-    create_elmarketvaluestrings,
-    create_h2marketvaluestrings,
     calculate_elfictdem,
     calculate_h2fictdem,
 )
@@ -37,35 +31,26 @@ import platform
 OS = platform.platform().split("-")[0]
 
 
-def context(SC_name: str | None):
+def context(SC_name: str):
     print("\n|--------------------------------------------------|")
     print("              POST-PROCESSING")
     print("|--------------------------------------------------|\n")
 
-    if SC_name == None:
-        # Otherwise, read config from top level
-        print("Reading SC from Config.ini..")
-        Config = configparser.ConfigParser()
-        Config.read("Config.ini")
-        SC_name = Config.get("RunMetaData", "SC")
-
     # 0.0 Load configurations
     Config = configparser.ConfigParser()
-    Config.read("Workflow/MetaResults/%s_meta.ini" % SC_name)
+    Config.read(f"Workflow/MetaResults/{SC_name}_meta.ini")
     SC_folder = Config.get("RunMetaData", "SC_Folder")
-
-    # Years
-    Y = np.array(Config.get("RunMetaData", "Y").split(",")).astype(int)
-    Y.sort()
-    Y = Y.astype(str)
-    ref_year = Config.getint("RunMetaData", "ref_year")
+    years = Config.get("RunMetaData", "Y")
+    years = np.array(Config.get("RunMetaData", "Y").split(",")).astype(int)
+    years.sort()
+    years = years.astype(str)
 
     # Get current iteration
     i = Config.getint("RunMetaData", "CurrentIter")
 
-    SC = SC_name + "_Iter%d" % i
+    SC = f"{SC_name}_Iter{i}"
 
-    return Config, SC, SC_name, SC_folder, Y, ref_year, i
+    return Config, SC, SC_name, SC_folder, years, i
 
 
 def old_processing(
@@ -74,14 +59,9 @@ def old_processing(
     SC_name: str,
     SC_folder: str,
     Y: np.ndarray,
-    ref_year: int,
     i: int,
 ):
-    wk_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
-    USE_MARKETVAL = Config.getboolean("PostProcessing", "Marketvalue")
-    USE_H2MARKETVAL = Config.getboolean("PostProcessing", "H2Marketvalue")
-    USE_PROFITDIF = Config.getboolean("PostProcessing", "ProfitDifference")
     USE_FICTDEM = Config.getboolean("PostProcessing", "Fictivedem")
     FICTDEMALLOC = Config.get("PostProcessing", "FictAllocation").lower()
     MAXOREXPECTED = Config.get("PostProcessing", "max_or_expected")
@@ -90,44 +70,30 @@ def old_processing(
     update_thermal = Config.getboolean("PostProcessing", "UpdateThermal")
     heggarty_func = Config.get(
         "PostProcessing", "HeggartyFunc"
-    ).lower()  # Conservative or Risky (Balanced not made yet)
-    UseFlexibleDemand = Config.getboolean(
-        "PeriProcessing", "UseFlexibleDemand")
-    negative_feedback = Config.getboolean(
-        "PostProcessing", "negative_feedback")
-
-    # 0.1 Checking if running this script by itself
-    if __name__ == "__main__":
-        test_mode = "Y"  # Set to N if you're running iterations
-        print(
-            "\n----------------------------\n\n        Test mode ON\n\n----------------------------\n"
-        )
-        wk_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    else:
-        test_mode = "N"
-        wk_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    ).lower()  # Conservative or Risky (corresponding to Function 1 or 2)
+    negative_feedback = Config.getboolean("PostProcessing", "negative_feedback")
 
     # Weights on fictive electricity demand from A2B
-    with open(wk_dir + "/Pre-Processing/Output/A2B_DE_weights.pkl", "rb") as f:
+    with open("Pre-Processing/Output/A2B_DE_weights.pkl", "rb") as f:
         A2B_DE_weights = pickle.load(f)
     # Weights on fictive hydrogen demand from A2B
-    with open(wk_dir + "/Pre-Processing/Output/A2B_DH2_weights.pkl", "rb") as f:
+    with open("Pre-Processing/Output/A2B_DH2_weights.pkl", "rb") as f:
         A2B_DH2_weights = pickle.load(f)
     # Hydrogen node mappings
-    with open(wk_dir + "/Pre-Processing/Output/A2B_regi_h2.pkl", "rb") as f:
+    with open("Pre-Processing/Output/A2B_regi_h2.pkl", "rb") as f:
         A2B_regi_h2 = pickle.load(f)
     # Electricity node mappings
-    with open(wk_dir + "/Pre-Processing/Output/A2B_regi.pkl", "rb") as f:
+    with open("Pre-Processing/Output/A2B_regi.pkl", "rb") as f:
         A2B_regi = pickle.load(f)
-    with open(wk_dir + "/Pre-Processing/Output/B2A_regi.pkl", "rb") as f:
+    with open("Pre-Processing/Output/B2A_regi.pkl", "rb") as f:
         B2A_regi = pickle.load(f)
-    with open(wk_dir + "/Pre-Processing/Output/B2A_regi_h2.pkl", "rb") as f:
+    with open("Pre-Processing/Output/B2A_regi_h2.pkl", "rb") as f:
         B2A_regi_h2 = pickle.load(f)
 
     # Get last all_endofmodel
-    ws = gams.GamsWorkspace()
+    ws = gams.GamsWorkspace()  # make sure gams system directory is in path. Add with: PATH="path/to/gams/sysdir:"$PATH
     ALLENDOFMODEL = ws.add_database_from_gdx(
-        wk_dir + "/Balmorel/%s/model/all_endofmodel.gdx" % SC_folder
+        str(Path(f"Balmorel/{SC_folder}/model/all_endofmodel.gdx").absolute())
     )
 
     # Iteration Meta and Overall Results
@@ -137,38 +103,35 @@ def old_processing(
     fENSH2 = pd.read_csv(
         "Workflow/OverallResults/%s_H2NotServedMWh.csv" % SC_name, index_col=0
     )
-    fLOLD = pd.read_csv("Workflow/OverallResults/%s_LOLD.csv" %
-                        SC_name, index_col=0)
+    fLOLD = pd.read_csv("Workflow/OverallResults/%s_LOLD.csv" % SC_name, index_col=0)
     fMV = pd.read_csv("Workflow/OverallResults/%s_MV.csv" % SC_name)
-    with open(wk_dir + "/Workflow/OverallResults/%s_AT.pkl" % SC_name, "rb") as f:
+    with open("Workflow/OverallResults/%s_AT.pkl" % SC_name, "rb") as f:
         fAntTechno = pickle.load(f)
 
     if USE_CAPCRED:
-        if i != 0:
-            with open(
-                wk_dir + "/Workflow/OverallResults/%s_CC.pkl" % (SC_name), "rb"
-            ) as f:
-                # Load capacity credits of the latest iteration
-                CC = pickle.load(f)
-        else:
+        if i == 0:
+            # Create electricity capacity credit file
             CC = pd.DataFrame(
                 index=pd.MultiIndex.from_product([[i], Y, B2A_regi.keys()])
             )
+        else:
+            # Load existing file of electricity capacity credits
+            with open("Workflow/OverallResults/%s_CC.pkl" % (SC_name), "rb") as f:
+                # Load capacity credits of the latest iteration
+                CC = pickle.load(f)
 
         if USE_H2CAPCRED:
-            if i != 0:
-                with open(
-                    wk_dir +
-                        "/Workflow/OverallResults/%s_CCH2.pkl" % (
-                            SC_name), "rb"
-                ) as f:
-                    CCH2 = pickle.load(
-                        f
-                    )  # Load capacity credits of the latest iteration
-            else:
+            if i == 0:
+                # Create hydrogen capacity credit file
                 CCH2 = pd.DataFrame(
                     index=pd.MultiIndex.from_product([[i], Y, B2A_regi.keys()])
                 )
+            else:
+                # Load existing file of electricity capacity credits
+                with open("Workflow/OverallResults/%s_CCH2.pkl" % (SC_name), "rb") as f:
+                    CCH2 = pickle.load(
+                        f
+                    )  # Load capacity credits of the latest iteration
 
         # Load interpolation data (read off Heggarty's PhD)
         interpolation_data = pd.read_csv(
@@ -193,11 +156,10 @@ def old_processing(
                 .pivot_table(index="Year", columns="Region", values="Value (h)")
                 .copy()
             )
-            RESMARH2.columns = [A2B_regi_h2[col][0]
-                                for col in RESMARH2.columns]
+            RESMARH2.columns = [A2B_regi_h2[col][0] for col in RESMARH2.columns]
 
     # 0.2 Technologies transfered from Balmorel, with marginal costs
-    with open(wk_dir + "/Pre-Processing/Output/BalmTechs.pkl", "rb") as f:
+    with open("Pre-Processing/Output/BalmTechs.pkl", "rb") as f:
         BalmTechs = pickle.load(f)
 
     # %% ------------------------------- ###
@@ -221,7 +183,7 @@ def old_processing(
     # 1.1 Load MainResults
     ws = gams.GamsWorkspace()
     db = ws.add_database_from_gdx(
-        wk_dir + "/Balmorel/%s/model/MainResults_%s.gdx" % (SC_folder, SC)
+        "Balmorel/%s/model/MainResults_%s.gdx" % (SC_folder, SC)
     )
 
     # 1.2 Capacities to dataframe
@@ -298,7 +260,7 @@ def old_processing(
             )
             fDH2VAR.loc[:, :] = 0
     # 1.3 Get Antares Runs
-    l = np.array(os.listdir(wk_dir + "/Antares/output"))
+    l = np.array(os.listdir("Antares/output"))
     l.sort()
     l = pd.Series(l[l != "maps"])
 
@@ -312,10 +274,7 @@ def old_processing(
         ant_res = l[idx].iloc[-1]  # Should be the most recent
         print("Analysing Antares result %s\n" % ant_res)
         # Get run
-        AntOut = AntaresOutput(ant_res, wk_dir=wk_dir)
-
-        if UseFlexibleDemand:
-            flexdem_uns = AntOut.load_area_results("0_flexdem", "details")
+        AntOut = AntaresOutput(ant_res)
 
         for area in A2B_regi.keys():
             if not (area in ["ITCO"]):
@@ -331,12 +290,7 @@ def old_processing(
                     UNSENR_arr = f.loc[:, "UNSP. ENRG.3"].astype(
                         int
                     )  # Hourly unsupplied energy for DE_VAR_T
-                UNSENR_arr.index = np.arange(
-                    0, len(UNSENR_arr))  # Correct index
-
-                if UseFlexibleDemand:
-                    # Add loss of load for flexible demand (if demand is not satisfied within the week)
-                    UNSENR_arr += flexdem_uns["%s_flexloss" % area]
+                UNSENR_arr.index = np.arange(0, len(UNSENR_arr))  # Correct index
 
                 t = hour.reset_index()
                 t.loc[: len(UNSENR_arr) - 1, "UNSENR"] = UNSENR_arr.values
@@ -359,7 +313,7 @@ def old_processing(
                     ignore_index=True,
                 )
 
-                if USE_CAPCRED | USE_MARKETVAL | USE_PROFITDIF:
+                if USE_CAPCRED:
                     # Load
                     AntOut.load = AntOut.collect_mcyears(
                         "LOAD", area
@@ -424,21 +378,6 @@ def old_processing(
                     # Weight
                     weight = A2B_DE_weights[area][BalmArea]
 
-                    if USE_MARKETVAL:
-                        MARKETVAL, fMV = calculate_elmarket_values(
-                            i, area, BalmArea, year, MARKETVAL, fMV, AntOut
-                        )
-
-                    if USE_PROFITDIF:
-                        antares_profits_pr_mwh = calculate_antares_elmarket_profits(
-                            i, area, year, AntOut, fAntTechno
-                        )
-
-                        # Make market value string
-                        MARKETVAL, fMV = create_elmarketvaluestrings(
-                            antares_profits_pr_mwh, i, year, BalmArea, MARKETVAL, fMV
-                        )
-
                     if USE_CAPCRED:
                         CC, CAPCRED_G = calculate_generator_capacity_credits(
                             i,
@@ -464,8 +403,7 @@ def old_processing(
                             columns="Carrier",
                             values="Value (h)",
                         )
-                        get_lold = get_lold.loc[(
-                            i, int(year), area), "Electricity"]
+                        get_lold = get_lold.loc[(i, int(year), area), "Electricity"]
                         RESMAREL = recalculate_resmar(
                             ALLENDOFMODEL,
                             year,
@@ -485,8 +423,7 @@ def old_processing(
                             columns="Carrier",
                             values="Value (h)",
                         )
-                        get_lold = get_lold.loc[(
-                            i, int(year), area), "Electricity"]
+                        get_lold = get_lold.loc[(i, int(year), area), "Electricity"]
                         fDEVAR, FICTDE = calculate_elfictdem(
                             FICTDEMALLOC,
                             balm_t,
@@ -515,8 +452,7 @@ def old_processing(
         for area in A2B_regi_h2.keys():
             # Unserved Energy
             f = pd.read_table(
-                wk_dir
-                + "/Antares/output/"
+                "Antares/output/"
                 + ant_res
                 + "/economy/mc-all/areas/%s/values-hourly.txt" % area.lower(),
                 skiprows=[0, 1, 2, 3, 5, 6],
@@ -553,8 +489,7 @@ def old_processing(
                     UNSENR_arr = f.loc[:, "UNSP. ENRG.3"].astype(
                         int
                     )  # Hourly unsupplied energy for DH2_VAR_T
-                    UNSENR_arr.index = np.arange(
-                        0, len(UNSENR_arr))  # Correct index
+                    UNSENR_arr.index = np.arange(0, len(UNSENR_arr))  # Correct index
 
                 get_lold = fLOLD.pivot_table(
                     index=["Iter", "Year", "Region"],
@@ -582,11 +517,7 @@ def old_processing(
                     negative_feedback,
                 )
 
-            if (
-                (USE_MARKETVAL and USE_H2MARKETVAL)
-                or (USE_CAPCRED and USE_H2CAPCRED)
-                or USE_PROFITDIF
-            ):
+            if USE_CAPCRED and USE_H2CAPCRED:
                 # Load
                 AntOut.load = AntOut.collect_mcyears(
                     "LOAD", area
@@ -613,21 +544,6 @@ def old_processing(
                     # Weight
                     weight = A2B_DH2_weights[area][BalmArea]
 
-                    if USE_H2MARKETVAL and USE_MARKETVAL:
-                        MARKETVAL, fMV = calculate_h2market_values(
-                            i, area, BalmArea, year, MARKETVAL, fMV, AntOut
-                        )
-
-                    if USE_PROFITDIF:
-                        antares_profits_pr_mwh = calculate_antares_h2market_profits(
-                            i, area, year, AntOut, fAntTechno
-                        )
-
-                        # Make market value string
-                        MARKETVAL, fMV = create_h2marketvaluestrings(
-                            antares_profits_pr_mwh, i, year, BalmArea, MARKETVAL, fMV
-                        )
-
                     if USE_H2CAPCRED and USE_CAPCRED:
                         CCH2, CAPCRED_G = calculate_h2generator_capacity_credits(
                             i,
@@ -653,8 +569,7 @@ def old_processing(
                             columns="Carrier",
                             values="Value (h)",
                         )
-                        get_lold = get_lold.loc[(
-                            i, int(year), area), "Hydrogen"]
+                        get_lold = get_lold.loc[(i, int(year), area), "Hydrogen"]
                         RESMARH2 = recalculate_resmar(
                             ALLENDOFMODEL,
                             year,
@@ -682,12 +597,6 @@ def old_processing(
 
         print("\n")
 
-    if USE_MARKETVAL | USE_PROFITDIF:
-        with open(
-            wk_dir + "/Balmorel/%s/data/ANTBALM_MARKETVAL.inc" % SC_folder, "w"
-        ) as f:
-            f.write(MARKETVAL)
-
     if USE_FICTDEM:
         # One profile pr year
         for year in Y:
@@ -713,25 +622,17 @@ def old_processing(
                                 % (BalmArea, year, BalmArea)
                             )
 
-        with open(
-            wk_dir + "/Balmorel/%s/data/ANTBALM_FICTDE.inc" % SC_folder, "w"
-        ) as f:
+        with open("Balmorel/%s/data/ANTBALM_FICTDE.inc" % SC_folder, "w") as f:
             f.write(FICTDE)
 
-        with open(
-            wk_dir + "/Balmorel/%s/data/ANTBALM_FICTDH2.inc" % SC_folder, "w"
-        ) as f:
+        with open("Balmorel/%s/data/ANTBALM_FICTDH2.inc" % SC_folder, "w") as f:
             f.write(FICTDH2)
 
-        with open(
-            wk_dir + "/Balmorel/%s/data/ANTBALM_FICTDE_VAR_T.inc" % SC_folder, "w"
-        ) as f:
+        with open("Balmorel/%s/data/ANTBALM_FICTDE_VAR_T.inc" % SC_folder, "w") as f:
             f.write(FICTDE_VAR_T)
 
     if USE_CAPCRED:
-        with open(
-            wk_dir + "/Balmorel/%s/data/ANTBALM_GCAPCRED.inc" % SC_folder, "w"
-        ) as f:
+        with open("Balmorel/%s/data/ANTBALM_GCAPCRED.inc" % SC_folder, "w") as f:
             f.write(CAPCRED_G)
 
         # Take care of internal links
@@ -739,12 +640,10 @@ def old_processing(
             CAPCRED_X
             + "ANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-W') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-E') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-S') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-S', 'DE4-W') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-N', 'DE4-E') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-N') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-S', 'DE4-E') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-E', 'DE4-S') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-W', 'DE4-N') = 0;\nANTBALM_XCAPCRED(YYY, 'DE4-N', 'DE4-W') = 0;\n"
         )
-        with open(
-            wk_dir + "/Balmorel/%s/data/ANTBALM_XCAPCRED.inc" % SC_folder, "w"
-        ) as f:
+        with open("Balmorel/%s/data/ANTBALM_XCAPCRED.inc" % SC_folder, "w") as f:
             f.write(CAPCRED_X)
 
-        with open(wk_dir + "/Workflow/OverallResults/%s_CC.pkl" % SC_name, "wb") as f:
+        with open("Workflow/OverallResults/%s_CC.pkl" % SC_name, "wb") as f:
             # Using pickle, as csv gets the types wrong in the index
             pickle.dump(CC, f)
 
@@ -755,14 +654,10 @@ def old_processing(
                 + "ANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-W') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-E') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-S') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-S', 'DE4-W') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-N', 'DE4-E') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-N') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-S', 'DE4-E') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-E', 'DE4-S') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-W', 'DE4-N') = 0;\nANTBALM_XH2CAPCRED(YYY, 'DE4-N', 'DE4-W') = 0;\n"
             )
 
-            with open(
-                wk_dir + "/Balmorel/%s/data/ANTBALM_XH2CAPCRED.inc" % SC_folder, "w"
-            ) as f:
+            with open("Balmorel/%s/data/ANTBALM_XH2CAPCRED.inc" % SC_folder, "w") as f:
                 f.write(CAPCRED_XH2)
 
-            with open(
-                wk_dir + "/Workflow/OverallResults/%s_CCH2.pkl" % SC_name, "wb"
-            ) as f:
+            with open("Workflow/OverallResults/%s_CCH2.pkl" % SC_name, "wb") as f:
                 pickle.dump(
                     CCH2, f
                 )  # Using pickle, as csv gets the types wrong in the index
@@ -770,9 +665,7 @@ def old_processing(
         # Write reserve margins
         RESMAREL.columns.name = ""
         RESMAREL.index.name = ""
-        with open(
-            wk_dir + "/Balmorel/%s/data/ANTBALM_RESMAR.inc" % SC_folder, "w"
-        ) as f:
+        with open("Balmorel/%s/data/ANTBALM_RESMAR.inc" % SC_folder, "w") as f:
             f.write(
                 "TABLE ANTBALM_RESMAR(YYY, RRR) 'Assumed electricity reserve margin'\n"
             )
@@ -789,9 +682,7 @@ def old_processing(
         if USE_H2CAPCRED:
             RESMARH2.columns.name = ""
             RESMARH2.index.name = ""
-            with open(
-                wk_dir + "/Balmorel/%s/data/ANTBALM_H2RESMAR.inc" % SC_folder, "w"
-            ) as f:
+            with open("Balmorel/%s/data/ANTBALM_H2RESMAR.inc" % SC_folder, "w") as f:
                 f.write(
                     "TABLE ANTBALM_H2RESMAR(YYY, RRR) 'Assumed hydrogen reserve margin'\n"
                 )
@@ -821,12 +712,10 @@ def old_processing(
 
 @click.command()
 @click.argument("scenario_name", type=str, required=False, default=None)
-def post_process(scenario_name: str | None):
-    Config, SC, scenario_name, SC_folder, years, ref_year, iteration = context(
-        scenario_name
-    )
-    old_processing(Config, SC, SC_name, SC_folder, years, ref_year, iteration)
-    print(SC, scenario_name, SC_folder, years, ref_year, iteration)
+def post_process(scenario_name: str):
+    Config, SC, scenario_name, SC_folder, years, iteration = context(scenario_name)
+    old_processing(Config, SC, scenario_name, SC_folder, years, iteration)
+    print(SC, scenario_name, SC_folder, years, iteration)
 
 
 if __name__ == "__main__":
