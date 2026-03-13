@@ -191,6 +191,9 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
     iteration = ctx.obj["iteration"]
     scenario = ctx.obj["scenario"]
     ENS = pd.read_csv(f"Workflow/OverallResults/ENS_{scenario}_{iteration}.csv")
+    EENS = pd.read_csv("Workflow/OverallResults/%s_ElecNotServedMWh.csv" % scenario)
+    H2ENS = pd.read_csv("Workflow/OverallResults/%s_H2NotServedMWh.csv" % scenario)
+    ELOLE = pd.read_csv("Workflow/OverallResults/%s_ElecLOLE.csv" % scenario)
 
     print("\n### ---------------POST-PROCESSING---------------- ###\n")
 
@@ -316,22 +319,19 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
                 )
 
     ### 3.5 Create Balmorel Files
-    os.chdir("Workflow")
-
     FICTDE = ""
     FICTDH2 = ""
     FICTDE_VAR_T = ""
     for BalmArea in ENS.R.unique():
-        FICTDE = (
-            FICTDE
-            + "DE('2050','%s','FICTIVE') = %0.2f;\n"
-            % (BalmArea, fDEVAR[BalmArea].sum())
-        )  # <--- Save this in a list or array instead, will accumulate el-demand from electrolyser as well
+        FICTDE = FICTDE + "DE('2050','%s','FICTIVE') = %0.2f;\n" % (
+            BalmArea,
+            fDEVAR[BalmArea].sum(),
+        )
         FICTDH2 = (
             FICTDH2
             + "HYDROGEN_DH2('2050','%s') = HYDROGEN_DH2('2050','%s') + %0.2f;\n"
             % (BalmArea, BalmArea, fDH2VAR[BalmArea].sum())
-        )  # <--- Save this in a list or array instead, will accumulate el-demand from electrolyser as well
+        )
 
         for season in fDEVAR[BalmArea].index:
             FICTDE_VAR_T = (
@@ -354,12 +354,9 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
         fDH2VAR.to_csv("MetaResults/FICTDH2profile.csv")
 
     ### 3.6 Save Results for Next Iteration
-    # res.to_csv('OverallResults/%s_Result.csv'%SC_name)
-    # fCAP.to_csv('OverallResults/%s_TotalCapacitiesGW.csv'%SC_name)
-    EENS.to_csv("OverallResults/%s_ElecNotServedMWh.csv" % SC_name)
-    H2ENS.to_csv("OverallResults/%s_H2NotServedMWh.csv" % SC_name)
-    ELOLE.to_csv("OverallResults/%s_ElecLOLE.csv" % SC_name)
-    # fDEM.to_csv('OverallResults/%s_DemandTWh.csv'%SC_name)
+    EENS.to_csv("OverallResults/%s_ElecNotServedMWh.csv" % scenario)
+    H2ENS.to_csv("OverallResults/%s_H2NotServedMWh.csv" % scenario)
+    ELOLE.to_csv("OverallResults/%s_ElecLOLE.csv" % scenario)
 
 
 if __name__ == "__main__":
