@@ -6,6 +6,19 @@ Adapted March 2026
 
 IN ONE SENTENCE:
 Handles BALMOREL-BALMOREL coupling
+
+HOW TO RUN:
+Place this script in the Balmorel folder
+If you have already have operational results, do:
+
+python balmorel-balmorel.py convergence 
+
+That will collect the ENS data needed and 'check convergence'
+Then do:
+
+python balmorel-balmorel.py post-process
+
+This will calculate fictive demands and create new .inc files
 """
 
 # ------------------------------- #
@@ -85,7 +98,7 @@ def main(
     if not Path("bifiles").exists():
         Path("bifiles").mkdir()
 
-    # Iteration Meta and Overall Results
+    # Iteration Meta Results
     ENS = Path(f"bifiles/ENS_{scenario}_{iteration}.csv")
 
     if not ENS.exists():
@@ -108,12 +121,12 @@ def peri_process(ctx):
     print("\n----------------PERI-PROCESSING---------------\n")
 
     # Change balopt to operation
-    balm_path = f"Balmorel/{ctx.obj['scenario_folder']}/model/"
+    balm_path = f"{ctx.obj['scenario_folder']}/model/"
     shutil.copyfile(balm_path + "balopt_operation.opt", balm_path + "balopt.opt")
 
     # Make full year time-series
-    shutil.copyfile("Balmorel/base/data/T_operation.inc", "Balmorel/base/data/T.inc")
-    shutil.copyfile("Balmorel/base/data/S_operation.inc", "Balmorel/base/data/S.inc")
+    shutil.copyfile("base/data/T_operation.inc", "base/data/T.inc")
+    shutil.copyfile("base/data/S_operation.inc", "base/data/S.inc")
 
     print("\nPeri-processing done\n----------------------------------------------\n")
 
@@ -126,7 +139,7 @@ def operation(ctx):
     SC = f"{ctx.obj['scenario']}_operational_Iter{ctx.obj['iteration']}"
 
     # Running Balmorel Operation
-    os.chdir(f"Balmorel/{ctx.obj['scenario_folder']}/model")
+    os.chdir(f"{ctx.obj['scenario_folder']}/model")
     if ctx.obj["OS"] == "Linux":
         Balm_cmd = ["gams", f'"Balmorel.gms" --scenario_name={SC}']
     else:
@@ -151,7 +164,7 @@ def convergence(ctx):
     for weather_year in [2000]:
         # Load MainResults
         res = MainResults(
-            f"Balmorel/{ctx.obj['scenario_folder']}/model/MainResults_{ctx.obj['scenario']}_operational_Iter{iteration}.gdx"
+            f"{ctx.obj['scenario_folder']}/model/MainResults_{ctx.obj['scenario']}_operational_Iter{iteration}.gdx"
         )
 
         # Calculate energy not supplied
@@ -229,8 +242,8 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
     use_fictdem = True if "fictdem" in strategy.lower() else False
     use_capcred = True if "capcred" in strategy.lower() else False
     if iteration != 0 and use_fictdem:
-        fDEVAR = pd.read_csv("MetaResults/FICTDEprofile.csv", index_col="S")
-        fDH2VAR = pd.read_csv("MetaResults/FICTDH2profile.csv", index_col="S")
+        fDEVAR = pd.read_csv("bifiles/FICTDEprofile.csv", index_col="S")
+        fDH2VAR = pd.read_csv("bifiles/FICTDH2profile.csv", index_col="S")
     else:
         fDEVAR = pd.DataFrame([])
         fDH2VAR = pd.DataFrame([])
@@ -279,14 +292,14 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
             % (year, region, region, fDH2VAR.loc[(year, region)].sum())
         )
 
-    with open("Balmorel/base/data/ANTBALM_FICTDE.inc", "w") as f:
+    with open("base/data/ANTBALM_FICTDE.inc", "w") as f:
         f.write(FICTDE)
 
-    with open("Balmorel/base/data/ANTBALM_FICTDH2.inc", "w") as f:
+    with open("base/data/ANTBALM_FICTDH2.inc", "w") as f:
         f.write(FICTDH2)
 
-    fDEVAR.to_csv("Workflow/MetaResults/FICTDEprofile.csv")
-    fDH2VAR.to_csv("Workflow/MetaResults/FICTDH2profile.csv")
+    fDEVAR.to_csv("bifiles/FICTDEprofile.csv")
+    fDH2VAR.to_csv("bifiles/FICTDH2profile.csv")
 
 
 if __name__ == "__main__":
