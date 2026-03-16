@@ -191,9 +191,6 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
     iteration = ctx.obj["iteration"]
     scenario = ctx.obj["scenario"]
     ENS = pd.read_csv(f"Workflow/OverallResults/ENS_{scenario}_{iteration}.csv")
-    EENS = pd.read_csv("Workflow/OverallResults/%s_ElecNotServedMWh.csv" % scenario)
-    H2ENS = pd.read_csv("Workflow/OverallResults/%s_H2NotServedMWh.csv" % scenario)
-    ELOLE = pd.read_csv("Workflow/OverallResults/%s_ElecLOLE.csv" % scenario)
 
     print("\n### ---------------POST-PROCESSING---------------- ###\n")
 
@@ -210,48 +207,32 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
     print("Loading timeseries from invest run...")
 
     # Load Balmorel timeseries index (electricity price is most light-weight) - this should be the low resolution timeseries though!
-    inv_res = MainResults(
-        f"Balmorel/{ctx.obj['scenario_folder']}/model/MainResults_{ctx.obj['scenario']}_investment_Iter{iteration}.gdx"
-    )
-    balm_t = inv_res.get_result(
-        "EL_PRICE_YCRST", ["Y", "C", "R", "S", "T", "Unit", "Val"]
-    ).groupby(by=["S", "T"])
-    balm_t = balm_t.aggregate({"Val": np.sum}).reset_index()[["S", "T"]]
-    S = [f"S{i:02.0f}" for i in range(1, 54)]
-    T = [f"T{i:03.0f}" for i in range(1, 169)]
-    idx = pd.MultiIndex.from_product([S, T], names=["S", "T"])[:8760]
-    hour = pd.DataFrame(data=np.arange(8760), columns=["Hour"], index=idx)
-
-    print("%d seasons:" % len(balm_t.S.unique()), balm_t.S.unique())
-    print("%d terms:" % len(balm_t["T"].unique()), balm_t["T"].unique())
-
     for year in ENS.Year.unique():
         for region in ENS.R.unique():
             for carrier in ENS.Commodity.unique():
 
-                # Get series of LOLE (backup capacity production)
-                region_ENS = (
-                    ENS
-                    .query(f"Year == {year} and R == '{region}' and Commodity == '{carrier}'")
-                    .pivot_table(index=["iteration", "S", "T"],
-                                 values='Value',
-                                 aggfunc='sum')
-                )  
+                if use_fictdem:
+                    # Get series of LOLE (backup capacity production)
+                    region_ENS = (
+                        ENS
+                        .query(f"Year == {year} and R == '{region}' and Commodity == '{carrier}'")
+                        .pivot_table(index=["iteration", "S", "T"],
+                                    values='Value',
+                                    aggfunc='sum')
+                    )  
 
-                print(year, region, carrier)
-                print(region_ENS)
-                # Skip if adequate
-                if len(region_ENS) == 0:
-                    continue
+                    # Skip if adequate
+                    if len(region_ENS) == 0:
+                        continue
 
-                LOLE = len(region_ENS.loc[iteration].index)
+                    LOLE = len(region_ENS.loc[iteration].index)
 
-                if carrier == "ELECTRICITY":
+                    if carrier == "ELECTRICITY":
 
-                    fDEVAR = fictdem_existing_ts(region, year, fictdemfactor, fDEVAR, region_ENS, LOLE, iteration)
+                        fDEVAR = fictdem_existing_ts(region, year, fictdemfactor, fDEVAR, region_ENS, LOLE, iteration)
 
-                else:
-                    fDH2VAR = fictdem_existing_ts(region, year, fictdemfactor, fDH2VAR, region_ENS, LOLE, iteration)
+                    else:
+                        fDH2VAR = fictdem_existing_ts(region, year, fictdemfactor, fDH2VAR, region_ENS, LOLE, iteration)
 
 
     ### 3.5 Create Balmorel Files
@@ -275,11 +256,6 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
 
     fDEVAR.to_csv("Workflow/MetaResults/FICTDEprofile.csv")
     fDH2VAR.to_csv("Workflow/MetaResults/FICTDH2profile.csv")
-
-    ### 3.6 Save Results for Next Iteration
-    EENS.to_csv("Workflow/OverallResults/%s_ElecNotServedMWh.csv" % scenario)
-    H2ENS.to_csv("Workflow/OverallResults/%s_H2NotServedMWh.csv" % scenario)
-    ELOLE.to_csv("Workflow/OverallResults/%s_ElecLOLE.csv" % scenario)
 
 
 if __name__ == "__main__":
