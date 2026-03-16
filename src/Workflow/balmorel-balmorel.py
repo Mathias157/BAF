@@ -30,37 +30,15 @@ def main(
     # Figure out operating system
     OS = platform.platform().split("-")[0]  # Assuming that linux will be == HPC!
 
+    if not Path("bifiles").exists():
+        Path("bifiles").mkdir()
+
     # Iteration Meta and Overall Results
-    EENS, H2ENS, ELOLE = (
-        Path(f"Workflow/OverallResults/{scenario}_ElecNotServedMWh.csv"),
-        Path(f"Workflow/OverallResults/{scenario}_H2NotServedMWh.csv"),
-        Path(f"Workflow/OverallResults/{scenario}_ElecLOLE.csv"),
-    )
+    ENS = Path(f"bifiles/ENS_{scenario}_{iteration}.csv")
 
-    if not Path("Workflow/OverallResults").exists():
-        Path("Workflow/OverallResults").mkdir()
-
-    if not EENS.exists() or not H2ENS.exists() or not ELOLE.exists():
-        # Electricity not served
-        fENS = pd.DataFrame({}, columns=["Iter", "Year", "Region", "Value (MWh)"])
-        fENS.to_csv(EENS)
-
-        # Hydrogen not served
-        fENSH2 = pd.DataFrame({}, columns=["Iter", "Year", "Region", "Value (MWh)"])
-        fENSH2.to_csv(H2ENS)
-
-        # Loss of load durations
-        fLOLD = pd.DataFrame(
-            {}, columns=["Iter", "Year", "Region", "Carrier", "Value (h)"]
-        )
-        fLOLD.to_csv(ELOLE)
-    else:
-        fENS = pd.read_csv(EENS, index_col=0)
-        fENS.loc[iteration, :] = np.zeros(fENS.shape[1])
-        fENSH2 = pd.read_csv(H2ENS, index_col=0)
-        fENSH2.loc[iteration, :] = np.zeros(fENSH2.shape[1])
-        fLOLD = pd.read_csv(ELOLE, index_col=0)
-        fLOLD.loc[iteration, :] = np.zeros(fLOLD.shape[1])
+    if not ENS.exists():
+        ENS = pd.DataFrame(columns=["Year","R","Commodity","S","T","Value","iteration"])
+        ENS.to_csv(f"bifiles/ENS_{scenario}_{iteration}.csv")
 
     # Store to context
     ctx.ensure_object(dict)
@@ -68,9 +46,6 @@ def main(
     ctx.obj["iteration"] = iteration
     ctx.obj["scenario"] = scenario
     ctx.obj["scenario_folder"] = scenario_folder
-    ctx.obj["EENS"] = fENS
-    ctx.obj["H2ENS"] = fENSH2
-    ctx.obj["ELOLE"] = fLOLD
 
 
 @main.command()
@@ -119,41 +94,45 @@ def convergence(ctx):
     # Get context
     iteration = ctx.obj["iteration"]
     scenario = ctx.obj["scenario"]
-    ELOLE = ctx.obj["ELOLE"]
 
-    # Load MainResults
-    res = MainResults(
-        f"Balmorel/{ctx.obj['scenario_folder']}/model/MainResults_{ctx.obj['scenario']}_operational_Iter{iteration}.gdx"
-    )
-
-    # Calculate energy not supplied
-    ENS = (
-        res.get_result(
-            "PRO_YCRAGFST",
-            [
-                "Year",
-                "C",
-                "R",
-                "A",
-                "G",
-                "F",
-                "S",
-                "T",
-                "Commodity",
-                "Tech",
-                "Unit",
-                "Value",
-            ],
+    ENS = pd.read_csv(f"bifiles/ENS_{scenario}_{iteration}.csv")
+    for weather_year in [2000]:
+        # Load MainResults
+        res = MainResults(
+            f"Balmorel/{ctx.obj['scenario_folder']}/model/MainResults_{ctx.obj['scenario']}_operational_Iter{iteration}.gdx"
         )
-        .query('G.str.contains("BACKUP")')  # Only look at backup generation
-        .groupby(by=["Year", "R", "Commodity", "S", "T"])
-        .aggregate({"Value": np.sum})
-        .reset_index()
-    )
-    ENS['iteration'] = iteration
+
+        # Calculate energy not supplied
+        temp = (
+            res.get_result(
+                "PRO_YCRAGFST",
+                [
+                    "Year",
+                    "C",
+                    "R",
+                    "A",
+                    "G",
+                    "F",
+                    "S",
+                    "T",
+                    "Commodity",
+                    "Tech",
+                    "Unit",
+                    "Value",
+                ],
+            )
+            .query('G.str.contains("BACKUP")')  # Only look at backup generation
+            .groupby(by=["Year", "R", "Commodity", "S", "T"])
+            .aggregate({"Value": np.sum})
+            .reset_index()
+        )
+        temp['weather_year'] = weather_year 
+        temp['iteration'] = iteration
+        ENS = pd.concat((ENS, temp))
 
     # Assess adequacy for all carriers
     carriers = ENS.Commodity.unique()
+    ELOLE = []
     for year in ENS.Year.unique():
         for region in ENS.R.unique():
             for carrier in carriers:
@@ -163,13 +142,13 @@ def convergence(ctx):
                 print(f"{carrier} LOLE in {region}: \t", LOLE, "h")
 
                 if carrier == "ELECTRICITY":
-                    ELOLE.loc[ctx, region] = LOLE
+                    ELOLE.append(LOLE)
 
-    convergence = np.all(ELOLE.loc[iteration] <= 3)
+    convergence = np.all(np.array(ELOLE) <= 3)
     print("\nConvergence achieved: %s\n" % convergence)
 
     # Store results
-    ENS.to_csv(f"Workflow/OverallResults/ENS_{scenario}_{iteration}.csv")
+    ENS.to_csv(f"bifiles/ENS_{scenario}_{iteration}.csv")
     print(
         "Assessing convergence criterion done\n----------------------------------------------\n"
     )
@@ -190,7 +169,7 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
     # Get context
     iteration = ctx.obj["iteration"]
     scenario = ctx.obj["scenario"]
-    ENS = pd.read_csv(f"Workflow/OverallResults/ENS_{scenario}_{iteration}.csv")
+    ENS = pd.read_csv(f"bifiles/ENS_{scenario}_{iteration}.csv")
 
     print("\n### ---------------POST-PROCESSING---------------- ###\n")
 
