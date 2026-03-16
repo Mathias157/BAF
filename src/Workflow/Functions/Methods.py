@@ -678,6 +678,45 @@ def adjust_resmar(old_resmar, LOLD, interpolate_data, params):
 # A function that increases from -0.9 at x = 0 to 0 at x = 2.5
 decrease_function = lambda x: 0.9/2.5*x - 0.9
 
+def fictdem_existing_ts(BalmArea: str,
+                        year: str,
+                        fict_de_factor: str,
+                        fDEVAR: pd.DataFrame,
+                        ENS: pd.DataFrame, 
+                        LOLE: float,
+                        i: int, 
+                        negative_feedback: bool = True):
+
+    # Prepare table
+    try: 
+        fDEVAR.loc[(year, BalmArea), :]
+    except KeyError:
+        idx = pd.MultiIndex.from_product([[year], [BalmArea]])
+        fDEVAR = pd.concat((fDEVAR, pd.DataFrame(index=idx,
+                                                  columns=['Value'],
+                                                  data=[0])))
+
+    if LOLE > 3:
+        total_ENS = ENS.loc[i].sum()
+        fDEVAR.loc[(year, BalmArea), :] += total_ENS*eval(fict_de_factor) / len(fDEVAR.columns)
+        print('%s adding elfictdem: '%BalmArea, total_ENS*eval(fict_de_factor))
+    elif (LOLE < 2.5) and negative_feedback and (i != 0):
+        last_fictdem = ENS.loc[i-1].sum()
+        previous_factor = eval(fict_de_factor.replace('i', '(i-1)'))
+        subtraction = last_fictdem *decrease_function(LOLE)*previous_factor / len(fDEVAR.columns)
+        print('%s subtracting elfictdem: '%BalmArea, subtraction*len(fDEVAR.columns))
+        fDEVAR.loc[(year, BalmArea), :] += float(subtraction) # decrease_function is negative, so we are adding a negative number
+        
+        # Make sure it's not negative (can happen if there was a small ENS but no fictdem added because LOLE is < 3 h)
+        if np.all(fDEVAR.loc[(year, BalmArea), :] < 0):
+            fDEVAR.loc[(year, BalmArea), :] = 0 
+    else:
+        print('Didnt add FICTDE for %s %s because EL LOLE %0.2f'%(year, BalmArea, LOLE))
+        pass
+    
+    return fDEVAR
+
+
 def calculate_elfictdem(FICTDEMALLOC: str, 
                         balm_t: pd.DataFrame, t: pd.DataFrame,
                         BalmArea: str, weight: float,

@@ -10,6 +10,7 @@ Handles BALMOREL-BALMOREL coupling
 
 from pathlib import Path
 from pybalmorel import MainResults
+from Functions.Methods import fictdem_existing_ts
 import pandas as pd
 import numpy as np
 import subprocess
@@ -130,7 +131,7 @@ def convergence(ctx):
         res.get_result(
             "PRO_YCRAGFST",
             [
-                "Y",
+                "Year",
                 "C",
                 "R",
                 "A",
@@ -145,25 +146,24 @@ def convergence(ctx):
             ],
         )
         .query('G.str.contains("BACKUP")')  # Only look at backup generation
-        .groupby(by=["R", "Commodity", "S", "T"])
+        .groupby(by=["Year", "R", "Commodity", "S", "T"])
         .aggregate({"Value": np.sum})
         .reset_index()
     )
+    ENS['iteration'] = iteration
 
     # Assess adequacy for all carriers
     carriers = ENS.Commodity.unique()
-    for BalmArea in ENS.R.unique():
-        idx1 = ENS.R == BalmArea
+    for year in ENS.Year.unique():
+        for region in ENS.R.unique():
+            for carrier in carriers:
 
-        for carrier in carriers:
-            idx2 = ENS.Commodity == carrier
+                # Count hours of backup production
+                LOLE = ENS.query(f"Year == '{year}' and R =='{region}' and Commodity == '{carrier}'").shape[0]
+                print(f"{carrier} LOLE in {region}: \t", LOLE, "h")
 
-            # Count hours of backup production
-            LOLE = ENS[idx1 & idx2].shape[0]
-            print(f"{carrier} LOLE in {BalmArea}: \t", LOLE, "h")
-
-            if carrier == "ELECTRICITY":
-                ELOLE.loc[ctx, BalmArea] = LOLE
+                if carrier == "ELECTRICITY":
+                    ELOLE.loc[ctx, region] = LOLE
 
     convergence = np.all(ELOLE.loc[iteration] <= 3)
     print("\nConvergence achieved: %s\n" % convergence)
@@ -217,146 +217,69 @@ def post_process(ctx, strategy: str, fictdemfactor: float = 100):
         "EL_PRICE_YCRST", ["Y", "C", "R", "S", "T", "Unit", "Val"]
     ).groupby(by=["S", "T"])
     balm_t = balm_t.aggregate({"Val": np.sum}).reset_index()[["S", "T"]]
-    S = [f"S{i:02.0f}" % i for i in range(1, 54)]
-    T = [f"T{i:03.0f}" % i for i in range(1, 169)]
+    S = [f"S{i:02.0f}" for i in range(1, 54)]
+    T = [f"T{i:03.0f}" for i in range(1, 169)]
     idx = pd.MultiIndex.from_product([S, T], names=["S", "T"])[:8760]
     hour = pd.DataFrame(data=np.arange(8760), columns=["Hour"], index=idx)
 
     print("%d seasons:" % len(balm_t.S.unique()), balm_t.S.unique())
     print("%d terms:" % len(balm_t["T"].unique()), balm_t["T"].unique())
 
-    for BalmArea in ENS.R.unique():
-        idx1 = ENS.R == BalmArea
+    for year in ENS.Year.unique():
+        for region in ENS.R.unique():
+            for carrier in ENS.Commodity.unique():
 
-        for carrier in ENS.loc[idx1, "Commodity"].unique():
-            idx2 = ENS.Commodity == carrier
+                # Get series of LOLE (backup capacity production)
+                region_ENS = (
+                    ENS
+                    .query(f"Year == {year} and R == '{region}' and Commodity == '{carrier}'")
+                    .pivot_table(index=["iteration", "S", "T"],
+                                 values='Value',
+                                 aggfunc='sum')
+                )  
 
-            # Get series of LOLE (backup capacity production)
-            LOLE = (
-                ENS.loc[idx1 & idx2].groupby(by=["S", "T"]).aggregate({"Value": np.sum})
-            )  # Not summing, just re-arranging
+                print(year, region, carrier)
+                print(region_ENS)
+                # Skip if adequate
+                if len(region_ENS) == 0:
+                    continue
 
-            if carrier == "ELECTRICITY":
-                # Join to full hour
-                t = hour.copy()
-                t = t.join(LOLE)
-                t = t.fillna(0).reset_index()
+                LOLE = len(region_ENS.loc[iteration].index)
 
-                front_t = t.copy().drop(columns=["S", "T"])
-                front_t.index = np.arange(-len(t), 0)
-                back_t = t.copy().drop(columns=["S", "T"])
-                back_t.index = np.arange(len(t), 2 * len(t))
-                temp_t = pd.concat((front_t, t.copy(), back_t))
+                if carrier == "ELECTRICITY":
 
-                for n, row in balm_t.iterrows():
-                    # Get current hour
-                    h1 = temp_t.loc[
-                        (temp_t["S"] == row["S"]) & (temp_t["T"] == row["T"]), "Hour"
-                    ].values[0]
+                    fDEVAR = fictdem_existing_ts(region, year, fictdemfactor, fDEVAR, region_ENS, LOLE, iteration)
 
-                    # Get previous hour
-                    try:
-                        h0 = temp_t.loc[
-                            (temp_t["S"] == balm_t.loc[n - 1, "S"])
-                            & (temp_t["T"] == balm_t.loc[n - 1, "T"]),
-                            "Hour",
-                        ].values[0]
-                        dif0 = round((h1 - h0) / 2)
-                    except KeyError:
-                        h0 = temp_t.loc[
-                            (temp_t["S"] == balm_t.loc[len(balm_t) - 1, "S"])
-                            & (temp_t["T"] == balm_t.loc[len(balm_t) - 1, "T"]),
-                            "Hour",
-                        ].values[0]
-                        dif0 = round((h1 + len(t) - h0) / 2)
-
-                    # Get last hour
-                    try:
-                        h2 = temp_t.loc[
-                            (temp_t["S"] == balm_t.loc[n + 1, "S"])
-                            & (temp_t["T"] == balm_t.loc[n + 1, "T"]),
-                            "Hour",
-                        ].values[0]
-                        dif2 = round((h2 - h1) / 2)
-                    except KeyError:
-                        h2 = temp_t.loc[
-                            (temp_t["S"] == balm_t.loc[0, "S"])
-                            & (temp_t["T"] == balm_t.loc[0, "T"]),
-                            "Hour",
-                        ].values[0]
-                        dif2 = round((h2 + len(t) - h1) / 2)
-
-                    # Accumulated Unsupplied Energy
-                    idx = (temp_t.index >= h1 - dif0) & (temp_t.index < h1 + dif2 - 1)
-                    balm_t.loc[n, BalmArea + "_UNSELEC"] = temp_t.loc[
-                        idx, "Value"
-                    ].sum()
-
-                agg = balm_t.groupby(by=["S"])
-                agg = agg.aggregate({BalmArea + "_UNSELEC": np.sum})
-
-                if iteration != 0:
-                    fDEVAR[BalmArea] += agg[BalmArea + "_UNSELEC"] * fictdemfactor
                 else:
-                    fDEVAR[BalmArea] = agg[BalmArea + "_UNSELEC"]
+                    fDH2VAR = fictdem_existing_ts(region, year, fictdemfactor, fDH2VAR, region_ENS, LOLE, iteration)
 
-                # Store overall unserved energy
-                EENS.loc[iteration, BalmArea] = agg[BalmArea + "_UNSELEC"].sum()
-
-            else:
-                if iteration != 0:
-                    fDH2VAR[BalmArea] += (
-                        t.groupby(by="S").aggregate({"Value": np.sum}).Value
-                    )
-                else:
-                    fDH2VAR[BalmArea] = (
-                        t.groupby(by="S").aggregate({"Value": np.sum}).Value
-                    )
-
-                # Store overall unserved energy
-                H2ENS.loc[iteration, BalmArea] = (
-                    LOLE.groupby(by="S").aggregate({"Value": np.sum}).sum().values[0]
-                )
 
     ### 3.5 Create Balmorel Files
     FICTDE = ""
     FICTDH2 = ""
-    FICTDE_VAR_T = ""
-    for BalmArea in ENS.R.unique():
-        FICTDE = FICTDE + "DE('2050','%s','FICTIVE') = %0.2f;\n" % (
-            BalmArea,
-            fDEVAR[BalmArea].sum(),
-        )
+    for year, region in fDEVAR.index:
+        FICTDE = FICTDE + f"DE('{year}','{region}','FICTIVE') = {fDEVAR.loc[(year, region)].sum()};\n"  
+            
+    for year, region in fDH2VAR.index:
         FICTDH2 = (
             FICTDH2
-            + "HYDROGEN_DH2('2050','%s') = HYDROGEN_DH2('2050','%s') + %0.2f;\n"
-            % (BalmArea, BalmArea, fDH2VAR[BalmArea].sum())
+            + "HYDROGEN_DH2('%d','%s') = HYDROGEN_DH2('2050','%s') + %0.2f;\n"
+            % (year, region, region, fDH2VAR.loc[(year, region)].sum())
         )
 
-        for season in fDEVAR[BalmArea].index:
-            FICTDE_VAR_T = (
-                FICTDE_VAR_T
-                + "DE_VAR_T('%s', 'FICTIVE', '%s', TTT) = %d/168;\n"
-                % (BalmArea, season, fDEVAR.loc[season, BalmArea])
-            )
+    with open("Balmorel/base/data/ANTBALM_FICTDE.inc", "w") as f:
+        f.write(FICTDE)
 
-    if use_fictdem:
-        with open("Balmorel/base/data/ANTBALM_FICTDE.inc", "w") as f:
-            f.write(FICTDE)
+    with open("Balmorel/base/data/ANTBALM_FICTDH2.inc", "w") as f:
+        f.write(FICTDH2)
 
-        with open("Balmorel/base/data/ANTBALM_FICTDH2.inc", "w") as f:
-            f.write(FICTDH2)
-
-        with open("Balmorel/base/data/ANTBALM_FICTDE_VAR_T.inc", "w") as f:
-            f.write(FICTDE_VAR_T)
-
-        fDEVAR.to_csv("MetaResults/FICTDEprofile.csv")
-        fDH2VAR.to_csv("MetaResults/FICTDH2profile.csv")
+    fDEVAR.to_csv("Workflow/MetaResults/FICTDEprofile.csv")
+    fDH2VAR.to_csv("Workflow/MetaResults/FICTDH2profile.csv")
 
     ### 3.6 Save Results for Next Iteration
-    EENS.to_csv("OverallResults/%s_ElecNotServedMWh.csv" % scenario)
-    H2ENS.to_csv("OverallResults/%s_H2NotServedMWh.csv" % scenario)
-    ELOLE.to_csv("OverallResults/%s_ElecLOLE.csv" % scenario)
+    EENS.to_csv("Workflow/OverallResults/%s_ElecNotServedMWh.csv" % scenario)
+    H2ENS.to_csv("Workflow/OverallResults/%s_H2NotServedMWh.csv" % scenario)
+    ELOLE.to_csv("Workflow/OverallResults/%s_ElecLOLE.csv" % scenario)
 
 
 if __name__ == "__main__":
