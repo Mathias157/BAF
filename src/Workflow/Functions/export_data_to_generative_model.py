@@ -203,51 +203,61 @@ def store_config(config: ConfigParser):
 
 
 @click.command()
-@click.argument("scenario_folder", type=str)
-def main(scenario_folder: str):
+@click.argument("scenario_folder", type=str, default="")
+@click.argument(
+    "weather_years",
+    type=str,
+)
+def main(scenario_folder, weather_years):
 
     # Load configuration
     config = ConfigParser()
     config.read("Config.ini")
     gams_system_directory = config.get("RunMetaData", "gams_system_directory")
 
-    weather_years = [
-        1982,
-        1983,
-        1984,
-        1985,
-        1986,
-        1987,
-        1988,
-        1989,
-        1990,
-        1991,
-        1992,
-        1993,
-        1994,
-        1995,
-        1996,
-        1997,
-        1998,
-        1999,
-        2000,
-        2001,
-        2002,
-        2003,
-        2004,
-        2005,
-        2006,
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-    ]
+    if weather_years == "":
+        weather_years = [
+            1982,
+            1983,
+            1984,
+            1985,
+            1986,
+            1987,
+            1988,
+            1989,
+            1990,
+            1991,
+            1992,
+            1993,
+            1994,
+            1995,
+            1996,
+            1997,
+            1998,
+            1999,
+            2000,
+            2001,
+            2002,
+            2003,
+            2004,
+            2005,
+            2006,
+            2007,
+            2008,
+            2009,
+            2010,
+            2011,
+            2012,
+            2013,
+            2014,
+            2015,
+            2016,
+        ]
+    else:
+        weather_years = [
+            int(weather_year)
+            for weather_year in weather_years.replace(" ", "").split(",")
+        ]
 
     for weather_year in weather_years:
         # Change weather year before preprocessing
