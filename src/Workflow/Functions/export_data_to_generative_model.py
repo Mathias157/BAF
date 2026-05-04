@@ -208,7 +208,8 @@ def store_config(config: ConfigParser):
     "weather_years",
     type=str,
 )
-def main(scenario_folder, weather_years):
+@click.option("--force", "-f", is_flag=True, help="Force snakemake rerun")
+def main(scenario_folder, weather_years, force):
 
     # Load configuration
     config = ConfigParser()
@@ -265,7 +266,10 @@ def main(scenario_folder, weather_years):
         store_config(config)
 
         # Preprocess data
-        os.system("pixi run preprocessing -F --rerun-incomplete")
+        if force:
+            os.system("pixi run preprocessing -F --rerun-incomplete")
+        else:
+            os.system("pixi run preprocessing --rerun-incomplete")
 
         # Get parameters
         export_to_generative_model(
