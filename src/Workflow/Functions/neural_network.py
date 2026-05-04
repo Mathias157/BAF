@@ -983,8 +983,8 @@ def train(
         ],
         paths=[f"Balmorel/{scenario_folder}/model"],
     )
-    obj_value, capital_costs, operational_costs = get_balmorel_kpis(
-        results, return_capex_opex_dfs=True
+    obj_value, df = get_balmorel_kpis(
+        results, return_df=True
     )
 
     log = logger.info if logger else print
