@@ -990,8 +990,8 @@ def train(
     log = logger.info if logger else print
 
     log("read objective values from capacity and dispatch runs")
-    log(f"Capital costs:\n%s" % capital_costs.to_string())
-    log(f"Operational costs:\n%s" % operational_costs.to_string())
+    log("Capital costs:\n%s" % capital_costs.to_string())
+    log("Operational costs:\n%s" % operational_costs.to_string())
     log(f"Loss value: {obj_value} M€")
 
     # update the model with the objective value
