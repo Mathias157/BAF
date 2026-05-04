@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from pybalmorel import IncFile, Balmorel, MainResults
-from GeneralHelperFunctions import get_combined_obj_value
+from GeneralHelperFunctions import get_balmorel_kpis
 import random
 import os
 
@@ -983,7 +983,7 @@ def train(
         ],
         paths=[f"Balmorel/{scenario_folder}/model"],
     )
-    obj_value, capital_costs, operational_costs = get_combined_obj_value(
+    obj_value, capital_costs, operational_costs = get_balmorel_kpis(
         results, return_capex_opex_dfs=True
     )
 

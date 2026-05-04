@@ -176,7 +176,7 @@ def doLDC(array, n_bins, plot=False, fig=None, ax=None):
         return duration, curve
 
 
-def get_combined_obj_value(
+def get_balmorel_kpis(
     results: MainResults,
     capital_scenario_string: str = "capacity",
     operational_scenario_string: str = "dispatch",

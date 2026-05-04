@@ -6,7 +6,7 @@ import click
 from pybalmorel import MainResults
 import sys
 sys.path.append('Workflow/Functions')
-from GeneralHelperFunctions import get_combined_obj_value
+from GeneralHelperFunctions import get_balmorel_kpis
 from pathlib import Path
 
 @click.group()
@@ -28,7 +28,7 @@ def sc(scenario: str, scenario_folder: str):
 
         if len(files[idx]) == 2:
             results = MainResults(files=list(files[idx]), paths=str(path.absolute().resolve()))
-            obj_value = get_combined_obj_value(results)
+            obj_value = get_balmorel_kpis(results)
             data.append([int(epoch), obj_value])
         else:
             print(f'Epoch {epoch} didnt finish')
