@@ -212,13 +212,6 @@ def CLI(
     ckpt_path = logs_dir / f"{scenario_name}_model_checkpoint.pth"
 
     os.chdir("Balmorel")
-    # make sure first run is a capacity expansion, by removing any leftover balopt.opt in scenario folder
-    balopt = Path(f"{scenario_folder}/model/balopt.opt")
-    try:
-        # delete if it exists
-        balopt.unlink()
-    except FileNotFoundError:
-        pass
 
     while epoch < update_epochs:
         epoch_string = f"{epoch:03.0f}"
@@ -227,8 +220,10 @@ def CLI(
             sp.run(f"rm {scenario_folder}/data/*.inc", shell=True)
 
             if runtype == "capacity":
+                # make sure to delete leftover balopt files to ensure capacity expansion run
+                delete_balopt(scenario_folder)
                 sp.run(
-                    f"cp -f {scenario_folder}/capexp_data/*.inc {scenario_folder}/data",
+                    f"/usr/bin/cp -f {scenario_folder}/capexp_data/*.inc {scenario_folder}/data",
                     shell=True,
                 )
                 sp.run(
@@ -245,17 +240,18 @@ def CLI(
                 )
             else:
                 sp.run(
-                    f"cp -f {scenario_folder}/S.inc {scenario_folder}/data", shell=True
+                    f"cat {scenario_folder}/S.inc > {scenario_folder}/data/S.inc",
+                    shell=True,
                 )
                 sp.run(
-                    f"cp -f {scenario_folder}/T_{runtype}.inc {scenario_folder}/data/T.inc",
+                    f"cat {scenario_folder}/T_{runtype}.inc > {scenario_folder}/data/T.inc",
                     shell=True,
                 )
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDE.inc", shell=True)
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH.inc", shell=True)
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH2.inc", shell=True)
                 sp.run(
-                    f"mv {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt",
+                    f"cat {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt",
                     shell=True,
                 )
 
@@ -274,13 +270,6 @@ def CLI(
                 logger.info(f"{current_scenario_name} feasible.")
 
             os.chdir("../../")
-
-            if runtype != "capacity":
-                # Rename balopt back
-                sp.run(
-                    f'mv "{scenario_folder}/model/balopt.opt" "{scenario_folder}/model/balopt_{runtype}.opt"',
-                    shell=True,
-                )
 
         sp.run(
             f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_dispatch" {epoch_string}',
@@ -322,6 +311,15 @@ def plot_style(ctx, fig, ax, name: str, legend: bool = True):
     fig.savefig(name + ctx.obj["plot_ext"], bbox_inches="tight", transparent=True)
 
     return fig, ax
+
+
+def delete_balopt(scenario_folder):
+    balopt = Path(f"{scenario_folder}/model/balopt.opt")
+    try:
+        # delete if it exists
+        balopt.unlink()
+    except FileNotFoundError:
+        pass
 
 
 # %% ------------------------------- ###
