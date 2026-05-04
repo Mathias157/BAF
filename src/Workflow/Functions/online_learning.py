@@ -251,7 +251,7 @@ def CLI(
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH.inc", shell=True)
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH2.inc", shell=True)
                 sp.run(
-                    f"cat {scenario_folder}/model/balopt_{runtype}.opt {scenario_folder}/model/balopt.opt",
+                    f"cat {scenario_folder}/model/balopt_{runtype}.opt > {scenario_folder}/model/balopt.opt",
                     shell=True,
                 )
 
