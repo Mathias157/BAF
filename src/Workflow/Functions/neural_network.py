@@ -9,6 +9,7 @@ from sklearn.cluster import KMeans
 from pybalmorel import IncFile, Balmorel, MainResults
 from GeneralHelperFunctions import get_balmorel_kpis
 import random
+from pathlib import Path
 import os
 
 # ignore warnings
@@ -956,7 +957,7 @@ def pretrain(
         new_scenarios_df,
         "base",
         scenario_folder,
-        gams_system_directory=os.getenv("GAMS_DIR", "/opt/gams/53"),
+        gams_system_directory=os.getenv("GAMS_DIR", "/appl/gams/50.4.1"),
         overwrite_data_load=True,
     )
 
@@ -983,15 +984,20 @@ def train(
         ],
         paths=[f"Balmorel/{scenario_folder}/model"],
     )
-    obj_value, df = get_balmorel_kpis(
-        results, return_df=True
-    )
+    obj_value, df = get_balmorel_kpis(results, return_df=True)
+
+    # Log KPIs to .csv file
+    file = Path(f"Workflow/OverallResults/{scenario}_KPIs.csv")
+    if epoch_string == "000":
+        df.to_csv(file, header=True)
+    else:
+        df.to_csv(file, mode="a", header=False)
 
     log = logger.info if logger else print
 
     log("read objective values from capacity and dispatch runs")
-    log("Capital costs:\n%s" % capital_costs.to_string())
-    log("Operational costs:\n%s" % operational_costs.to_string())
+    # log("Capital costs:\n%s" % capital_costs.to_string())
+    # log("Operational costs:\n%s" % operational_costs.to_string())
     log(f"Loss value: {obj_value} M€")
 
     # update the model with the objective value
@@ -1007,8 +1013,7 @@ def train(
         new_scenarios_df,
         "base",
         scenario_folder,
-        gams_system_directory=os.getenv("GAMS_DIR", "/appl/gams/47.6.0"),
+        gams_system_directory=os.getenv("GAMS_DIR", "/appl/gams/50.4.1"),
     )
 
     return model
-
