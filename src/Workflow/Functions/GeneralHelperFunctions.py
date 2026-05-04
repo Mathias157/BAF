@@ -182,50 +182,68 @@ def get_balmorel_kpis(
 ):
     # System Costs
     df = results.get_result("OBJ_YCR")
-    operational_costs = (
-        df
-        .query(f'Scenario.str.contains("{operational_scenario_string}") and not (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
-        .rename(columns={'Category':'Parameter'})   
-    )
-    capital_costs = (
-        df
-        .query(f'Scenario.str.contains("{capital_scenario_string}") and (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))')
-        .rename(columns={'Category':'Parameter'})   
-    )
+    operational_costs = df.query(
+        f'Scenario.str.contains("{operational_scenario_string}") and not (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))'
+    ).rename(columns={"Category": "Parameter"})
+    capital_costs = df.query(
+        f'Scenario.str.contains("{capital_scenario_string}") and (Category.str.contains("CAPITAL") or Category.str.contains("FIXED"))'
+    ).rename(columns={"Category": "Parameter"})
     obj_value = capital_costs.Value.sum() + operational_costs.Value.sum()
 
     if not return_df:
         return obj_value
     else:
-        # Capacities 
+        # Capacities
         df_cap = (
-            results.get_result('G_CAP_YCRAF')
-            .query(f'Technology != "H2-STORAGE" and not Technology.str.contains("INTERSEASONAL") and not Technology.str.contains("INTRASEASONAL") and Scenario.str.contains("{capital_scenario_string}")')
-            .pivot_table(index=['Scenario', 'Year', 'Country', 'Region', 'Technology', 'Unit'], values='Value', aggfunc='sum')
-            .rename(columns={'Technology':'Parameter'})   
-        ) 
+            results.get_result("G_CAP_YCRAF")
+            .query(
+                f'Technology != "H2-STORAGE" and not Technology.str.contains("INTERSEASONAL") and not Technology.str.contains("INTRASEASONAL") and Scenario.str.contains("{capital_scenario_string}")'
+            )
+            .pivot_table(
+                index=["Scenario", "Year", "Country", "Region", "Technology", "Unit"],
+                values="Value",
+                aggfunc="sum",
+            )
+            .rename(columns={"Technology": "Parameter"})
+        )
         df_sto = (
-            results.get_result('G_STO_YCRAF')
-            .query(f'Technology == "H2-STORAGE" or Technology.str.contains("INTERSEASONAL") or Technology.str.contains("INTRASEASONAL") and Scenario.str.contains("{capital_scenario_string}")')
-            .pivot_table(index=['Scenario', 'Year', 'Country', 'Region', 'Technology', 'Unit'], values='Value', aggfunc='sum')
-            .rename(columns={'Technology':'Parameter'})   
+            results.get_result("G_STO_YCRAF")
+            .query(
+                f'Technology == "H2-STORAGE" or Technology.str.contains("INTERSEASONAL") or Technology.str.contains("INTRASEASONAL") and Scenario.str.contains("{capital_scenario_string}")'
+            )
+            .pivot_table(
+                index=["Scenario", "Year", "Country", "Region", "Technology", "Unit"],
+                values="Value",
+                aggfunc="sum",
+            )
+            .rename(columns={"Technology": "Parameter"})
         )
 
         # Emissions
         df_emi = (
-            results.get_result('EMI_YCRAG')
+            results.get_result("EMI_YCRAG")
             .query(f'Scenario.str.contains("{operational_scenario_string}")')
-            .rename(columns={'Y':'Year','C':'Country', 'RRR':'Region', 'TECH_TYPE':'Parameter', 'UNITS':'Unit'})   
-            .pivot_table(index=['Scenario', 'Year', 'Country', 'Region', 'Parameter', 'Unit'], values='Value', aggfunc='sum')
+            .rename(
+                columns={
+                    "Y": "Year",
+                    "C": "Country",
+                    "RRR": "Region",
+                    "TECH_TYPE": "Parameter",
+                    "UNITS": "Unit",
+                }
+            )
+            .pivot_table(
+                index=["Scenario", "Year", "Country", "Region", "Parameter", "Unit"],
+                values="Value",
+                aggfunc="sum",
+            )
             .reset_index()
         )
 
         # Adequacy
         # load adequacy indicator
 
-        df=pd.concat(
-            (capital_costs, operational_costs, df_cap, df_sto, df_emi)
-        )
+        df = pd.concat((capital_costs, operational_costs, df_cap, df_sto, df_emi))
 
         return obj_value, df
 
@@ -1127,4 +1145,3 @@ if __name__ == "__main__":
         cf.get("fr_psp", "type"),
         cf.get("fr_psp", "operator"),
     )
-
