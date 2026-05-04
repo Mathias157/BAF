@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import numpy as np
@@ -9,17 +8,31 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from pybalmorel import IncFile, Balmorel, MainResults
 from GeneralHelperFunctions import get_combined_obj_value
-import random  
+import random
 import os
 
-# ignore warnings 
+# ignore warnings
 import warnings
+
 warnings.filterwarnings("ignore")
 
 
 class ScenarioGenerator(nn.Module):
-    def __init__(self, X_tensor=None, input_shape=(24, 72), latent_dim=32, device='cpu', lr=0.0005, seed=42, scale=True, selection_method="kcenter", scaler_type="standard",
-                 const_tol_abs=1e-8, const_tol_rel=1e-6, logger=None):
+    def __init__(
+        self,
+        X_tensor=None,
+        input_shape=(24, 72),
+        latent_dim=32,
+        device="cpu",
+        lr=0.0005,
+        seed=42,
+        scale=True,
+        selection_method="kcenter",
+        scaler_type="standard",
+        const_tol_abs=1e-8,
+        const_tol_rel=1e-6,
+        logger=None,
+    ):
         """
         Non-conditional AE Scenario Generator.
 
@@ -34,8 +47,11 @@ class ScenarioGenerator(nn.Module):
         self.seq_len, self.input_dim = input_shape
         self.latent_dim = latent_dim
         self.lr = lr
-        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu") \
-                      if device == 'cpu' else torch.device(device)
+        self.device = (
+            torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+            if device == "cpu"
+            else torch.device(device)
+        )
 
         # logs
         self.total_loss_history = []
@@ -54,17 +70,17 @@ class ScenarioGenerator(nn.Module):
         # config
         self.scale = scale
         self.selection_method = selection_method.lower()  # "kcenter" | "dpp" | "kmeans"
-        self.scaler_type = scaler_type.lower()            # "standard" | "minmax"
+        self.scaler_type = scaler_type.lower()  # "standard" | "minmax"
         self.const_tol_abs = const_tol_abs
         self.const_tol_rel = const_tol_rel
 
         # constants/dynamic bookkeeping
-        self.const_idx = []            # list[int]
-        self.dyn_idx = []              # list[int]
-        self.const_values = None       # np.ndarray (D_const,)
+        self.const_idx = []  # list[int]
+        self.dyn_idx = []  # list[int]
+        self.const_values = None  # np.ndarray (D_const,)
         self.dynamic_dim = 0
         self.flat_dyn = 0
-        self.x_dtype = np.float32      # will be overwritten from data
+        self.x_dtype = np.float32  # will be overwritten from data
 
         # scaler for dynamic only
         self.scaler = None
@@ -87,13 +103,12 @@ class ScenarioGenerator(nn.Module):
         self.encoder = nn.Identity()
         self.decoder = nn.Identity()
         self.optimizer_ = None  # <- defer optimizer creation until layers are built
-        
+
         self.logger = logger
-        self.log = (self.logger.info if self.logger else print)
+        self.log = self.logger.info if self.logger else print
 
         self.to(self.device)
-        
-        
+
     # ---------------------- build model per dynamic size ----------------------
     def _build_models_for_dynamic(self):
         """(Re)build encoder/decoder sized to dynamic features and (re)create optimizer."""
@@ -128,7 +143,7 @@ class ScenarioGenerator(nn.Module):
         # (Re)create optimizer NOW that parameters exist
         self.optimizer_ = torch.optim.Adam(
             list(self.encoder.parameters()) + list(self.decoder.parameters()),
-            lr=self.lr
+            lr=self.lr,
         )
 
     # ---------------------- forward on dynamic (scaled) ----------------------
@@ -161,22 +176,22 @@ class ScenarioGenerator(nn.Module):
         N = Z.shape[0]
         first = rng.integers(N)
         selected = [first]
-        d2_min = np.sum((Z - Z[first])**2, axis=1)
+        d2_min = np.sum((Z - Z[first]) ** 2, axis=1)
         for _ in range(1, k):
             nxt = int(np.argmax(d2_min))
             selected.append(nxt)
-            d2_new = np.sum((Z - Z[nxt])**2, axis=1)
+            d2_new = np.sum((Z - Z[nxt]) ** 2, axis=1)
             d2_min = np.minimum(d2_min, d2_new)
         return np.array(selected, dtype=int)
 
     def rbf_kernel(self, Z, sigma=None):
         G = Z @ Z.T
         H = np.diag(G)
-        D2 = H[:,None] + H[None,:] - 2*G
+        D2 = H[:, None] + H[None, :] - 2 * G
         if sigma is None:
             med = np.median(D2[np.triu_indices_from(D2, k=1)])
-            sigma = np.sqrt(0.5*med + 1e-12)
-        K = np.exp(-D2 / (2*sigma**2 + 1e-12))
+            sigma = np.sqrt(0.5 * med + 1e-12)
+        K = np.exp(-D2 / (2 * sigma**2 + 1e-12))
         return K
 
     def dpp_greedy(self, K, k, rng=None):
@@ -188,7 +203,7 @@ class ScenarioGenerator(nn.Module):
         for i in range(k):
             j = np.argmax(gains)
             selected.append(j)
-            if i == k-1:
+            if i == k - 1:
                 break
             if i == 0:
                 C[i] = K[j] / np.sqrt(K[j, j] + 1e-12)
@@ -197,7 +212,7 @@ class ScenarioGenerator(nn.Module):
                 norm2 = K[j, j] - np.sum(proj**2)
                 norm2 = max(norm2, 1e-12)
                 C[i] = (K[j] - C[:i].T @ proj) / np.sqrt(norm2)
-            gains = np.diag(K) - np.sum(C[:i+1]**2, axis=0)
+            gains = np.diag(K) - np.sum(C[: i + 1] ** 2, axis=0)
             gains[selected] = -np.inf
         return np.array(selected)
 
@@ -206,25 +221,29 @@ class ScenarioGenerator(nn.Module):
         df = df.copy()
         df.fillna(0, inplace=True)
 
-        df['year'] = df['WY'].astype(int)
-        df['week'] = df['SSS'].str.extract(r'S(\d+)').astype(int)
-        df['hour'] = df['TTT'].str.extract(r'T(\d+)').astype(int)
+        df["year"] = df["WY"].astype(int)
+        df["week"] = df["SSS"].str.extract(r"S(\d+)").astype(int)
+        df["hour"] = df["TTT"].str.extract(r"T(\d+)").astype(int)
 
-        df['day_in_week'] = ((df['hour'] - 1) // 24) + 1
-        df['block_in_week'] = ((df['day_in_week'] - 1) // k_days) + 1
+        df["day_in_week"] = ((df["hour"] - 1) // 24) + 1
+        df["block_in_week"] = ((df["day_in_week"] - 1) // k_days) + 1
 
-        group = df.groupby(['year', 'week', 'block_in_week'])
+        group = df.groupby(["year", "week", "block_in_week"])
         df = group.filter(lambda x: len(x) == 24 * k_days)
 
-        feature_cols = df.columns.difference(['WY', 'SSS', 'TTT', 'year', 'week', 'hour', 'day_in_week', 'block_in_week'])
+        feature_cols = df.columns.difference(
+            ["WY", "SSS", "TTT", "year", "week", "hour", "day_in_week", "block_in_week"]
+        )
         if len(feature_cols) == 0:
-            raise ValueError("No valid feature columns found. Ensure there are non-constant features.")
+            raise ValueError(
+                "No valid feature columns found. Ensure there are non-constant features."
+            )
 
         self.log(f"Using {len(feature_cols)} features for {k_days}-day blocks.")
         self.empty_df = pd.DataFrame(columns=feature_cols)
 
         samples = []
-        for (_, _, _), grp in df.groupby(['year', 'week', 'block_in_week']):
+        for (_, _, _), grp in df.groupby(["year", "week", "block_in_week"]):
             X_block = grp[feature_cols].values
             samples.append(X_block)
 
@@ -282,7 +301,9 @@ class ScenarioGenerator(nn.Module):
                 X_dyn_scaled = X_dyn.astype(np.float32)
             dyn_scaled = X_dyn_scaled.astype(np.float32)
 
-        self.X_tensor_dyn_scaled = torch.tensor(dyn_scaled, dtype=torch.float32).to(self.device)
+        self.X_tensor_dyn_scaled = torch.tensor(dyn_scaled, dtype=torch.float32).to(
+            self.device
+        )
         self.X_tensor = self.X_tensor_dyn_scaled  # for compatibility with your loops
 
     def load_and_process_data(self, file_path, k_days=1):
@@ -298,7 +319,9 @@ class ScenarioGenerator(nn.Module):
 
         # Report counts
         self.log(f"Original data shape: {self.X_original.shape}")
-        self.log(f"Detected {len(self.const_idx)} constant features and {len(self.dyn_idx)} dynamic features.")
+        self.log(
+            f"Detected {len(self.const_idx)} constant features and {len(self.dyn_idx)} dynamic features."
+        )
         if len(self.const_idx) > 0:
             self.log(f"Constant feature indices: {self.const_idx}")
 
@@ -307,7 +330,9 @@ class ScenarioGenerator(nn.Module):
         if self.X_tensor_dyn_scaled is None:
             raise ValueError("Data not prepared. Call load_and_process_data() first.")
         if self.optimizer_ is None:
-            raise RuntimeError("Optimizer not initialized. Did _build_models_for_dynamic run?")
+            raise RuntimeError(
+                "Optimizer not initialized. Did _build_models_for_dynamic run?"
+            )
 
         dataset = TensorDataset(self.X_tensor_dyn_scaled)  # scaled dynamic only
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -316,7 +341,9 @@ class ScenarioGenerator(nn.Module):
         self.log("-" * 121)
         self.log("Pretraining the model...")
         self.log("*" * 74)
-        self.log(f"Pretraining on {len(loader)} batches with batch size {batch_size} for {epochs} epochs.")
+        self.log(
+            f"Pretraining on {len(loader)} batches with batch size {batch_size} for {epochs} epochs."
+        )
 
         for epoch in range(epochs):
             total_loss = 0.0
@@ -324,12 +351,14 @@ class ScenarioGenerator(nn.Module):
                 x_dyn_batch = x_dyn_batch.to(self.device)
                 self.optimizer_.zero_grad()
                 recon_dyn, _ = self(x_dyn_batch)
-                loss = self.cae_loss(recon_dyn, x_dyn_batch)  # loss on scaled dynamic only
+                loss = self.cae_loss(
+                    recon_dyn, x_dyn_batch
+                )  # loss on scaled dynamic only
                 loss.backward()
                 self.optimizer_.step()
                 total_loss += loss.item()
             self.pretrain_loss_history.append(total_loss)
-            self.log(f"Epoch {epoch+1}/{epochs} - Loss: {total_loss:.6f}")
+            self.log(f"Epoch {epoch + 1}/{epochs} - Loss: {total_loss:.6f}")
 
     # ---------------------- utils for reconstruction ----------------------
     def _inverse_scale_dynamic_np(self, dyn_scaled_np):
@@ -347,13 +376,17 @@ class ScenarioGenerator(nn.Module):
         if self.dynamic_dim > 0:
             full[:, :, self.dyn_idx] = dyn_np.astype(self.x_dtype, copy=False)
         if len(self.const_idx) > 0:
-            full[:, :, self.const_idx] = self.const_values.reshape(1, 1, -1).astype(self.x_dtype, copy=False)
+            full[:, :, self.const_idx] = self.const_values.reshape(1, 1, -1).astype(
+                self.x_dtype, copy=False
+            )
         return full
 
     def _force_constants_exact(self, arr: np.ndarray) -> np.ndarray:
         """Safety net: overwrite constant columns with saved values."""
         if len(self.const_idx) > 0 and arr is not None:
-            arr[:, :, self.const_idx] = self.const_values.reshape(1, 1, -1).astype(self.x_dtype, copy=False)
+            arr[:, :, self.const_idx] = self.const_values.reshape(1, 1, -1).astype(
+                self.x_dtype, copy=False
+            )
         return arr
 
     # ---------------------- scenario generation ----------------------
@@ -361,7 +394,9 @@ class ScenarioGenerator(nn.Module):
         if self.X_tensor_dyn_scaled is None:
             raise ValueError("Data not prepared. Call load_and_process_data() first.")
         if self.optimizer_ is None:
-            raise RuntimeError("Optimizer not initialized. Did _build_models_for_dynamic run?")
+            raise RuntimeError(
+                "Optimizer not initialized. Did _build_models_for_dynamic run?"
+            )
 
         dataset = TensorDataset(self.X_tensor_dyn_scaled)  # scaled dynamic only
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -369,7 +404,9 @@ class ScenarioGenerator(nn.Module):
         self.train()
         if self.empty_df is not None:
             self.empty_df.drop(self.empty_df.index, inplace=True)
-            self.empty_df.drop(columns=['scenario_id', 'time_step'], inplace=True, errors='ignore')
+            self.empty_df.drop(
+                columns=["scenario_id", "time_step"], inplace=True, errors="ignore"
+            )
 
         all_z_batches = []
         all_recon_dyn_scaled_batches = []
@@ -389,7 +426,9 @@ class ScenarioGenerator(nn.Module):
         self.reconstruction_loss_total = torch.stack(recon_loss_total).sum()
 
         all_z_batches = np.concatenate(all_z_batches, axis=0)
-        all_recon_dyn_scaled = np.concatenate(all_recon_dyn_scaled_batches, axis=0)  # (N,T,D_dyn)
+        all_recon_dyn_scaled = np.concatenate(
+            all_recon_dyn_scaled_batches, axis=0
+        )  # (N,T,D_dyn)
 
         # Inverse-scale to original dynamic, then reinsert constants to get full D
         recon_dyn_inv = self._inverse_scale_dynamic_np(all_recon_dyn_scaled)
@@ -410,29 +449,53 @@ class ScenarioGenerator(nn.Module):
         if self.dynamic_dim == 0:
             # degenerate case: everything constant
             idx = np.arange(min(n_scenarios, len(all_z_batches)))
-            centroids_z = torch.zeros((len(idx), self.latent_dim), dtype=torch.float32, device=self.device)
+            centroids_z = torch.zeros(
+                (len(idx), self.latent_dim), dtype=torch.float32, device=self.device
+            )
         elif method == "kmeans":
             kmeans_z = KMeans(n_clusters=n_scenarios, random_state=self.seed)
             kmeans_z.fit(all_z_batches)
-            centroids_z = torch.tensor(kmeans_z.cluster_centers_, dtype=torch.float32).to(self.device)
+            centroids_z = torch.tensor(
+                kmeans_z.cluster_centers_, dtype=torch.float32
+            ).to(self.device)
         elif method == "kcenter":
             idx = self.kcenter_farthest_points(all_z_batches, k=n_scenarios)
-            centroids_z = torch.tensor(all_z_batches[idx], dtype=torch.float32).to(self.device)
+            centroids_z = torch.tensor(all_z_batches[idx], dtype=torch.float32).to(
+                self.device
+            )
         elif method == "dpp":
             K = self.rbf_kernel(all_z_batches, sigma=None)
-            idx = self.dpp_greedy(K, k=n_scenarios, rng=np.random.RandomState(self.seed))
-            centroids_z = torch.tensor(all_z_batches[idx], dtype=torch.float32).to(self.device)
+            idx = self.dpp_greedy(
+                K, k=n_scenarios, rng=np.random.RandomState(self.seed)
+            )
+            centroids_z = torch.tensor(all_z_batches[idx], dtype=torch.float32).to(
+                self.device
+            )
         else:
-            raise ValueError(f"Unknown selection method: {self.selection_method}. Choose from 'kmeans', 'kcenter', or 'dpp'.")
+            raise ValueError(
+                f"Unknown selection method: {self.selection_method}. Choose from 'kmeans', 'kcenter', or 'dpp'."
+            )
 
         # ---- Decode new scenarios (dynamic scaled) -> inverse-scale -> reinsert constants ----
         if self.dynamic_dim == 0:
-            new_full = np.empty((n_scenarios, self.seq_len, self.input_dim), dtype=self.x_dtype)
+            new_full = np.empty(
+                (n_scenarios, self.seq_len, self.input_dim), dtype=self.x_dtype
+            )
             if len(self.const_idx) > 0:
-                new_full[:, :, self.const_idx] = self.const_values.reshape(1, 1, -1).astype(self.x_dtype, copy=False)
+                new_full[:, :, self.const_idx] = self.const_values.reshape(
+                    1, 1, -1
+                ).astype(self.x_dtype, copy=False)
         else:
-            new_dyn_scaled = self.decoder(centroids_z).view(-1, self.seq_len, self.dynamic_dim).cpu().detach().numpy()
-            new_dyn_inv = self._inverse_scale_dynamic_np(new_dyn_scaled).astype(self.x_dtype, copy=False)
+            new_dyn_scaled = (
+                self.decoder(centroids_z)
+                .view(-1, self.seq_len, self.dynamic_dim)
+                .cpu()
+                .detach()
+                .numpy()
+            )
+            new_dyn_inv = self._inverse_scale_dynamic_np(new_dyn_scaled).astype(
+                self.x_dtype, copy=False
+            )
             new_full = self._reinsert_constants_np(new_dyn_inv)
 
             # optional clamp ONLY dynamic dims
@@ -449,18 +512,26 @@ class ScenarioGenerator(nn.Module):
             new_rows = []
             for i in range(self.new_scenarios.shape[0]):
                 for j in range(self.new_scenarios.shape[1]):
-                    new_row = pd.Series(self.new_scenarios[i, j, :], index=self.empty_df.columns)
-                    new_row['scenario_id'] = i + 1
-                    new_row['time_step'] = j + 1
+                    new_row = pd.Series(
+                        self.new_scenarios[i, j, :], index=self.empty_df.columns
+                    )
+                    new_row["scenario_id"] = i + 1
+                    new_row["time_step"] = j + 1
                     new_rows.append(new_row)
             new_df = pd.DataFrame(new_rows)
             self.empty_df = pd.concat([self.empty_df, new_df], ignore_index=True)
-            self.empty_df['scenario_id'] = self.empty_df['scenario_id'].astype(int)
-            self.empty_df['time_step'] = self.empty_df['time_step'].astype(int)
-            cols = ['scenario_id', 'time_step'] + [c for c in self.empty_df.columns if c not in ['scenario_id', 'time_step']]
+            self.empty_df["scenario_id"] = self.empty_df["scenario_id"].astype(int)
+            self.empty_df["time_step"] = self.empty_df["time_step"].astype(int)
+            cols = ["scenario_id", "time_step"] + [
+                c
+                for c in self.empty_df.columns
+                if c not in ["scenario_id", "time_step"]
+            ]
             self.empty_df = self.empty_df[cols]
 
-        return self.new_scenarios, (self.empty_df if self.empty_df is not None else None)
+        return self.new_scenarios, (
+            self.empty_df if self.empty_df is not None else None
+        )
 
     # ---------------------- feedback update ----------------------
     def update(self, obj_value, epoch=None):
@@ -470,25 +541,43 @@ class ScenarioGenerator(nn.Module):
             self.log("*" * 74)
 
         self.obj_values.append(obj_value)
-        self.recon_loss_feedback.append(self.reconstruction_loss_total.item() if self.reconstruction_loss_total is not None else np.nan)
+        self.recon_loss_feedback.append(
+            self.reconstruction_loss_total.item()
+            if self.reconstruction_loss_total is not None
+            else np.nan
+        )
 
         policy_loss = obj_value
-        total_batch_loss = (self.reconstruction_loss_total if self.reconstruction_loss_total is not None else 0.0) + policy_loss
+        total_batch_loss = (
+            self.reconstruction_loss_total
+            if self.reconstruction_loss_total is not None
+            else 0.0
+        ) + policy_loss
 
         self.optimizer_.zero_grad()
         total_batch_loss.backward()
         self.optimizer_.step()
 
-        self.total_loss_history.append(total_batch_loss.item() if hasattr(total_batch_loss, "item") else float(total_batch_loss))
-        prefix = f'Epoch {epoch+1} - ' if epoch is not None else ''
-        rec = self.reconstruction_loss_total.item() if self.reconstruction_loss_total is not None else float('nan')
+        self.total_loss_history.append(
+            total_batch_loss.item()
+            if hasattr(total_batch_loss, "item")
+            else float(total_batch_loss)
+        )
+        prefix = f"Epoch {epoch + 1} - " if epoch is not None else ""
+        rec = (
+            self.reconstruction_loss_total.item()
+            if self.reconstruction_loss_total is not None
+            else float("nan")
+        )
         pol = policy_loss.item() if hasattr(policy_loss, "item") else float(policy_loss)
         tot = self.total_loss_history[-1]
-        self.log(f"{prefix}Total Loss: {tot:.6f} | Reconstruction Loss: {rec:.6f} | Policy Loss: {pol:.6f}")
+        self.log(
+            f"{prefix}Total Loss: {tot:.6f} | Reconstruction Loss: {rec:.6f} | Policy Loss: {pol:.6f}"
+        )
 
     # ---------------------- plots ----------------------
     def plot_loss_history(self):
-        plt.plot(self.pretrain_loss_history, label='Pretrain Loss')
+        plt.plot(self.pretrain_loss_history, label="Pretrain Loss")
         plt.title("Loss History")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
@@ -496,9 +585,9 @@ class ScenarioGenerator(nn.Module):
         plt.grid(True)
         plt.tight_layout()
         plt.show()
-        
+
         plt.figure(figsize=(12, 6))
-        plt.plot(self.recon_loss_feedback, label='Reconstruction Loss')
+        plt.plot(self.recon_loss_feedback, label="Reconstruction Loss")
         plt.title("Reconstruction History in Feedback Loop")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
@@ -507,8 +596,8 @@ class ScenarioGenerator(nn.Module):
         plt.tight_layout()
         plt.show()
 
-        plt.plot(self.total_loss_history, label='Total Loss')
-        plt.plot(self.obj_values, label='Objective Values', linestyle='--')
+        plt.plot(self.total_loss_history, label="Total Loss")
+        plt.plot(self.obj_values, label="Objective Values", linestyle="--")
         plt.title("Total Loss History")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
@@ -519,7 +608,9 @@ class ScenarioGenerator(nn.Module):
 
     def plot_scenarios(self, selecting_feature_index=0):
         if self.new_scenarios is None:
-            raise ValueError("No new scenarios generated. Please call generate_scenario() first.")
+            raise ValueError(
+                "No new scenarios generated. Please call generate_scenario() first."
+            )
 
         plt.figure(figsize=(12, 6))
         for i in range(self.X_original.shape[0]):
@@ -538,91 +629,101 @@ class ScenarioGenerator(nn.Module):
 
     # ---------------------- save / load ----------------------
     def save_model(self, file_path):
-        torch.save({
-            'model_state_dict': self.state_dict(),
-            'encoder_state_dict': self.encoder.state_dict() if not isinstance(self.encoder, nn.Identity) else None,
-            'decoder_state_dict': self.decoder.state_dict() if not isinstance(self.decoder, nn.Identity) else None,
-            'total_loss_history': self.total_loss_history,
-            'pretrain_loss_history': self.pretrain_loss_history,
-            'obj_values': self.obj_values,
-            'new_scenarios_list': self.new_scenarios_list,
-            'X_original': self.X_original,
-            'X_tensor_dyn_scaled': self.X_tensor_dyn_scaled,
-            'reconstruction_loss_total': self.reconstruction_loss_total,
-            'empty_df': self.empty_df,
-            'reconstruction_scenarios': self.reconstruction_scenarios,
-            'recon_loss_feedback': self.recon_loss_feedback,
-            # constants/dynamic info
-            'const_idx': self.const_idx,
-            'dyn_idx': self.dyn_idx,
-            'const_values': self.const_values,
-            'dynamic_dim': self.dynamic_dim,
-            'x_dtype': str(self.x_dtype),
-            # scaler & config
-            'scaler': self.scaler,
-            'scaler_type': self.scaler_type,
-            'scale': self.scale,
-            'selection_method': self.selection_method,
-            'input_shape': (self.seq_len, self.input_dim),
-            'latent_dim': self.latent_dim,
-            'lr': self.lr,
-            'const_tol_abs': self.const_tol_abs,
-            'const_tol_rel': self.const_tol_rel,
-        }, file_path)
+        torch.save(
+            {
+                "model_state_dict": self.state_dict(),
+                "encoder_state_dict": self.encoder.state_dict()
+                if not isinstance(self.encoder, nn.Identity)
+                else None,
+                "decoder_state_dict": self.decoder.state_dict()
+                if not isinstance(self.decoder, nn.Identity)
+                else None,
+                "total_loss_history": self.total_loss_history,
+                "pretrain_loss_history": self.pretrain_loss_history,
+                "obj_values": self.obj_values,
+                "new_scenarios_list": self.new_scenarios_list,
+                "X_original": self.X_original,
+                "X_tensor_dyn_scaled": self.X_tensor_dyn_scaled,
+                "reconstruction_loss_total": self.reconstruction_loss_total,
+                "empty_df": self.empty_df,
+                "reconstruction_scenarios": self.reconstruction_scenarios,
+                "recon_loss_feedback": self.recon_loss_feedback,
+                # constants/dynamic info
+                "const_idx": self.const_idx,
+                "dyn_idx": self.dyn_idx,
+                "const_values": self.const_values,
+                "dynamic_dim": self.dynamic_dim,
+                "x_dtype": str(self.x_dtype),
+                # scaler & config
+                "scaler": self.scaler,
+                "scaler_type": self.scaler_type,
+                "scale": self.scale,
+                "selection_method": self.selection_method,
+                "input_shape": (self.seq_len, self.input_dim),
+                "latent_dim": self.latent_dim,
+                "lr": self.lr,
+                "const_tol_abs": self.const_tol_abs,
+                "const_tol_rel": self.const_tol_rel,
+            },
+            file_path,
+        )
 
         print("-" * 121)
-        print(f'Model and additional attributes saved to {file_path}')
+        print(f"Model and additional attributes saved to {file_path}")
 
     def load_model(self, file_path):
         checkpoint = torch.load(file_path, weights_only=False, map_location=self.device)
 
         # restore config
-        self.scale = checkpoint.get('scale', self.scale)
-        self.scaler_type = checkpoint.get('scaler_type', self.scaler_type)
-        self.selection_method = checkpoint.get('selection_method', self.selection_method)
-        self.lr = checkpoint.get('lr', self.lr)
-        self.const_tol_abs = checkpoint.get('const_tol_abs', self.const_tol_abs)
-        self.const_tol_rel = checkpoint.get('const_tol_rel', self.const_tol_rel)
+        self.scale = checkpoint.get("scale", self.scale)
+        self.scaler_type = checkpoint.get("scaler_type", self.scaler_type)
+        self.selection_method = checkpoint.get(
+            "selection_method", self.selection_method
+        )
+        self.lr = checkpoint.get("lr", self.lr)
+        self.const_tol_abs = checkpoint.get("const_tol_abs", self.const_tol_abs)
+        self.const_tol_rel = checkpoint.get("const_tol_rel", self.const_tol_rel)
 
         # restore histories
-        self.total_loss_history = checkpoint.get('total_loss_history', [])
-        self.pretrain_loss_history = checkpoint.get('pretrain_loss_history', [])
-        self.obj_values = checkpoint.get('obj_values', [])
-        self.new_scenarios_list = checkpoint.get('new_scenarios_list', [])
-        self.X_original = checkpoint.get('X_original', None)
-        self.X_tensor_dyn_scaled = checkpoint.get('X_tensor_dyn_scaled', None)
+        self.total_loss_history = checkpoint.get("total_loss_history", [])
+        self.pretrain_loss_history = checkpoint.get("pretrain_loss_history", [])
+        self.obj_values = checkpoint.get("obj_values", [])
+        self.new_scenarios_list = checkpoint.get("new_scenarios_list", [])
+        self.X_original = checkpoint.get("X_original", None)
+        self.X_tensor_dyn_scaled = checkpoint.get("X_tensor_dyn_scaled", None)
         if isinstance(self.X_tensor_dyn_scaled, torch.Tensor):
             self.X_tensor_dyn_scaled = self.X_tensor_dyn_scaled.to(self.device)
-        self.reconstruction_loss_total = checkpoint.get('reconstruction_loss_total', None)
-        self.empty_df = checkpoint.get('empty_df', None)
-        self.reconstruction_scenarios = checkpoint.get('reconstruction_scenarios', None)
-        self.recon_loss_feedback = checkpoint.get('recon_loss_feedback', [])
+        self.reconstruction_loss_total = checkpoint.get(
+            "reconstruction_loss_total", None
+        )
+        self.empty_df = checkpoint.get("empty_df", None)
+        self.reconstruction_scenarios = checkpoint.get("reconstruction_scenarios", None)
+        self.recon_loss_feedback = checkpoint.get("recon_loss_feedback", [])
 
         # restore constants/dynamics
-        self.const_idx = checkpoint.get('const_idx', [])
-        self.dyn_idx = checkpoint.get('dyn_idx', [])
-        self.const_values = checkpoint.get('const_values', None)
-        self.dynamic_dim = checkpoint.get('dynamic_dim', len(self.dyn_idx))
-        x_dtype_str = checkpoint.get('x_dtype', 'float32')
+        self.const_idx = checkpoint.get("const_idx", [])
+        self.dyn_idx = checkpoint.get("dyn_idx", [])
+        self.const_values = checkpoint.get("const_values", None)
+        self.dynamic_dim = checkpoint.get("dynamic_dim", len(self.dyn_idx))
+        x_dtype_str = checkpoint.get("x_dtype", "float32")
         self.x_dtype = np.dtype(x_dtype_str)
 
         # scaler
-        self.scaler = checkpoint.get('scaler', None)
+        self.scaler = checkpoint.get("scaler", None)
 
         # rebuild encoder/decoder for dynamic dims and create optimizer
         self._build_models_for_dynamic()
 
         # load encoder/decoder weights if present
-        enc_sd = checkpoint.get('encoder_state_dict', None)
-        dec_sd = checkpoint.get('decoder_state_dict', None)
+        enc_sd = checkpoint.get("encoder_state_dict", None)
+        dec_sd = checkpoint.get("decoder_state_dict", None)
         if enc_sd is not None and not isinstance(self.encoder, nn.Identity):
             self.encoder.load_state_dict(enc_sd, strict=False)
         if dec_sd is not None and not isinstance(self.decoder, nn.Identity):
             self.decoder.load_state_dict(dec_sd, strict=False)
 
         self.to(self.device)
-        print(f'Model and additional attributes loaded from {file_path}')
-
+        print(f"Model and additional attributes loaded from {file_path}")
 
     def plot_reconstruction_scenarios(self, features_to_plot, sample_index=0):
         num_features = len(features_to_plot)
@@ -634,11 +735,17 @@ class ScenarioGenerator(nn.Module):
         for i, feature in enumerate(features_to_plot):
             if i >= len(axes):
                 break
-            axes[i].plot(self.X_original[sample_index, :, feature], label='Original', alpha=0.5)
-            axes[i].plot(self.reconstruction_scenarios[sample_index, :, feature], label='Reconstructed', alpha=0.7)
-            axes[i].set_title(f'Feature {feature}')
-            axes[i].set_xlabel('Time Step')
-            axes[i].set_ylabel('Value')
+            axes[i].plot(
+                self.X_original[sample_index, :, feature], label="Original", alpha=0.5
+            )
+            axes[i].plot(
+                self.reconstruction_scenarios[sample_index, :, feature],
+                label="Reconstructed",
+                alpha=0.7,
+            )
+            axes[i].set_title(f"Feature {feature}")
+            axes[i].set_xlabel("Time Step")
+            axes[i].set_ylabel("Value")
             axes[i].legend()
             axes[i].grid(True)
 
@@ -650,121 +757,149 @@ class ScenarioGenerator(nn.Module):
         print("Reconstruction scenarios shape:", self.reconstruction_scenarios.shape)
         print("Sample index:", sample_index)
         print("Number of features:", num_features)
-        
-def convert_to_incfiles(new_scenarios_df: pd.DataFrame,
-                        scenario: str,
-                        scenario_folder: str,
-                        balmorel_model_path: str = 'Balmorel',
-                        gams_system_directory: str | None = None,
-                        overwrite_data_load: bool = False):
-    
-    
+
+
+def convert_to_incfiles(
+    new_scenarios_df: pd.DataFrame,
+    scenario: str,
+    scenario_folder: str,
+    balmorel_model_path: str = "Balmorel",
+    gams_system_directory: str | None = None,
+    overwrite_data_load: bool = False,
+):
+
     # Get parameters and temporal resolution
-    parameters = new_scenarios_df.columns[2:] # pop scenario id and time_step
-    balmorel_season_time_index = [f"S{row['scenario_id']:02d} . T{row['time_step']:03d}" for i,row  in new_scenarios_df.loc[:, ['scenario_id', 'time_step']].iterrows()]
-    balmorel_season_index = [f"S{season:02d}" for season in new_scenarios_df.loc[:, 'scenario_id'].values]
-    balmorel_term_index = [f"T{term:03d}" for term in new_scenarios_df.loc[:, 'time_step'].values]
-    
+    parameters = new_scenarios_df.columns[2:]  # pop scenario id and time_step
+    balmorel_season_time_index = [
+        f"S{row['scenario_id']:02d} . T{row['time_step']:03d}"
+        for i, row in new_scenarios_df.loc[:, ["scenario_id", "time_step"]].iterrows()
+    ]
+    balmorel_season_index = [
+        f"S{season:02d}" for season in new_scenarios_df.loc[:, "scenario_id"].values
+    ]
+    balmorel_term_index = [
+        f"T{term:03d}" for term in new_scenarios_df.loc[:, "time_step"].values
+    ]
+
     # Load Balmorel input data for descriptions and set names
     model = Balmorel(balmorel_model_path, gams_system_directory=gams_system_directory)
     model.load_incfiles(scenario, overwrite=overwrite_data_load)
-    
-    placeholder_parameter = ''
-    for parameter in parameters:
 
+    placeholder_parameter = ""
+    for parameter in parameters:
         # Get elements and parameter_name
-        elements = parameter.split('|')
+        elements = parameter.split("|")
         parameter_name = elements.pop(0)
-        
+
         # Skip if we already processed this parameter
         if placeholder_parameter == parameter_name:
             continue
         else:
             placeholder_parameter = parameter_name
-        
+
         # Find all values of this parameter
-        idx=new_scenarios_df.columns.str.find(parameter_name + '|') == 0
-        
+        idx = new_scenarios_df.columns.str.find(parameter_name + "|") == 0
+
         # Get sets, values and explanation
         sets = model.input_data[scenario][parameter_name].domains_as_strings
         text = model.input_data[scenario][parameter_name].text
-        table_or_param = 'PARAMETER' if (len(sets) == 1) else 'TABLE'
-        if table_or_param == 'PARAMETER':
-            prefix = f"""{table_or_param} {parameter_name}({','.join(sets)}) "{text}" \n/\n"""
-            suffix = '\n/;'
+        table_or_param = "PARAMETER" if (len(sets) == 1) else "TABLE"
+        if table_or_param == "PARAMETER":
+            prefix = f"""{table_or_param} {parameter_name}({",".join(sets)}) "{text}" \n/\n"""
+            suffix = "\n/;"
         else:
-            prefix = f"""{table_or_param} {parameter_name}({','.join(sets)}) "{text}" \n"""
-            suffix = '\n;'
-        
-        df = new_scenarios_df.loc[:, idx]
-        df.columns = df.columns.str.replace(parameter_name+'|', '', n=1).str.replace('|', ' . ')
+            prefix = (
+                f"""{table_or_param} {parameter_name}({",".join(sets)}) "{text}" \n"""
+            )
+            suffix = "\n;"
 
-        if 'SSS' in sets and 'TTT' in sets:
-            df.index = balmorel_season_time_index   
-            df.index.name = 'ST'
-            df = df.pivot_table(index='ST', aggfunc='mean')
-            df.index.name = ''
+        df = new_scenarios_df.loc[:, idx]
+        df.columns = df.columns.str.replace(parameter_name + "|", "", n=1).str.replace(
+            "|", " . "
+        )
+
+        if "SSS" in sets and "TTT" in sets:
+            df.index = balmorel_season_time_index
+            df.index.name = "ST"
+            df = df.pivot_table(index="ST", aggfunc="mean")
+            df.index.name = ""
             df = df.T
-            
-        elif 'SSS' in sets:
+
+        elif "SSS" in sets:
             df.index = balmorel_season_index
-            df.index.name = 'S'
-            df = df.pivot_table(index='S', aggfunc='mean')
-            df.index.name = ''
+            df.index.name = "S"
+            df = df.pivot_table(index="S", aggfunc="mean")
+            df.index.name = ""
             df = df.T
-            
+
         else:
             df = df.mean().T
-            if table_or_param != 'PARAMETER':
-                prefix = prefix.replace('TABLE', 'PARAMETER')
+            if table_or_param != "PARAMETER":
+                prefix = prefix.replace("TABLE", "PARAMETER")
                 prefix += "/\n"
                 suffix = "\n/;"
-        
-        if parameter_name != 'HYDROGEN_DH2':
+
+        if parameter_name != "HYDROGEN_DH2":
             file = IncFile(
                 name=parameter_name,
                 prefix=prefix,
                 body=df.to_string(),
                 suffix=suffix,
-                path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
+                path=balmorel_model_path + f"/{scenario_folder}/capexp_data",
             )
         else:
             file = IncFile(
-                name='HYDROGEN_DH2',
-                prefix='',
-                suffix='',
-                body="\n".join([f"HYDROGEN_DH2('{year}', '{region}') = HYDROGEN_DH2('{year}', '{region}') + {df.loc[f'{year} . {region}']};" for year, region in df.index.str.split(' . ', expand=True)]),
-                path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
+                name="HYDROGEN_DH2",
+                prefix="",
+                suffix="",
+                body="\n".join(
+                    [
+                        f"HYDROGEN_DH2('{year}', '{region}') = HYDROGEN_DH2('{year}', '{region}') + {df.loc[f'{year} . {region}']};"
+                        for year, region in df.index.str.split(" . ", expand=True)
+                    ]
+                ),
+                path=balmorel_model_path + f"/{scenario_folder}/capexp_data",
             )
-            
-        if parameter_name == 'DE_VAR_T':
+
+        if parameter_name == "DE_VAR_T":
             file.suffix += "\n* Flat profiles for industry and datacenter"
             file.suffix += "\nDE_VAR_T(RRR,'PII',SSS,TTT)=1;"
             file.suffix += "\nDE_VAR_T(RRR,'DATACENTER',SSS,TTT)=1;"
-            
+
         file.save()
-        
+
     # Define temporal resolution
     IncFile(
-        name='S',
+        name="S",
         prefix="SET S(SSS)  'Seasons in the simulation'\n/\n",
-        body=', '.join(np.unique(balmorel_season_index)),
-        suffix='\n/;',
-        path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
+        body=", ".join(np.unique(balmorel_season_index)),
+        suffix="\n/;",
+        path=balmorel_model_path + f"/{scenario_folder}/capexp_data",
     ).save()
     IncFile(
-        name='T',
+        name="T",
         prefix="SET T(TTT)  'Time periods within a season in the simulation'\n/\n",
-        body=','.join(np.unique(balmorel_term_index)),
-        suffix='\n/;',
-        path=balmorel_model_path + f'/{scenario_folder}/capexp_data'
+        body=",".join(np.unique(balmorel_term_index)),
+        suffix="\n/;",
+        path=balmorel_model_path + f"/{scenario_folder}/capexp_data",
     ).save()
 
-        
-def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int = 64, batch_size: int = 256, learning_rate: float = 5e-4, seed: int = 42, n_features=72, logger=None, scenario_folder: str = 'operun'):
+
+def pretrain(
+    epochs: int,
+    days: int = 1,
+    n_scenarios: int = 4,
+    latent_dim: int = 64,
+    batch_size: int = 256,
+    learning_rate: float = 5e-4,
+    seed: int = 42,
+    n_features=72,
+    logger=None,
+    scenario_folder: str = "operun",
+):
     """
     Pretrain the scenario generator.
-    
+
     Parameters
     ----------
     epochs : int
@@ -788,51 +923,92 @@ def pretrain(epochs: int, days: int = 1, n_scenarios: int = 4, latent_dim: int =
     scenario_folder : str, default operun
         Which scenario folder to run
     """
-    
-    log = (logger.info if logger else print)
 
+    log = logger.info if logger else print
 
-    model = ScenarioGenerator(input_shape=(days*24, n_features), latent_dim=latent_dim, lr=learning_rate, seed=seed, logger=logger, selection_method="kmeans", scaler_type="standard")
-    model.load_and_process_data('Pre-Processing/Output/genmodel_input.csv', k_days=days)
-    
-    log(f"Pretraining for {epochs} epochs, batch_size={batch_size}, lr={learning_rate}, seed={seed}")
-    
+    model = ScenarioGenerator(
+        input_shape=(days * 24, n_features),
+        latent_dim=latent_dim,
+        lr=learning_rate,
+        seed=seed,
+        logger=logger,
+        selection_method="kmeans",
+        scaler_type="standard",
+    )
+    model.load_and_process_data("Pre-Processing/Output/genmodel_input.csv", k_days=days)
+
+    log(
+        f"Pretraining for {epochs} epochs, batch_size={batch_size}, lr={learning_rate}, seed={seed}"
+    )
+
     model.pretrain(epochs=epochs, batch_size=batch_size)
-    
+
     log("Pretraining done; generating initial scenarios")
-    
+
     # create new incfiles
-    new_scenarios, new_scenarios_df = model.generate_scenario(batch_size=batch_size, n_scenarios=n_scenarios)
-    
+    new_scenarios, new_scenarios_df = model.generate_scenario(
+        batch_size=batch_size, n_scenarios=n_scenarios
+    )
+
     log("Converting scenarios to INC files")
-    
-    convert_to_incfiles(new_scenarios_df, 'base', scenario_folder, gams_system_directory=os.getenv('GAMS_DIR','/appl/gams/47.6.0'), overwrite_data_load=True)
+
+    convert_to_incfiles(
+        new_scenarios_df,
+        "base",
+        scenario_folder,
+        gams_system_directory=os.getenv("GAMS_DIR", "/opt/gams/53"),
+        overwrite_data_load=True,
+    )
 
     # model.save_model(f'Pre-Processing/Output/{scenario}_model.pth')
 
     return model
 
-def train(model: ScenarioGenerator, scenario: str, epoch_string: str, n_scenarios: int=4, batch_size: int = 256, logger=None, scenario_folder: str = 'operun'):
-    
-    # Get the objective value
-    results = MainResults([f'MainResults_{scenario}_{runtype}_E{epoch_string}.gdx' for runtype in ['capacity', 'dispatch']],
-                          paths=[f'Balmorel/{scenario_folder}/model'])
-    obj_value, capital_costs, operational_costs = get_combined_obj_value(results, return_capex_opex_dfs=True)
 
-    log = (logger.info if logger else print)
-    
+def train(
+    model: ScenarioGenerator,
+    scenario: str,
+    epoch_string: str,
+    n_scenarios: int = 4,
+    batch_size: int = 256,
+    logger=None,
+    scenario_folder: str = "operun",
+):
+
+    # Get the objective value
+    results = MainResults(
+        [
+            f"MainResults_{scenario}_{runtype}_E{epoch_string}.gdx"
+            for runtype in ["capacity", "dispatch"]
+        ],
+        paths=[f"Balmorel/{scenario_folder}/model"],
+    )
+    obj_value, capital_costs, operational_costs = get_combined_obj_value(
+        results, return_capex_opex_dfs=True
+    )
+
+    log = logger.info if logger else print
+
     log("read objective values from capacity and dispatch runs")
-    log(f"Capital costs:\n%s"%capital_costs.to_string())
-    log(f"Operational costs:\n%s"%operational_costs.to_string())
-    log(f'Loss value: {obj_value} M€')
+    log(f"Capital costs:\n%s" % capital_costs.to_string())
+    log(f"Operational costs:\n%s" % operational_costs.to_string())
+    log(f"Loss value: {obj_value} M€")
 
     # update the model with the objective value
     model.update(obj_value, epoch=int(epoch_string))
-    
+
     # create new incfiles
-    new_scenarios, new_scenarios_df = model.generate_scenario(batch_size=batch_size, n_scenarios=n_scenarios)
-    
+    new_scenarios, new_scenarios_df = model.generate_scenario(
+        batch_size=batch_size, n_scenarios=n_scenarios
+    )
+
     log("running convert_to_incfiles")
-    convert_to_incfiles(new_scenarios_df, 'base', scenario_folder, gams_system_directory=os.getenv('GAMS_DIR','/appl/gams/47.6.0'))
-    
+    convert_to_incfiles(
+        new_scenarios_df,
+        "base",
+        scenario_folder,
+        gams_system_directory=os.getenv("GAMS_DIR", "/appl/gams/47.6.0"),
+    )
+
     return model
+
