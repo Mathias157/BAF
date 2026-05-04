@@ -22,6 +22,7 @@ from neural_network import pretrain, train
 import subprocess as sp
 import logging
 import shlex
+import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
@@ -189,6 +190,11 @@ def CLI(
     # pretraining + initial scenario generation
     logger.info("Starting pretraining...")
 
+    # get amount of features
+    n_features = (
+        len(pd.read_csv("Pre-Processing/Output/genmodel_input.csv").columns) - 3
+    )
+
     epoch = 0
     model = pretrain(
         pretrain_epochs,
@@ -199,17 +205,20 @@ def CLI(
         learning_rate=learning_rate,
         seed=seed,
         logger=logger,
-        n_features=80,
+        n_features=n_features,
     )
 
     logs_dir = logfile.parent
     ckpt_path = logs_dir / f"{scenario_name}_model_checkpoint.pth"
 
     os.chdir("Balmorel")
-    sp.run(
-        f"mv {scenario_folder}/model/balopt.opt {scenario_folder}/model/balopt_dispatch.opt",
-        shell=True,
-    )  # make sure first run is a capacity expansion
+    # make sure first run is a capacity expansion, by removing any leftover balopt.opt in scenario folder
+    balopt = Path(f"{scenario_folder}/model/balopt.opt")
+    try:
+        # delete if it exists
+        balopt.unlink()
+    except FileNotFoundError:
+        pass
 
     while epoch < update_epochs:
         epoch_string = f"{epoch:03.0f}"
