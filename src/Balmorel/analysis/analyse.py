@@ -92,7 +92,7 @@ marker_cycle = itertools.cycle(markers)
     "--gams-sysdir",
     type=str,
     required=False,
-    default=config("GAMS_SYSTEM_DIR"),
+    default=config("GAMS_SYSTEM_DIR", "/appl/gams/50.4.1"),
     help="Path to GAMS system directory. If none, will look for it in LD_LIBRARY_PATH, which can be set in an .env file",
 )
 @click.option(
@@ -1501,51 +1501,58 @@ def adequacy(ctx, scenario: str, nth_max: int):
         system_directory=ctx.obj["gams_system_directory"],
     )
 
-    # Get backup production
-    df = res.get_result("PRO_YCRAGFST").query(
-        'Scenario == @scenario and Generation.str.contains("BACKUP")'
-    )
+    get_adequacy(res).to_csv(f"analysis/output/{scenario}_adeq.csv")
 
-    # Get backup 'capacity' based on the nth maximum production from BACKUP units (nth_max = 1 => No inadequacy, nth_max = 3 => LOLE = 3 h, perhaps)
-    if nth_max == -1:
-        cap = df.pivot_table(
-            index=["Region"], columns=["Commodity"], values="Value", aggfunc="max"
-        )
-    else:
-        cap = (
-            df.groupby(["Region", "Commodity"])["Value"]
-            .apply(lambda x: x.nlargest(nth_max).iloc[-1])  # Selects N'th max
-            .unstack()  # Reshapes the data into a table
-        )
-    cap.to_csv(
-        "analysis/output/%s_backcapN%d.csv" % (scenario.replace("_operun", ""), nth_max)
-    )
 
-    ## Get energy not served
-    ENS = df.pivot_table(
-        index=["Scenario", "Year", "Country", "Region", "Technology", "Unit"],
-        values="Value",
-        aggfunc=lambda x: np.sum(x) / 1e6,
-    ).rename({"Technology": "Parameter"})
-    ENS["Parameter"] = "ENS"
+def get_adequacy(results: MainResults):
+    """Function to obtain adequacy indicators from MainResults file"""
+
+    # Get production from backup generators
+    df = results.get_result("PRO_YCRAGFST").query('Generation.str.contains("BACKUP")')
+
+    # Get max backup 'capacity', i.e.: highest use of backup generators in any hour
+    cap = (
+        df.pivot_table(
+            index=["Scenario", "Year", "Country", "Region", "Commodity", "Unit"],
+            values="Value",
+            aggfunc="max",
+        )
+        .reset_index()
+        .rename(columns={"Commodity": "Parameter"})
+    )
+    cap["Parameter"] = "Max Backup Capacity " + cap.Parameter.str.capitalize()
+    cap["Unit"] = "GW"
+    cap.Value = cap.Value / 1e3
+
+    # Get energy not served
+    ENS = (
+        df.pivot_table(
+            index=["Scenario", "Year", "Country", "Region", "Commodity", "Unit"],
+            values="Value",
+            aggfunc=lambda x: np.sum(x) / 1e6,
+        )
+        .reset_index()
+        .rename(columns={"Commodity": "Parameter"})
+    )
+    ENS["Parameter"] = "ENS " + ENS.Parameter.str.capitalize()
     ENS["Unit"] = "TWh"
 
-    LOLE = df.pivot_table(
-        index=["Scenario", "Year", "Country", "Region", "Technology", "Unit"],
-        aggfunc="count",
-    ).rename({"Technology": "Parameter"})
-    LOLE["Parameter"] = "LOLE"
+    # Get loss of load expectation
+    LOLE = (
+        df.pivot_table(
+            index=["Scenario", "Year", "Country", "Region", "Commodity", "Unit"],
+            values="Value",
+            aggfunc="count",
+        )
+        .reset_index()
+        .rename(columns={"Commodity": "Parameter"})
+    )
+    LOLE["Parameter"] = "LOLE " + LOLE.Parameter.str.capitalize()
     LOLE["Unit"] = "h"
 
-    LOLE.columns = pd.MultiIndex.from_product((["LOLE (h)"], LOLE.columns))
-    ENS = ENS.pivot_table(index="Region", aggfunc="sum") / 1e6
-    ENS.columns = pd.MultiIndex.from_product((["ENS (TWh)"], ENS.columns))
+    df_out = pd.concat((cap, ENS, LOLE))
 
-    df_out = ENS.join(LOLE).fillna(
-        0
-    )  # Fill NaNs with zero, as it means no backup was used
-
-    df_out.to_csv(f"analysis/output/{scenario}_adeq.csv")
+    return df_out
 
 
 @CLI.command()
