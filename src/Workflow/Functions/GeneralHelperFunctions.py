@@ -243,9 +243,14 @@ def get_balmorel_kpis(
         )
 
         # Adequacy
-        # load adequacy indicator
+        df_adeq = get_adequacy(results)
+        df_adeq = df_adeq.query(
+            f'Scenario.str.contains("{operational_scenario_string}")'
+        )
 
-        df = pd.concat((capital_costs, operational_costs, df_cap, df_sto, df_emi))
+        df = pd.concat(
+            (capital_costs, operational_costs, df_cap, df_sto, df_emi, df_adeq)
+        )
         df.Scenario = df.Scenario.str.replace("_dispatch", "")
         df.Scenario = df.Scenario.str.replace("_capacity", "")
 
