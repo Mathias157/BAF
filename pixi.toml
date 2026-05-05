@@ -15,8 +15,12 @@ initialisation = "cd src && python -m Workflow.Initialisation"
 periprocess = "cd src && python Workflow/PeriProcessing.py" 
 postprocess = "cd src && python Workflow/PostProcessing.py" 
 space-aggregate-balmorel = "cd src && python Pre-Processing/spatial_aggregation.py"
-analyse = "cd src/Balmorel && python Analysis/analyse.py "
+analyse = "cd src/Balmorel && python analysis/analyse.py "
 temporal-agg = "cd src && python Workflow/TimeseriesAggregation.py"
+genmodelinput = "cd src && python Workflow/Functions/export_data_to_generative_model.py"
+all-genmodelinput = "cd src && python Workflow/Functions/export_data_to_generative_model.py base -f"
+sync-down = { cmd = "rsync -avzu --filter=':- .gitignore' mberos@login2.hpc.dtu.dk:/work3/mberos/BAF/ . && rsync -avzu --filter=':- .gitignore' mberos@login2.hpc.dtu.dk:'/work3/mberos/BAF/src/Balmorel/base/data/*' ./src/Balmorel/base/data/", description = "Syncs repository to local, including .git folder, but without gitignored files" }
+sync-up = { cmd = "rsync -avzu --filter=':- .gitignore'  . mberos@login2.hpc.dtu.dk:/work3/mberos/BAF && rsync -avzu --filter=':- .gitignore'  ./src/Balmorel/base/data/* mberos@login2.hpc.dtu.dk:/work3/mberos/BAF/src/Balmorel/base/data/", description = "Syncs repository to remote, including .git folder, but without gitignored files" }
 
 [target.win.tasks]
 r = "cmd /c %USERPROFILE%\\AppData\\Local\\Programs\\R\\R-4.2.3\\bin\\x64\\R"
@@ -45,7 +49,7 @@ pytest = ">=8.4.0,<9"
 
 [pypi-dependencies]
 rpy2 = "==3.5.11"
-pybalmorel = ">=0.5.3, <0.6"
+pybalmorel = ">=1.1.7, <2"
 ipython = ">=9.1.0, <10"
 ptyprocess = ">=0.7.0, <0.8"
 ipykernel = ">=6.29.5, <7"
@@ -54,3 +58,4 @@ premailer = ">=3.10.0, <4"
 gamsapi = { version = "==47.6.0", extras = ["transfer"] }
 scikit-learn = "*"
 torch = ">=2.8.0, <3"
+python-decouple = ">=3.8, <4"
