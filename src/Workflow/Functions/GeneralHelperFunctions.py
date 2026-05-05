@@ -204,8 +204,8 @@ def get_balmorel_kpis(
                 values="Value",
                 aggfunc="sum",
             )
-            .rename(columns={"Technology": "Parameter"})
             .reset_index()
+            .rename(columns={"Technology": "Parameter"})
         )
         df_sto = (
             results.get_result("G_STO_YCRAF")
@@ -217,8 +217,8 @@ def get_balmorel_kpis(
                 values="Value",
                 aggfunc="sum",
             )
-            .rename(columns={"Technology": "Parameter"})
             .reset_index()
+            .rename(columns={"Technology": "Parameter"})
         )
 
         # Emissions

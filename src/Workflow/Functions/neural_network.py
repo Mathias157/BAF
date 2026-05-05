@@ -989,9 +989,9 @@ def train(
     # Log KPIs to .csv file
     file = Path(f"Workflow/OverallResults/{scenario}_KPIs.csv")
     if epoch_string == "000":
-        df.to_csv(file, header=True)
+        df.to_csv(file, header=True, index=False)
     else:
-        df.to_csv(file, mode="a", header=False)
+        df.to_csv(file, mode="a", header=False, index=False)
 
     log = logger.info if logger else print
 
