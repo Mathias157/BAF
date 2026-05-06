@@ -987,18 +987,27 @@ def train(
     obj_value, df = get_balmorel_kpis(results, return_df=True)
 
     # Log KPIs to .csv file
+    log = logger.info if logger else print
+    log("Read objective value and results from capacity and dispatch runs")
+
     file = Path(f"Workflow/OverallResults/{scenario}_KPIs.csv")
     if epoch_string == "000":
         df.to_csv(file, header=True, index=False)
     else:
         df.to_csv(file, mode="a", header=False, index=False)
 
-    log = logger.info if logger else print
-
-    log("read objective values from capacity and dispatch runs")
-    # log("Capital costs:\n%s" % capital_costs.to_string())
-    # log("Operational costs:\n%s" % operational_costs.to_string())
-    log(f"Loss value: {obj_value} M€")
+    log(f"Loss value (total system costs): {obj_value} M€")
+    log(f"Total generation capacity: {round(df.query('Unit == "GW"').Value.sum())} GW")
+    log(f"Total storage capacity: {round(df.query('Unit == "GWh"').Value.sum())} GWh")
+    log(f"Total emissions: {round(df.query('Unit == "kton"').Value.sum())} kton")
+    log("Adequacy indicators:")
+    log(
+        df.query(
+            'Parameter.str.contains("LOLE") or Parameter.str.contains("ENS") and Parameter != "CONDENSING"'
+        )
+        .pivot_table(index=["Parameter", "Unit"], values="Value", aggfunc="sum")
+        .to_string()
+    )
 
     # update the model with the objective value
     model.update(obj_value, epoch=int(epoch_string))
