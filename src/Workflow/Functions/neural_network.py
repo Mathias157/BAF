@@ -996,16 +996,17 @@ def train(
     else:
         df.to_csv(file, mode="a", header=False, index=False)
 
-    log(f"Loss value (total system costs): {obj_value} M€")
+    log(f"Loss value (total system costs): {round(obj_value)} M€")
     log(f"Total generation capacity: {round(df.query('Unit == "GW"').Value.sum())} GW")
     log(f"Total storage capacity: {round(df.query('Unit == "GWh"').Value.sum())} GWh")
     log(f"Total emissions: {round(df.query('Unit == "kton"').Value.sum())} kton")
-    log("Adequacy indicators:")
+    log("Adequacy indicators:\n")
     log(
         df.query(
             'Parameter.str.contains("LOLE") or Parameter.str.contains("ENS") and Parameter != "CONDENSING"'
         )
         .pivot_table(index=["Parameter", "Unit"], values="Value", aggfunc="sum")
+        .round()
         .to_string()
     )
 

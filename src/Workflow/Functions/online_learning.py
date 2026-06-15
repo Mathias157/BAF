@@ -216,7 +216,7 @@ def CLI(
     while epoch < update_epochs:
         epoch_string = f"{epoch:03.0f}"
 
-        for runtype in ["capacity", "dispatch"]:
+        for runtype in ["capacity", "dispatch", "rolling"]:
             sp.run(f"rm {scenario_folder}/data/*.inc", shell=True)
 
             if runtype == "capacity":
@@ -272,7 +272,7 @@ def CLI(
             os.chdir("../../")
 
         sp.run(
-            f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_dispatch" {epoch_string}',
+            f'pixi run python -u analysis/analyse.py adequacy "{scenario_name}_rolling" {epoch_string}',
             shell=True,
         )
         os.chdir("../")
