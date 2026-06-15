@@ -18,6 +18,8 @@ import shutil
 import os
 import time
 import sys
+sys.path.append('Balmorel/analysis')
+from analyse import get_adequacy
 import configparser
 import click
 
@@ -1146,11 +1148,6 @@ def load_OSMOSE_data(files: list, print_files_read: bool = False):
 
 
 if __name__ == "__main__":
-    print("Test of loading binding constraint:")
-    cf = BC()
-
-    print(
-        "Load fr_psp type and operator:",
-        cf.get("fr_psp", "type"),
-        cf.get("fr_psp", "operator"),
-    )
+    print("Test get_adequacy")
+    res=MainResults("MainResults_DO_D1W1_capacity_E000", paths='Balmorel/operun/model')
+    df=get_adequacy(res)
