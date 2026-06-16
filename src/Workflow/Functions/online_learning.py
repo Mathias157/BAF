@@ -220,8 +220,6 @@ def CLI(
             sp.run(f"rm {scenario_folder}/data/*.inc", shell=True)
 
             if runtype == "capacity":
-                # make sure to delete leftover balopt files to ensure capacity expansion run
-                delete_balopt(scenario_folder)
                 sp.run(
                     f"/usr/bin/cp -f {scenario_folder}/capexp_data/*.inc {scenario_folder}/data",
                     shell=True,
@@ -250,10 +248,11 @@ def CLI(
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDE.inc", shell=True)
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH.inc", shell=True)
                 sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH2.inc", shell=True)
-                sp.run(
-                    f"cat {scenario_folder}/model/balopt_{runtype}.opt > {scenario_folder}/model/balopt.opt",
-                    shell=True,
-                )
+
+            sp.run(
+                f"cat {scenario_folder}/model/balopt_{runtype}.opt > {scenario_folder}/model/balopt.opt",
+                shell=True,
+            )
 
             os.chdir(f"{scenario_folder}/model")
             current_scenario_name = f"{scenario_name}_{runtype}_E{epoch_string}"
@@ -311,15 +310,6 @@ def plot_style(ctx, fig, ax, name: str, legend: bool = True):
     fig.savefig(name + ctx.obj["plot_ext"], bbox_inches="tight", transparent=True)
 
     return fig, ax
-
-
-def delete_balopt(scenario_folder):
-    balopt = Path(f"{scenario_folder}/model/balopt.opt")
-    try:
-        # delete if it exists
-        balopt.unlink()
-    except FileNotFoundError:
-        pass
 
 
 # %% ------------------------------- ###

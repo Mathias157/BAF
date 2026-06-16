@@ -28,6 +28,12 @@ $setglobal reduced_vqdebug
 *-----------------------------------------------------------------
 *---- END: VQDEBUG ------------------------------------------------
 
+$setglobal SCNAME APS
+*!option LS *Late Sprint
+*!option M  *Marathon
+*!option ES *Early Sprint
+*!option ENTSOE *ENTSOE TYNDP 2024 scenario
+*!option APS *IEA WEO 2024 APS scenario
 
 *===============================================================================
 *===============================================================================
@@ -38,7 +44,7 @@ $setglobal reduced_vqdebug
 * PROJECTID is the identification of the Project.
 * Convenient, and additioanally needed if results shall be compared among projects.
 *
-$setglobal PROJECTID %scenario_name%
+$setglobal PROJECTID
 *!option !fixedvalue
 *
 *
@@ -88,7 +94,7 @@ ROLLINGSEASONSNUMBER= 1;
 
 *--------   QDENET  ---------
 * Introduces the calculation of the net demand of different users (e.g. households, industry, etc). Relevant for taxes, grid tariffs, demand response, etc.
-$setglobal NETDEMAND
+$setglobal NETDEMAND yes
 *!option yes
 *-------- END: QDENET  ---------
 
@@ -103,6 +109,21 @@ $setglobal TechInvest   yes
 
 SCALAR GINVESTSTART 'Year from which endogenous decisions in generation capacities are allowed' ;
 GINVESTSTART= 2025;
+
+* TB
+* Set a upper threshold constraint on the build-out of solar and wind
+$setglobal GrowthVRE yes
+*!option yes
+
+SCALAR GROWTH_SOLE 'Upper threshold installed capacity build-out of solar in GW in 2030';
+SCALAR GROWTH_HP
+SCALAR GROWTH_YEAR 'year that the ramping rate is effective until';
+* The ramp-rate of heat savings is a bit ambiguous, it is defined as the total capacity of all heat saving technologies divided by 10
+
+GROWTH_SOLE = 691.33;
+GROWTH_HP = 450;
+GROWTH_YEAR = 2030;
+
 
 *---- End: Generation investments options----
 
@@ -151,7 +172,7 @@ $setglobal INDIVUSERS YES
 *!option yes
 
 * Include the possibility to shift exogenous heat demand between technology groups.
-$setglobal GROUP_DEMAND_SHIFT 
+$setglobal GROUP_DEMAND_SHIFT
 *!option yes
 *-----------------END: INDIVIDUAL USERS--------------------------------------------------------------
 
@@ -189,54 +210,49 @@ $setglobal VRESHUTDOWN   yes
 $setglobal EV 
 *!option YES
 
-* Adds DUMB charging:
-$setglobal DUMB
-*!option yes
-
-* Adds smart charging. Only smart charging, without V2G!:
-$setglobal SMART 
-*!option yes
-
-* Adds V2G charging: 
-$setglobal V2G YES  
-*!option  yes
-
-* Restricts PHEV vehicles from doing V2G (only relevant if V2G is activated):
-$setglobal NO_PHEV_V2G  yes
-*!option  yes
-
-* Adds step charging scheme (NOT SURE IT IS WORKING ANY MORE):
-$setglobal STEPCHARGSCHEME
-*!option yes
-
-* Adds cycle degradation (NOT SURE IT IS WORKING ANY MORE, COSTS SHOULD BE ANNUALIZED):
-$setglobal DEGCYCLE
-*!option  yes
-
-* Adds calendar degradation (NOT SURE IT IS WORKING ANY MORE, COSTS SHOULD BE ANNUALIZED):
-$setglobal DEGCAL
-*!option yes
-
-* EV timeseries will be averaged (relevant if less than all time steps in TTT are used).
-* NOTE: It currently only works if T are equally distanced from each other and if the first T chosen is equal to the first element int TTT). If this is not desired, one can replace the timeseries with new averaged-with-another-procedude timeseries
-* NOTE: It might lead to infeasibilities though
-$setglobal EV_PROFILE_AVG  yes
-*!option yes
-
-*Adds EV infeasibility variables (added here on purpose, since if not all TTT are used it is very likely to run into small infeasibilities)
-*Note: The value of the parameter PENALTQ should be in line with the cost assumptions in the model to obtain meaninful results
-$setglobal EV_infeas  yes
+* Adds V2G charging:
+* $setglobal V2G yes
 *!option
 
 * Models EV as inter-seasonal storage (if it is not activated, then EVs are model as intra-seasonal storage):
-$setglobal EV_INTERSEASONAL
+* NOTE: If not INTERSEASONAL, then use EV_allreturn and profile3 or profile4
+$setglobal EV_INTERSEASONAL yes
 *!option yes
+
+* EV timeseries will be normalized (relevant if less than all time steps in TTT are used).
+* NOTE: Normalizing each time step, by the time steps not used in the simulation.
+* Recommend to use if the terms are not 24 consecutive hours, as the profiles have hourly seasonality.
+$setglobal EV_normalization yes
+*!option yes
+
+* If not S01 is used, then it will calculate available EVs for the first season in the simulation.
+* If not "yes" and not S01 in simulation, then you would likely have more EVs in your system than assumed by the data.
+$setglobal EV_season_calc yes
+*!option yes
+
+* Adds EV infeasibility variables (added here on purpose, since if bad data is used, you will likely run into small infeasibilities)
+* Example when it can happen: V2G is no, profile says noone is leaving but everyone is dumb charging.
+* The reason is that the EV addon is highly affected by input data.
+* Note: The value of the parameter PENALTQ should be in line with the cost assumptions in the model to obtain meaninful results
+* Note: Rule of thumb, if this is needed, something is probably wrong with the data used.
+$setglobal EV_infeas
+*!option yes
+
+* Scenario where every EV return to charger after each trip. Needs specific profile as well (profile3 or profile4).
+$setglobal EV_allreturn
+*!option yes
+
+* Set profile
+* NOTE: If NOT using EV_INTERSEASONAL or using EV_allreturn use profile3 or profile4
+$setglobal EV_profile profile1
+*!option profile1 profile2, profile3, profile4
+
 *------------------------------END: EV ADDON-------------------------------------------------
 
 *------------------------------TRANSPORT ADDON-------------------------------------------------
 * overall control variable TRANSPORT must be 'yes' if any of the other TRANSPORT controls are:
 * Include transport data in the optimization (it is supposed to complement the EV addon, so check consistency of data before using it).
-$setglobal TRANSPORT YES 
+$setglobal TRANSPORT YES
 *!option yes
 
 * Defines the commodity used to model synthetic fuel generation.
@@ -245,27 +261,10 @@ $setglobal TRANSPORT_SYNTHFUEL_COMMODITY    HYDROGEN
 *!option HYDROGEN       !Text "The demand for synthetic fuel generation is modelled as hydrogen demand (requires hydrogen addon to be activated)"
 
 * Defines the possibility for the transport demand of synthetic fuels to be aggregated internationally instead of having to satisfy it regionally.
-$setglobal TRANSPORT_DEMAND_AGGREGATED    
+$setglobal TRANSPORT_DEMAND_AGGREGATED
 
 
 *------------------------------END:TRANSPORT ADDON-------------------------------------------------
-
-
-*------------------------------FLEXDEM ADDON-------------------------------------------------
-* Overall control variable of adding the flexible demand addon
-$setglobal FLEXDEM 
-*!option yes
-
-* Seasonal demand - if not set to yes, demand will just have to be met within a year
-$setglobal seasonal_demand yes
-*!option yes
-
-* Inflexible demand
-$setglobal inflex_demand  
-*!option yes
-
-*------------------------------END:FLEXDEM ADDON-------------------------------------------------
-
 
 *-----------------------------------------------------------
 *---------------HYDRO RESERVOIRS OPTIONS--------------------
@@ -335,7 +334,7 @@ $setglobal NOHEATMARKET
 * however, it has not been checked. Please take contact if problems.
 
 * Combine two technologies to one to achieve e.g. multifuel characteristics.
-$setglobal COMBTECH 
+$setglobal COMBTECH yes
 *!option yes
 
 *-----------------HYDROGEN ADDON---------------------------------------
@@ -345,21 +344,21 @@ $Setglobal HYDROGEN YES
 *!option yes
 
 * Allows investments in hydrogen transport
-$Setglobal H2TransInvest YES
+* $Setglobal H2TransInvest
 *!option yes
 
 SCALAR XH2INVESTSTART 'Year from which endogenous decisions in H2 transmission capacities are allowed' ;
 XH2INVESTSTART= 2030;
 
 *Adds Economies of Scale in H2 transmission. It requires to use the MIP solver, so remember to activate it (Dataset not updated for new countries in pan-European system)
-$setglobal ES_H2TRANS 
+$setglobal ES_H2TRANS
 
 * Allows import of Hydrogen from 3rd countries outside Balmorel
-$Setglobal IMPORT_H2 YES
+$Setglobal IMPORT_H2
 *!option yes
 
 * Allows flexible demand of H2 in regions (set ratio of flexible demand in HYDROGEN_FLEXDH2 with the scalar THETA_FLEX_DH2)
-$setglobal flexible_h2_space 
+$setglobal flexible_h2_space
 *!option yes
 
 *-----------------END: HYDROGEN ADDON---------------------------------------
@@ -376,7 +375,7 @@ $setglobal DFLEXQUANT
 *!option yes
 
 * Allow demand response (requires NETDEMAND) (it should be checked before using it)
-$setglobal DEMANDRESPONSE
+$setglobal DEMANDRESPONSE yes
 *!option yes
 
 * Permit exchange of electricity with third regions using a price interface (in contrast to X3FX) (it should be checked before using it)
@@ -397,7 +396,7 @@ $setglobal TRANS_RAMP
 
 *-----------------------ANCILLARY SERVICES----------------------------------------------------------------------------------------------------
 * Ancillary services addon (it requires UnitComm to be active). The other options require this one to be activated.
-$setglobal ANC_SERV 
+$setglobal ANC_SERV
 *!option yes
 
 * FCR reserve requirement activated
@@ -426,7 +425,7 @@ $setglobal DOWN_REGULATION_INCLUDED
 *-----------------------END: ANCILLIARY SERVICES----------------------------------------------------------------------------------------------------
 
 * Make investments in technologies only at specified capacities. (it should be checked before using it)
-$setglobal AGKNDISC 
+$setglobal AGKNDISC
 *!option yes
 *!onlyif %BB2%==yes
 *!onlyif %solvetype%==MIP
@@ -458,15 +457,15 @@ $setglobal DECOM yes
 * Note: If no option for endogenous capacities is activated, endogenous investments will not be decommissioned
 
 * Adds Endogenous capacities will maximum stay in the system as much as their lifetimes:
-$setglobal LIFETIME_DECOM_ENDO_G YES
+$setglobal LIFETIME_DECOM_ENDO_G yes
 *!option yes
 
 * Adds Endogenous capacities can be decommissioned based on their profitability:
-$setglobal ECONOMIC_DECOM_ENDO_G   yes
+$setglobal ECONOMIC_DECOM_ENDO_G
 *!option yes
 
 * Adds Endogenous decommissioned endogenous capacities can be brought back to the energy system. To be combined with the other decommissioning options:
-$setglobal REVERT_DECOM_ENDO_G   yes
+$setglobal REVERT_DECOM_ENDO_G
 *!option yes
 
 *--------END OF ENDOGENOUS CAPACITIES-----
@@ -486,15 +485,15 @@ $setglobal NO_DECOM_EXO_G
 *!option yes
 
 * Adds Exogenous capacities will maximum stay in the system as much as their lifetimes (or as much as political decissions suggest it, for instance), which should be represented in the yearly development of capacities of the input parameter GKFX:
-$setglobal LIFETIME_DECOM_EXO_G  YES
+$setglobal LIFETIME_DECOM_EXO_G  yes
 *!option yes
 
 * Adds Exogenous capacities can be decommissioned based on their profitability:
-$setglobal ECONOMIC_DECOM_EXO_G    yes
+$setglobal ECONOMIC_DECOM_EXO_G
 *!option yes
 
 * Adds Endogenous decommissioned exogenous capacities can be brought back to the energy system. To be combined with the other decommissioning options:
-$setglobal REVERT_DECOM_EXO_G   yes
+$setglobal REVERT_DECOM_EXO_G
 *!option yes
 *--------END OF ENDOGENOUS CAPACITIES-----
 *-----------------------End of TECHNOLOGY DECOMMISSIONING--------------------------------------------------------
@@ -503,7 +502,7 @@ $setglobal REVERT_DECOM_EXO_G   yes
 *-------------------- UNIT COMMITMENT -----------------------------------------------------------
 * overall control variable UnitComm must be 'yes' if any of the other unit commitment controls are:
 
-$setglobal UnitComm 
+$setglobal UnitComm
 *!option yes
 
 * Adds minimal production-when-on:
@@ -792,36 +791,6 @@ $setglobal ADDGROUP_DEMAND_SHIFT
 *--------------------------------------------
 
 
-*--------------------ANTARES SOFT-LINK--------------------------------------------------------------
-$setglobal ANTBALM yes
-*!option yes
-
-$setglobal FICTDEM yes
-
-* NOTE: The following options are chosen by the BAF framework 
-* Only change these if working with Balmorel stand-alone!
-
-* Using mapping of VRE areas from Antares to Balmorel?
-* If not 'yes': New areas area created and Antares timeseries are used
-$setglobal USEANTARESDATA
-*!option yes
-
-* Adjust hydro to antares data?
-$setglobal ADJUSTHYDRO
-*!option yes
-
-* The following aggregation options should be harmonised with the input antares data
-* Aggregate option 1? (NOS = NO1 + NO2 + NO5 and DE = DE4-N + DE4-E + DE4-S + DE4-W)
-$setglobal AGGR1
-*!option yes
-
-
-* Disaggregation option 2? (FR = FR00, FR15, GR = GR00, GR03, IT = ITCA, ITCN, ITN1, ITSI, ITS1, ITSA, ITCS, UK = UK00, UKNI)
-$setglobal AGGR2
-*!option yes
-
-
-*--------------------END OF ANTARES SOFT-LINK-----------------------------------------------------------
 
 
 *===============================================================================
