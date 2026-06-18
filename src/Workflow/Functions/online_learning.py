@@ -245,12 +245,9 @@ def CLI(
                     f"cat {scenario_folder}/T_{runtype}.inc > {scenario_folder}/data/T.inc",
                     shell=True,
                 )
-                sp.run(
-                    f"touch {scenario_folder}/data/ANTBALM_FICTDE.inc", shell=True)
-                sp.run(
-                    f"touch {scenario_folder}/data/ANTBALM_FICTDH.inc", shell=True)
-                sp.run(
-                    f"touch {scenario_folder}/data/ANTBALM_FICTDH2.inc", shell=True)
+                sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDE.inc", shell=True)
+                sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH.inc", shell=True)
+                sp.run(f"touch {scenario_folder}/data/ANTBALM_FICTDH2.inc", shell=True)
 
             sp.run(
                 f"cat {scenario_folder}/model/balopt_{runtype}.opt > {scenario_folder}/model/balopt.opt",
@@ -260,15 +257,14 @@ def CLI(
             os.chdir(f"{scenario_folder}/model")
             current_scenario_name = f"{scenario_name}_{runtype}_E{epoch_string}"
             logger.info(f"Running {current_scenario_name}")
-            sp.run(
-                f"gams Balmorel --scenario_name {current_scenario_name}", shell=True)
+            sp.run(f"gams Balmorel --scenario_name {current_scenario_name}", shell=True)
 
             # Check feasibility
             out = sp.run(
                 'cat Balmorel.lst | grep "LP status"', shell=True, capture_output=True
             ).stdout
             if "optimal" not in str(out):
-                logger.warning(f"{current_scenario_name} infeasible!")
+                logger.error(f"{current_scenario_name} infeasible!")
             else:
                 logger.info(f"{current_scenario_name} feasible.")
 
@@ -311,8 +307,7 @@ def plot_style(ctx, fig, ax, name: str, legend: bool = True):
     if legend:
         ax.legend(loc="center", bbox_to_anchor=(0.5, 1.15), ncol=3)
 
-    fig.savefig(name + ctx.obj["plot_ext"],
-                bbox_inches="tight", transparent=True)
+    fig.savefig(name + ctx.obj["plot_ext"], bbox_inches="tight", transparent=True)
 
     return fig, ax
 
