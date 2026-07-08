@@ -31,5 +31,4 @@
 ### Get paths to binaries and Python-API for GAMS
 export PATH=/appl/gams/50.4.1:$PATH
 
-pixi run python Workflow/Functions/export_data_to_generative_model.py base
-
+pixi run python Workflow/Functions/export_data_to_generative_model.py base -f
