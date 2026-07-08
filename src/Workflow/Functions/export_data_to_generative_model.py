@@ -56,7 +56,8 @@ def export_to_generative_model(
     # Verify weather year
     with open(f"Balmorel/{scenario_folder}/data/DH_VAR_T.inc", "r") as f:
         content = f.read()
-        read_weather_year = int(content.split("Weather year ")[1].split("\n")[0])
+        read_weather_year = int(content.split(
+            "Weather year ")[1].split("\n")[0])
 
     if read_weather_year != weather_year:
         raise ValueError(
@@ -86,7 +87,8 @@ def correct_format(
 ):
 
     # Extract unique dimensions
-    unique_sets = [col for col in df.columns if col not in ["SSS", "TTT", "Value"]]
+    unique_sets = [col for col in df.columns if col not in [
+        "SSS", "TTT", "Value"]]
 
     # Remove unnecessary model years
     if "YYY" in df.columns:
@@ -178,7 +180,8 @@ def correct_format(
 
 def concat_missing(df: pd.DataFrame, missing_index: pd.MultiIndex):
 
-    df_missing = pd.DataFrame(index=missing_index, columns=df.columns, data=0.0)
+    df_missing = pd.DataFrame(
+        index=missing_index, columns=df.columns, data=0.0)
     df = pd.concat((df, df_missing))
 
     return df
@@ -207,6 +210,7 @@ def store_config(config: ConfigParser):
 @click.argument(
     "weather_years",
     type=str,
+    default="",
 )
 @click.option("--force", "-f", is_flag=True, help="Force snakemake rerun")
 def main(scenario_folder, weather_years, force):
